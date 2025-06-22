@@ -1,0 +1,80 @@
+<!-- templates/layout.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+
+    <!-- SITE HEADER / NAV -->
+     <header class="site-header">
+         <div class="container">
+             <a href="/" class="logo">Minnesota Sentencing Explorer</a>
+             <nav>
+                 <ul class="nav-links">
+                     <li><a href="/overview">Overview</a></li>
+                     <li><a href="/load">Clear Data</a></li>
+                     <li><a href="/info">Descriptive</a></li>
+                     <li><a href="/table">Crosstab</a></li>
+                     <li><a href="/filter">Filter</a></li>
+                     {% if user %}
+                        <li><a href="/logout" class="btn-logout">Logout</a></li>
+                     {% else %}
+                        <li><a href="/login" class="btn-logout">Login</a></li>
+                     {% endif %}
+                 </ul>
+             </nav>
+         </div>
+     </header>
+
+{% if user %}
+    <div class="container">
+        <h2>Current Data History</h2>
+        <ul class=history>
+            {% for ih in user['history'] %}
+                <li>{{ ih['desc'] }}</li>
+            {% endfor %}
+        </ul>
+        <hr>
+    </div>
+{% endif %}
+
+{% if error %}
+    <!-- FLASHES & ERRORS -->
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for msg in messages %}
+                        <div class="flash">{{ msg }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% if error %}
+            <div class="flash error">
+                {% for ie in error %}<p>{{ ie }}</p>{% endfor %}
+            </div>
+        {% endif %}
+    </div>
+{% endif %}
+
+<!-- MAIN CONTENT -->
+<main class="container">
+    {% block body %}{% endblock %}
+</main>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+    <div class="container">
+        &copy; {{ current_year }} Sidney Allen
+    </div>
+</footer>
+
+</body>
+</html>

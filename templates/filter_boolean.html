@@ -1,0 +1,109 @@
+{% extends "layout.html" %}
+{% block head %}
+<title>Minnesota Analysis of Sentencing Trends</title>
+{% endblock %}
+
+{% block body %}
+<body>
+
+    <h1>{{ data['column_info']['header'] }} Filter</h1>
+
+    <div class="card">
+        <h3>Total Entries</h3>
+        <p>{{ data['column_info']['entries'] }}</p>
+    </div>
+    <div class="card">
+        <h3>Empty Entries</h3>
+        <p>{{ data['column_info']['nan'] }}</p>
+    </div>
+
+    {% if data['column_info']['numeric'] == True %}
+    <section class="stats container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; padding-bottom: 3rem;">
+        <div class="card">
+            <h3>Mean</h3>
+            <p>{{ data['column_info']['mean'] }}</p>
+        </div>
+        <div class="card">
+            <h3>Median</h3>
+            <p>{{ data['column_info']['mdn'] }}</p>
+        </div>
+        <div class="card">
+            <h3>Standard Deviation</h3>
+            <p>{{ data['column_info']['std'] }}</p>
+        </div>
+    </section>
+    {% endif %}
+
+    <h2>Sort By:</h2>
+    <div class="btn-bar">
+
+        {% if sorting != "occurrence" %}
+            <a href="/filter/boolean/{{ column }}/occurrence" class="btn">Most Common</a>
+        {% else %}
+            <a href="/filter/boolean/{{ column }}/occurrencee" class="btn disabled">Most Common</a>
+        {% endif %}
+
+        {% if sorting != "reverse_occurrence" %}
+            <a href="/filter/boolean/{{ column }}/reverse_occurrence" class="btn">Least Common</a>
+        {% else %}
+            <a href="/filter/boolean/{{ column }}/reverse_occurrence" class="btn disabled">Least Common</a>
+        {% endif %}
+
+        {% if sorting != "alphanumeric" %}
+            <a href="/filter/boolean/{{ column }}/alphanumeric" class="btn">Alphanumeric</a>
+        {% else %}
+            <a href="/filter/boolean/{{ column }}/alphanumeric" class="btn disabled">Alphanumeric</a>
+        {% endif %}
+
+        {% if sorting != "reverse_alphanumeric" %}
+            <a href="/filter/boolean/{{ column }}/reverse_alphanumeric" class="btn">Reverse Alphanumeric</a>
+        {% else %}
+            <a href="/filter/boolean/{{ column }}/reverse_alphanumeric" class="btn disabled">Reverse Alphanumeric</a>
+        {% endif %}
+
+    </div>
+
+    <h2>Filter Options</h2>
+
+    {% if data['column_info']['numeric'] == True %}
+    <form method="post">
+        <input type="submit" value="Submit">
+        <br>
+        Include only values where {{ data['column_info']['header'] }} is:
+        <br>
+        <input type="radio" value="eq" name="comparison">equal to
+        <input type="radio" value="ne" name="comparison">not equal to
+        <input type="radio" value="gt" name="comparison">greater than
+        <input type="radio" value="ge" name="comparison">greater or equal to
+        <input type="radio" value="lt" name="comparison">less than
+        <input type="radio" value="le" name="comparison">less or equal to
+        <br>
+        <input type="text" name="value">
+    </form>
+
+    <h2>Results</h2>
+    <ul>
+    {% for ii in data['column_info']['each'] %}
+        <li>{{ ii['text'] }}</li>
+    {% endfor %}
+    </ul>
+
+    {% else %}
+
+    <form method="post">
+        <input type="submit" value="Submit">
+        <br>
+        Include only values where {{ data['column_info']['header'] }} is:
+        <br>
+        <input type="radio" value="eq" name="comparison">equal to
+        <input type="radio" value="ne" name="comparison">not equal to
+        {% for ii in data['column_info']['each'] %}
+        <p><input type="radio" value="{{ ii['value'] }}" name="value">{{ ii['text'] }}
+        {% endfor %}
+
+    </form>
+
+    {% endif %}
+
+</body>
+{% endblock %}

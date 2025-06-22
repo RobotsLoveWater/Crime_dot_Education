@@ -1,0 +1,245 @@
+/* static/css/style.css */
+/* 1. Color & type variables */
+:root {
+  --color-bg:      #F4F6F8;
+  --color-panel:   #FFFFFF;
+  --color-accent:  #0069D9;
+  --color-accent-light: #338EFF;
+  --color-text:    #2E3A45;
+  --color-muted:   #6C7A89;
+  --color-border:  #E1E5EB;
+
+  --font-base:     "Roboto", sans-serif;
+  --fs-small:      0.875rem;
+  --fs-base:       1rem;
+  --fs-lg:         1.25rem;
+  --fs-xl:         1.5rem;
+}
+
+/* 2. Global resets & body */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-base);
+  font-size: var(--fs-base);
+  line-height: 1.6;
+}
+
+/* 3. Layout helpers */
+.container {
+  width: 90%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+/* 4. Header & nav */
+.site-header {
+  background: var(--color-panel);
+  border-bottom: 1px solid var(--color-border);
+}
+.site-header .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+}
+.logo {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+.nav-links {
+  list-style: none;
+  display: flex;
+  gap: 0.75rem;
+}
+.nav-links a {
+  color: var(--color-muted);
+  text-decoration: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  transition: background 0.2s, color 0.2s;
+}
+.nav-links a:hover {
+  background: var(--color-accent-light);
+  color: #fff;
+}
+.btn-logout {
+  border: 1px solid var(--color-accent);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+/* 5. Flash & error */
+.flash-messages, .flash.error {
+  margin: 1rem 0;
+}
+.flash {
+  background: var(--color-accent);
+  color: #fff;
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+.flash.error {
+  background: tomato;
+}
+
+/* 6. Headings & paragraphs */
+h1 {
+  font-size: var(--fs-xl);
+  margin-bottom: 0.5rem;
+}
+h2 {
+  font-size: var(--fs-lg);
+  margin: 1rem 0 0.5rem;
+}
+p {
+  margin-bottom: 1rem;
+}
+
+/* 7. Forms */
+form {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+}
+form dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  row-gap: 0.75rem;
+  column-gap: 1rem;
+}
+form input[type="text"],
+form input[type="password"],
+form select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+form input[type="submit"],
+form button {
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+form input[type="submit"]:hover,
+form button:hover {
+  opacity: 0.9;
+}
+
+/* 8. Metric cards (e.g. on overview) */
+.card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  padding: 1rem;
+  text-align: center;
+}
+.card .value {
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+/* 9. Tables */
+.table-wrapper {
+  overflow-x: auto;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+thead {
+  background: var(--color-accent);
+  color: #fff;
+}
+th, td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+tbody tr:nth-child(odd) {
+  background: #FAFBFC;
+}
+tbody tr:hover {
+  background: var(--color-accent-light);
+  color: #fff;
+}
+
+/* 10. Chart container */
+.chart-container {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  margin: 2rem auto;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+/* 11. Button Bar */
+.btn-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.btn-bar .btn {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: var(--color-accent);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.btn-bar .btn:hover {
+  opacity: 0.9;
+}
+
+.btn-bar .btn.disabled,
+.btn-bar .btn.disabled:hover {
+  background: var(--color-border);
+  color: var(--color-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 12. Footer */
+.site-footer {
+  text-align: center;
+  padding: 1rem 0;
+  background: var(--color-panel);
+  border-top: 1px solid var(--color-border);
+  margin-top: 2rem;
+}

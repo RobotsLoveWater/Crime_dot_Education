@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% block head %}
+<title>Minnesota Analysis of Sentencing Trends</title>
+{% endblock %}
+
+{% block body %}
+<body>
+
+    <div class="container">
+
+        <h1>Get Column Info</h1>
+
+        <div class="card">
+            <h3>Total Entries</h3>
+            <p>{{ data['entries'] }}</p>
+        </div>
+
+        <table>
+        <thead>
+            <tr>
+                <th>Header</th>
+                <th>Codebook Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for col in data['columns_alphanumeric'] %}
+            <tr>
+                <td><a href="/info/{{ col }}">{{ col }}</a></td>
+                <td>{{ data['columns'][col] }}{% if col in data['excluded'] %} -> !!!WARNING!!!{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        </table>
+
+    </div>
+
+</body>
+{% endblock %}

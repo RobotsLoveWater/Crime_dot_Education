@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+{% block head %}
+<title>Minnesota Sentencing Explorer - Homepage</title>
+{% endblock %}
+
+{% block body %}
+<body>
+
+    {% if user %}
+    <h2>Hello, {{ user['username'] }}</h2>
+    {% endif %}
+
+    <!-- Hero Section -->
+    <section class="hero" style="background-image: url('{{ hero_image_url }}'); background-size: cover; background-position: center; padding: 5rem 1rem; color: #fff; text-align: center; position: relative;">
+    <!-- Overlay for readability -->
+    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);"></div>
+    <div class="container" style="position: relative; z-index: 1;">
+        <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">Explore Criminal Sentencing Data</h1>
+        <p style="font-size: 1.25rem; margin-bottom: 2rem;">Interactive, guided data exploration tailored for educators and students.</p>
+        <a href="/guide" style="background: var(--color-accent); color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; text-decoration: none; font-weight: 500;">Get Started</a>
+    </div>
+    </section>
+
+    <!-- Overview Text -->
+    <section class="overview container" style="padding: 3rem 0; text-align: center;">
+        <h2 style="font-size: 2rem; margin-bottom: 1rem;">Why Crime[dot]Education?</h2>
+        <p style="max-width: 700px; margin: 0 auto 2rem; color: var(--color-muted);">Minnesota Sentencing Explorer empowers educators with a dynamic toolkit to dive deep into real-world sentencing trends. Create interactive lessons, visualize key metrics, and let students ask their own questions of the data — all within a clean, intuitive interface.</p>
+    </section>
+
+    <!-- Feature Cards -->
+    <section class="features container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; padding-bottom: 3rem;">
+        <div class="card">
+            <h3>Guided Lessons</h3>
+            <p>Step-by-step activities designed to build analytical skills.</p>
+        </div>
+        <div class="card">
+            <h3>Custom Filters</h3>
+            <p>Drill down by offense, county, sentence length, and more.</p>
+        </div>
+        <div class="card">
+            <h3>Interactive Tables</h3>
+            <p>Bring data to life with visualizations students can manipulate.</p>
+        </div>
+    </section>
+
+    <!-- Key Metrics -->
+    <section class="metrics container" style="padding-bottom: 3rem;">
+        <div class="metrics">
+            <div class="card">
+                <p class="value">294,467</p>
+                <h3>Total Cases</h3>
+            </div>
+            <div class="card">
+                <p class="value">18 yrs</p>
+                <h3>Years of Data</h3>
+            </div>
+            <div class="card">
+                <p class="value">0</p>
+                <h3>Interactive Lessons</h3>
+            </div>
+        </div>
+    </section>
+
+    <!-- Call to Action -->
+    {% if not user %}
+        <section class="container" style="text-align: center; padding-bottom: 3rem;">
+            <h2 style="font-size: 1.75rem; margin-bottom: 1rem;">Ready to dive in?</h2>
+            <a href="/new" style="background: var(--color-accent); color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; text-decoration: none; font-weight: 500;">Create an Account</a>
+        </section>
+    {% endif %}
+
+</body>
+{% endblock %}
+

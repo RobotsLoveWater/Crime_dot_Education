@@ -1,0 +1,97 @@
+{% extends "layout.html" %}
+{% block head %}
+<title>Minnesota Analysis of Sentencing Trends</title>
+{% endblock %}
+
+{% block body %}
+<body>
+
+    <h1>{{ code_list[0] }}</h1>
+
+    <div class="card">
+        <h3>Entries - With Filters / Total</h3>
+        <p>{{ data['moc_options']['*'] }} / {{ data['entries'] }}</p>
+    </div>
+
+    <h2>Setting MOC Code</h2>
+    <h5>MOC1 (Index) is set to {{ cur_moc[0] }}, which is the code for {{ code_list[0] }}.</h5>
+    {% for imoc in range(1,5) %}
+        {% if cur_moc[imoc] != '*' %}
+        <h5>MOC{{ imoc+1 }} ({{ code_list[imoc]['COL'] }}) is set to {{ cur_moc[imoc] }}, which is the code for {{ code_list[imoc][cur_moc[imoc]] }}</h5>
+        {% else %}
+        <h5>MOC{{ imoc+1 }} ({{ code_list[imoc]['COL'] }}) is set to Wildcard, and is not being filtered.</h5>
+        {% endif %}
+    {% endfor %}
+    <h4>Full Code: [{{ cur_moc[0] }}]-[{{ cur_moc[1] }}]-[{{ cur_moc[2] }}]-[{{ cur_moc[3] }}]-[{{ cur_moc[4] }}]</h4>
+
+    <h2>Select</h2>
+    <div class="btn-bar">
+        {% for imc in moc_col %}
+        {% if active == imc %}
+        <a href="{{ imc }}" class="btn disabled">{{ code_list[imc]['COL'] }}</a>
+        {% else %}
+        <a href="{{ imc }}" class="btn">{{ code_list[imc]['COL'] }}</a>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <form method="post">
+        <p><input type="submit" value="Run Filters"/>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>MOC Digit</th>
+                <th>Description</th>
+                <th>Remaining Entries After Filter</th>
+            </tr>
+        </thead>
+        <tbody>
+
+            <tr>
+                {% if active == 1 %}
+                <td><a href="/filter/moc/{{ cur_moc[0] }}/*/{{ cur_moc[2] }}/{{ cur_moc[3] }}/{{ cur_moc[4] }}/{{ active }}">*</a></td>
+                <td>Reset Filter</td>
+                <td>{{ data['moc_options']['*'] }}</td>
+                {% elif active == 2 %}
+                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/*/{{ cur_moc[3] }}/{{ cur_moc[4] }}/{{ active }}">*</a></td>
+                <td>Reset Filter</td>
+                <td>{{ data['moc_options']['*'] }}</td>
+                {% elif active == 3 %}
+                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/{{ cur_moc[2] }}/*/{{ cur_moc[4] }}/{{ active }}">*</a></td>
+                <td>Reset Filter</td>
+                <td>{{ data['moc_options']['*'] }}</td>
+                {% elif active == 4 %}
+                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/{{ cur_moc[2] }}/{{ cur_moc[3] }}/*/{{ active }}">*</a></td>
+                <td>Reset Filter</td>
+                <td>{{ data['moc_options']['*'] }}</td>
+                {% endif %}
+            </tr>
+
+            {% for moc in code_list[active] %}
+            <tr>
+                {% if moc != 'INC' and moc != 'COL' %}
+
+                {% if active == 1 %}
+                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ moc }}/{{ cur_moc[2] }}/{{ cur_moc[3] }}/{{ cur_moc[4] }}/{{ active }}">{{ moc }}</a></td>
+                {% elif active == 2 %}
+                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/{{ moc }}/{{ cur_moc[3] }}/{{ cur_moc[4] }}/{{ active }}">{{ moc }}</a></td>
+                {% elif active == 3 %}
+                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/{{ cur_moc[2] }}/{{ moc }}/{{ cur_moc[4] }}/{{ active }}">{{ moc }}</a></td>
+                {% elif active == 4 %}
+                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/{{ cur_moc[2] }}/{{ cur_moc[3] }}/{{ moc }}/{{ active }}">{{ moc }}</a></td>
+                {% endif %}
+
+                <td>{{ code_list[active][moc] }}</td>
+                <td>{{ data['moc_options'][moc] }}</td>
+
+                {% endif %}
+            </tr>
+            {% endfor %}
+
+        </tbody>
+    </table>
+
+</body>
+{% endblock %}

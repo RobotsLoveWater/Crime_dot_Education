@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block head %}
+<title>Minnesota Analysis of Sentencing Trends</title>
+{% endblock %}
+
+{% block body %}
+<body>
+
+    <h1>Create a new Account</h1>
+    <p>or, <a href="/login">login</a> to an existing account.</p>
+
+    {% if error %}
+    <p class=error><strong>Error:</strong> {{ error }}
+    {% endif %}
+
+    <form method=post>
+        <dl>
+            <dt>Username:
+            <dd><input type=text name=username value="{{ request.form.username }}">
+            <dt>Class Code:
+            <dd><input type=text name=classcode value="{{ request.form.classcode }}">
+            <dt>Password:
+            <dd><input type=password name=password value="{{ request.form.password }}">
+        </dl>
+        <p><input type=submit value=Create>
+    </form>
+
+</body>
+{% endblock %}

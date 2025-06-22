@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+{% block head %}
+<title>Minnesota Analysis of Sentencing Trends</title>
+{% endblock %}
+
+{% block body %}
+<body>
+
+    <h1>Choose Top Level Code</h1>
+
+    <div class="card">
+        <h3>Total Entries</h3>
+        <p>{{ data['entries'] }}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>MOC Code</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for moc1 in code_list %}
+            <tr>
+                <td><a href="/filter/moc/{{ moc1 }}/*/*/*/*/1">{{ moc1 }}</a></td>
+                <td>{{ code_list[moc1][0] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+{% endblock %}
