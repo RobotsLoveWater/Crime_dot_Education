@@ -1,7 +1,7 @@
 # MN Analysis of Sentencing Trends
 # Programming By:
 # Sidney D. Allen
-# Social Science Component:
+# Special Thanks:
 # Dr. Lindsey Vigesaa
 # Dr. Mary Clifford
 # David Hudson
@@ -14,7 +14,8 @@ from util import ordinal
 CODES = {
     'action': [
         'f',  # single filter
-        'o',  # or
+        'o',  # or same
+        'd',  # or different
         'a'   # and
     ]
 }
@@ -52,12 +53,34 @@ def filter_single(column, operation, value) -> dict:
     return entry
 
 
-def filter_or(column, operation, values) -> list:
+def filter_or_same(column, operation, values) -> dict:
+    # an or filter operation on the same column
+
+    entry = {}
+
+    # what we're doing
+    entry['action'] = [CODES['action'][1], column, operation, values]
+
+    # what the user will see
+    entry['desc'] = 'Kept only entries where ' + column + ' was'
+    entry['desc'] += operation_text(operation)
+
+    # add all the values we're filtering
+    for value in values:
+        entry['desc'] += value
+        entry['desc'] += ' OR '
+
+    # cut the final ' OR '
+    entry['desc'] = entry['desc'][:-4]
+
+    return entry
+
+def filter_or_diff(columns, operations, values) -> list:
+    # an or filter operation on different columns
 
     pass
 
-
-def filter_and(column, operation, values) -> list:
+def filter_and(columns, operations, values) -> list:
 
     pass
 

@@ -1,12 +1,12 @@
 # MN Analysis of Sentencing Trends
 # Programming By:
 # Sidney D. Allen
-# Social Science Component:
+# Special Thanks:
 # Dr. Lindsey Vigesaa
 # Dr. Mary Clifford
 # David Hudson
 #
-# web.py
+# app.py
 # web interface
 
 from flask import Flask
@@ -35,14 +35,12 @@ app.secret_key = b'YVjOnAn6NmJ7eHEOPH9RMGAizZRoZsMrbvyHkZaIVMMX71NdS8wRdvJPFe7GE
 # codes starts empty
 codes = ['']
 
-
 # MOC data is an object imported from another python file
 MOC = moc.MnOffenseCodes
 
 
 # homepage
 @app.route("/")
-@app.route("/overview")
 @app.route("/landing")
 def index():
 
@@ -286,19 +284,20 @@ def filter_boolean(column, sorting):
     if is_logged_in():
         error = []
         user = account.retrieve(session['userid'])
+        values = request.form.getlist('value')
 
         if request.method == 'POST':
 
             # trying to compare to nothing
-            if request.form['value'] == '':
+            if values is None or values == []:
                 error.append("Filter value input cannot be blank.")
 
             # trying to compare non-numbers numerically
             elif request.form['comparison'] in ['gt', 'ge', 'lt', 'le']:
                 try:
-                    float(request.form['value'])
+                    float(values[0])
                 except ValueError:
-                    error.append("Filter value: " + request.form['value'] + " is not numeric and a numeric comparison was selected.")
+                    error.append("Filter value: " + values[0] + " is not numeric and a numeric comparison was selected.")
 
             # no comparison selected
             if request.form['comparison'] not in ['eq', 'ne', 'gt', 'ge', 'lt', 'le']:
@@ -306,8 +305,12 @@ def filter_boolean(column, sorting):
 
             # edit the history log
             else:
-                account.history_add(session['userid'], make_history.filter_single(column, request.form['comparison'], request.form['value']))
-                return redirect(url_for('index'))
+                if len(values) == 1:
+                    account.history_add(session['userid'], make_history.filter_single(column, request.form['comparison'], values[0]))
+                    return redirect(url_for('index'))
+                else:
+                    account.history_add(session['userid'], make_history.filter_or_same(column, request.form['comparison'], values))
+                    return redirect(url_for('index'))
 
         if sorting not in Data.VALID_SORTING:
             return redirect(url_for('filter_boolean', column=column, sorting='occurrence'))

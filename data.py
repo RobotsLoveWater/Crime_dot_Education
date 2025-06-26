@@ -1,7 +1,7 @@
 # MN Analysis of Sentencing Trends
 # Programming By:
 # Sidney D. Allen
-# Social Science Component:
+# Special Thanks:
 # Dr. Lindsey Vigesaa
 # Dr. Mary Clifford
 # David Hudson
@@ -79,7 +79,24 @@ class Data:
         if inplace: self.df = temp
         return temp
 
-    def filter_or(self, columns, operations, values, inplace=True, source=None) -> pd.DataFrame:
+    def filter_or_same(self, column, operation, values, inplace=True, source=None) -> pd.DataFrame:
+
+        # no source means self.df is used
+        if source is None: source = self.df
+
+        # create a list of filtered results
+        filter_list = []
+        for ii in range(len(values)):
+            filter_list.append(self.filter(column, operation, values[ii], inplace=False, source=source))
+
+        # combine the filtered lists then drop duplicate entries
+        filter_df = pd.concat(filter_list).drop_duplicates()
+
+        # if in place make changes before returning
+        if inplace: self.df = filter_df
+        return filter_df
+
+    def filter_or_diff(self, columns, operations, values, inplace=True, source=None) -> pd.DataFrame:
 
         # no source means self.df is used
         if source is None: source = self.df
@@ -98,6 +115,9 @@ class Data:
         # if in place make changes before returning
         if inplace: self.df = filter_df
         return filter_df
+
+    def filter_and(self) -> pd.DataFrame:
+        pass
 
     def filter_moc(self, moc_list, inplace=True, source=None) -> pd.DataFrame:
 

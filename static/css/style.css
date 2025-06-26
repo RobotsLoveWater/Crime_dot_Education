@@ -5,6 +5,7 @@
   --color-panel:   #FFFFFF;
   --color-accent:  #0069D9;
   --color-accent-light: #338EFF;
+  --color-accent-muted: #D6E4F0;
   --color-text:    #2E3A45;
   --color-muted:   #6C7A89;
   --color-border:  #E1E5EB;
@@ -188,8 +189,8 @@ tbody tr:nth-child(odd) {
   background: #FAFBFC;
 }
 tbody tr:hover {
-  background: var(--color-accent-light);
-  color: #fff;
+  background: var(--color-accent-muted);
+  color: var(--color-text);
 }
 
 /* 10. Chart container */

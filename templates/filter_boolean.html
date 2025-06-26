@@ -71,7 +71,7 @@
         <br>
         Include only values where {{ data['column_info']['header'] }} is:
         <br>
-        <input type="radio" value="eq" name="comparison">equal to
+        <input type="radio" value="eq" name="comparison" checked>equal to
         <input type="radio" value="ne" name="comparison">not equal to
         <input type="radio" value="gt" name="comparison">greater than
         <input type="radio" value="ge" name="comparison">greater or equal to
@@ -82,11 +82,18 @@
     </form>
 
     <h2>Results</h2>
-    <ul>
-    {% for ii in data['column_info']['each'] %}
-        <li>{{ ii['text'] }}</li>
-    {% endfor %}
-    </ul>
+    <table>
+        <thead>
+
+        </thead>
+        <tbody>
+            {% for ii in data['column_info']['each'] %}
+            <tr>
+                <td>{{ ii['text'] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 
     {% else %}
 
@@ -95,10 +102,10 @@
         <br>
         Include only values where {{ data['column_info']['header'] }} is:
         <br>
-        <input type="radio" value="eq" name="comparison">equal to
+        <input type="radio" value="eq" name="comparison" checked>equal to
         <input type="radio" value="ne" name="comparison">not equal to
         {% for ii in data['column_info']['each'] %}
-        <p><input type="radio" value="{{ ii['value'] }}" name="value">{{ ii['text'] }}
+        <p><input type="checkbox" value="{{ ii['value'] }}" name="value">{{ ii['text'] }}
         {% endfor %}
 
     </form>

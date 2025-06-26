@@ -17,7 +17,6 @@
              <a href="/" class="logo">Minnesota Sentencing Explorer</a>
              <nav>
                  <ul class="nav-links">
-                     <li><a href="/overview">Overview</a></li>
                      <li><a href="/load">Clear Data</a></li>
                      <li><a href="/info">Descriptive</a></li>
                      <li><a href="/table">Crosstab</a></li>
@@ -33,13 +32,23 @@
      </header>
 
 {% if user %}
+    <!-- HISTORY -->
     <div class="container">
         <h2>Current Data History</h2>
-        <ul class=history>
+        <table>
+            <tbody>
             {% for ih in user['history'] %}
-                <li>{{ ih['desc'] }}</li>
+                <tr>
+                    {% if ih['active'] == False %}
+                    <td><a href="/">Revert</a></td>
+                    {% else %}
+                    <td>Current</td>
+                    {% endif %}
+                    <td>{{ ih['desc'] }}</td>
+                </tr>
             {% endfor %}
-        </ul>
+            </tbody>
+        </table>
         <hr>
     </div>
 {% endif %}

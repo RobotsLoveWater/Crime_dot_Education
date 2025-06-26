@@ -1,7 +1,7 @@
 # MN Analysis of Sentencing Trends
 # Programming By:
 # Sidney D. Allen
-# Social Science Component:
+# Special Thanks:
 # Dr. Lindsey Vigesaa
 # Dr. Mary Clifford
 # David Hudson
@@ -12,6 +12,7 @@
 import os
 import pickle
 
+from fontTools.varLib.avarPlanner import measureWidth
 
 NO_CLASS_CODE = 'unmanaged'
 
@@ -93,7 +94,16 @@ def create(username, classcode, password, overwrite=False) -> dict:
 def history_add(userid, entry) -> None:
 
     user = retrieve(userid)
-    user['history'].append(entry)
+
+    # make only the most recent active
+    new_history = []
+    for ih in user['history']:
+        temp_entry = ih
+        temp_entry['active'] = False
+        new_history.append(temp_entry)
+    entry['active'] = True
+    new_history.append(entry)
+    user['history'] = new_history
 
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)

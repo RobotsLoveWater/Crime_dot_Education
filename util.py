@@ -1,7 +1,7 @@
 # MN Analysis of Sentencing Trends
 # Programming By:
 # Sidney D. Allen
-# Social Science Component:
+# Special Thanks:
 # Dr. Lindsey Vigesaa
 # Dr. Mary Clifford
 # David Hudson

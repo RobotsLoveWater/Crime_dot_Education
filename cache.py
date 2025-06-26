@@ -1,7 +1,7 @@
 # MN Analysis of Sentencing Trends
 # Programming By:
 # Sidney D. Allen
-# Social Science Component:
+# Special Thanks:
 # Dr. Lindsey Vigesaa
 # Dr. Mary Clifford
 # David Hudson
@@ -29,6 +29,20 @@ EXCLUDED_COLUMNS = [
     'dcnum2'
 ]
 
+def history_item_to_text(item) -> str:
+
+    if item['action'][0] == 'f':  # single filter
+        return '.'.join(item['action'])
+    elif item['action'][0] == 'o':  # or same filter
+        final_text = 'o'
+        final_text += '.' + item['action'][1] + '.' + item['action'][2] + '.'
+        final_text += '~'.join(item['action'][3])
+        return final_text
+
+    # if we got this far, the action code was not valid
+    raise ValueError
+
+
 def get_data(session, column=None, sorting=None, history_override=None, data_override=None) -> dict:
 
     if session:
@@ -41,7 +55,8 @@ def get_data(session, column=None, sorting=None, history_override=None, data_ove
 
     hist = []
     for item in full_history:
-        hist.append('.'.join(item['action']))
+        hist.append(history_item_to_text(item))
+
     code = DATAPATH + '/'.join(hist)
 
     # bugfix for cacheing
@@ -63,7 +78,7 @@ def get_data(session, column=None, sorting=None, history_override=None, data_ove
         # if there is any need to execute, also create directories along the way
         walk = DATAPATH
         for item in full_history:
-            walk += '.'.join(item['action']) + '/'
+            walk += history_item_to_text(item) + '/'
             if not os.path.exists(walk):
                 os.mkdir(walk)
 
@@ -167,6 +182,10 @@ def _execute(session) -> Data:
             if action[0] == 'f':
 
                 temp_data.filter(action[1], action[2], action[3])
+
+            elif action[0] == 'o':
+
+                temp_data.filter_or_same(action[1], action[2], action[3])
 
             else:
                 raise ValueError
