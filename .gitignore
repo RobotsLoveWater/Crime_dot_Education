@@ -1,1 +1,17 @@
+# Large source dataset (not distributed via git)
 /dataset.sav
+
+# Generated cache (includes a 200MB+ raw.csv) and per-user data
+cache/
+user/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# IDE
+.idea/workspace.xml

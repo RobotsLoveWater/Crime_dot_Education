@@ -417,7 +417,7 @@ def load():
 @app.route('/save', methods=['GET', 'POST'])
 def save():
     if is_logged_in():
-        not_implemented()
+        return not_implemented()
     else:
         return not_logged_in()
 
@@ -425,7 +425,7 @@ def save():
 @app.route('/other')
 def other():
     if is_logged_in():
-        not_implemented()
+        return not_implemented()
     else:
         return not_logged_in()
 
@@ -433,7 +433,7 @@ def other():
 @app.route('/settings')
 def settings():
     if is_logged_in():
-        not_implemented()
+        return not_implemented()
     else:
         return not_logged_in()
 
@@ -442,6 +442,15 @@ def settings():
 def admin():
     return not_implemented()
 
+
+@app.route('/lesson')
+def lesson():
+    return not_implemented()
+
+
+@app.route('/lesson/get_started/<page>')
+def lesson_guide():
+    return not_implemented()
 
 def is_logged_in(): return 'userid' in session
 def not_loaded(): return redirect(url_for('load'))
