@@ -145,6 +145,57 @@ Every data route follows the pattern: `if is_logged_in(): ... else: return not_l
 - Templates reference `hero_image_url` and `current_year`, but no route passes them → they render empty.
 - Stubbed/`pass`-only: `Data.filter_and`, `filter_or_diff` (partial), `make_history.filter_or_diff`, `filter_and`, `moc_or`; the `d` and `a` action codes are not handled by `_execute` (raise `ValueError`).
 
+## Planned: Learning Modules framework (next phase — NOT yet built)
+
+Design for the upcoming "learning modules" / guided-lessons feature. The UI already
+anticipates it (`index.html` advertises "Guided Lessons" and a hardcoded "Interactive
+Lessons: 0"; the `/lesson*` routes are stubs). **None of this is implemented yet — it is a
+plan.** Detailed, phased implementation prompts live in `LEARNING_MODULES_PROMPTS.md`; work
+through them one phase at a time.
+
+**Core idea — reuse the history/cache substrate.** A lesson is an ordered sequence of
+*steps*; each step optionally carries a **data state** expressed as history tokens (the same
+`f.col.op.val` encoding `cache.history_item_to_text` already produces). Because every
+statistic in the app is a deterministic function of a history, a step can (a) reconstruct
+exactly the filtered dataset the lesson wants via the existing `_execute`/cache path, and
+(b) **auto-grade numeric questions by computing the answer live** (`Data.get_column_info`,
+`Data.get_table`) rather than hardcoding it — so answers stay correct if the data changes.
+This shared data-state abstraction is what "links the statistical analysis" to lesson content.
+
+**Module/step data model (file-based, no DB — matches the rest of the app):**
+- `lessons/<module_id>.json` — a module: `id`, `title`, `description`, `author` (classcode),
+  `objectives`, and an ordered `steps` list.
+- Step types: `read` (markdown only), `explore` (sets a data `state` + deep-links into
+  `/info` or `/table`), `question` (`choice` / `numeric` / `free` answers; `numeric` graded
+  against live computation on the step's state), `checkpoint` (assert the user's current state
+  matches an expected one).
+- Loader: a new `lessons.py` that lists/parses `lessons/` (mirrors how `account.py` lists
+  `user/`). `lessons/` is author-supplied content and **safe to commit** (unlike `user/`).
+
+**Progress & sandboxing (key design decisions):**
+- Store progress on the user pickle under a new **`progress`** key
+  (`{module_id: {step, answers, completed}}`), defaulting to `{}` when the key is absent —
+  the same backwards-compatible pattern as `saved`.
+- **Lessons are strictly sandboxed (decided).** A lesson's data state must **never** be
+  copied into, merged with, or mutate the student's own exploration `history` — there is no
+  carry-over. Render lesson states via an **override history** instead of touching the account.
+  Note:
+  `cache.get_data` already has a half-wired `history_override` parameter that is currently a
+  **no-op** (`full_history + history_override` is computed but never assigned, cache.py:54);
+  completing it — and adding the same override to `_execute` — is the intended hook for
+  lesson-scoped state.
+
+**Routes to flesh out (currently stubs in `app.py`):** `/lesson` (catalog),
+`/lesson/<module_id>` (overview), `/lesson/<module_id>/<step>` (render + POST to answer/
+advance). The existing `/lesson/get_started/<page>` stub is also buggy — its view function
+`lesson_guide()` omits the `page` argument. New templates extend `layout.html`:
+`lesson_catalog.html`, `lesson.html`, `lesson_step.html`.
+
+**Roles/authoring:** educators author modules as files scoped to their `classcode`; the stub
+`/admin` route is the intended authoring surface. There is currently **no role system** (all
+accounts are equal) — adding an educator flag to the account pickle is a prerequisite for
+authoring/permissions.
+
 ## Git remotes
 
 - `origin` → GitLab (`gitlab.com/sidallen-scsu/cde.git`).
