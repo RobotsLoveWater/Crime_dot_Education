@@ -1,0 +1,58 @@
+{
+  "id": "intro-descriptive-stats",
+  "title": "Reading Descriptive Statistics",
+  "description": "Use the Minnesota Sentencing Explorer to read means, medians, and distributions of presumptive sentence length, and learn what the gap between mean and median tells you about a distribution.",
+  "author": "unmanaged",
+  "objectives": [
+    "Describe what one row in the sentencing dataset represents",
+    "Apply an offense-code filter and read the resulting dataset summary",
+    "Distinguish the mean from the median of a numeric column",
+    "Infer distribution shape (skew) from the mean-vs-median gap"
+  ],
+  "steps": [
+    {
+      "type": "read",
+      "title": "What is in this dataset?",
+      "body": "This tool explores roughly **294,000 Minnesota felony sentencing records** from **2001-2019**. Each row is a single sentenced count. Two columns you will use here:\n\n- `sentyear` - the **Year Sentenced** (2001-2019).\n- `time` - the **Presumptive Sentence** in **months** (what the sentencing guidelines recommend).\n\nWe will filter the data down to one kind of offense and then read the descriptive statistics the Explorer computes for `time`."
+    },
+    {
+      "type": "explore",
+      "title": "Narrow to assault cases",
+      "body": "The **MN Offense Code** is decoded one character at a time. Its first character, `moc1`, is the top-level offense category. `moc1 = A` means **Assault**.\n\nWe apply the filter `moc1 == A` and view the descriptive statistics for the presumptive-sentence column `time`. Note the reported **N** (how many rows survived the filter), the **mean**, and the **median**.",
+      "state": ["f.moc1.eq.A"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "Average presumptive sentence",
+      "body": "Reading the summary for `time` on the assault-filtered data (`moc1 == A`): to the nearest **0.1 months**, what is the **mean** presumptive sentence?",
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "mean", "column": "time" },
+        "tolerance": 0.1
+      }
+    },
+    {
+      "type": "question",
+      "title": "Mean vs. median",
+      "body": "For these assault cases the **mean** of `time` is noticeably **larger** than the **median**. When the mean sits well above the median, the distribution is most likely...",
+      "answer": {
+        "type": "choice",
+        "options": ["Right-skewed (a long tail of long sentences)", "Left-skewed (a long tail of short sentences)", "Perfectly symmetric"],
+        "correct": 0
+      }
+    },
+    {
+      "type": "explore",
+      "title": "Does length vary by group?",
+      "body": "Descriptive statistics get more interesting when broken out by group. Here we cross-tabulate the mean of `time` by offender **`race`** (columns) and **`sex`** (rows), still within assault cases. Skim the table: do the cell means differ across groups?",
+      "focus": { "view": "table", "dependant": "time", "x_axis": "race", "y_axis": "sex" }
+    },
+    {
+      "type": "checkpoint",
+      "title": "Confirm your filter",
+      "body": "Before finishing, confirm your working data is still filtered to assault offenses (`moc1 == A`). The next lesson builds on this filtered view.",
+      "expect_state": ["f.moc1.eq.A"]
+    }
+  ]
+}

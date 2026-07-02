@@ -12,8 +12,6 @@
 import os
 import pickle
 
-from fontTools.varLib.avarPlanner import measureWidth
-
 NO_CLASS_CODE = 'unmanaged'
 
 
@@ -80,7 +78,8 @@ def create(username, classcode, password, overwrite=False) -> dict:
         'userid': userid,
         'password': password,
         'history': [{'desc': 'Loaded complete Minnesota felony sentencing data for 2001 to 2019', 'action': None}],
-        'saved': []
+        'saved': [],
+        'progress': {}
     }
 
     if not os.path.exists('user/' + classcode): os.mkdir('user/' + classcode)  # create directory if needed
@@ -116,6 +115,56 @@ def history_revert(userid, entry_number=1):
 
     user = retrieve(userid)
     user['history'] = user['history'][:entry_number]
+
+    with open(get_user_directory(userid), 'wb') as handle:
+        pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def get_progress(userid, module_id) -> dict:
+
+    user = retrieve(userid)
+
+    # read defensively: accounts created before learning modules have no 'progress' key
+    return user.get('progress', {}).get(module_id, {})
+
+
+def set_progress(userid, module_id, step, answers=None, completed=False) -> None:
+
+    user = retrieve(userid)
+
+    # lazily create the 'progress' key for pre-existing accounts on first write
+    progress = user.get('progress', {})
+
+    # merge into any existing progress for this module so we don't clobber
+    # sibling keys such as 'state' (set by lesson exploration) or prior answers
+    module_progress = progress.get(module_id, {})
+    module_progress['step'] = step
+    module_progress['completed'] = completed
+    if answers is not None:
+        module_progress['answers'] = answers
+
+    progress[module_id] = module_progress
+    user['progress'] = progress
+
+    with open(get_user_directory(userid), 'wb') as handle:
+        pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def set_lesson_state(userid, module_id, state) -> None:
+
+    # records the active lesson data state on progress[module_id]['state'].
+    # this is the sandboxed lesson view only -- it is NEVER merged into user['history'].
+
+    user = retrieve(userid)
+
+    # lazily create 'progress' for pre-existing accounts, and merge so we don't
+    # clobber 'step' / 'answers' / 'completed' already recorded for this module
+    progress = user.get('progress', {})
+    module_progress = progress.get(module_id, {})
+    module_progress['state'] = state
+
+    progress[module_id] = module_progress
+    user['progress'] = progress
 
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)

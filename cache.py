@@ -43,6 +43,24 @@ def history_item_to_text(item) -> str:
     raise ValueError
 
 
+def history_text_to_item(text) -> dict:
+    # inverse of history_item_to_text: turns a state token back into a history entry.
+    # used to feed lesson `state` tokens through the override path as real history items.
+
+    parts = text.split('.')
+    code = parts[0]
+
+    if code == 'f':  # single filter: f.col.op.val
+        action = ['f', parts[1], parts[2], '.'.join(parts[3:])]
+    elif code == 'o':  # or same filter: o.col.op.v1~v2~...
+        action = ['o', parts[1], parts[2], '.'.join(parts[3:]).split('~')]
+    else:
+        # if we got this far, the action code was not valid
+        raise ValueError
+
+    return {'desc': 'lesson: ' + text, 'action': action}
+
+
 def get_data(session, column=None, sorting=None, history_override=None, data_override=None) -> dict:
 
     if session:
@@ -51,7 +69,7 @@ def get_data(session, column=None, sorting=None, history_override=None, data_ove
         full_history = []
 
     if history_override:
-        full_history + history_override
+        full_history = full_history + history_override
 
     hist = []
     for item in full_history:
@@ -73,7 +91,7 @@ def get_data(session, column=None, sorting=None, history_override=None, data_ove
         if data_override:
             temp_data = data_override
         else:
-            temp_data = _execute(session)
+            temp_data = _execute(session, history_override)
 
         # if there is any need to execute, also create directories along the way
         walk = DATAPATH
@@ -164,7 +182,7 @@ def get_moc_options(session, moc_filter, active):
     return temp_options[str(moc_filter)][int(active)-1]
 
 
-def _execute(session) -> Data:
+def _execute(session, history_override=None) -> Data:
 
     temp_data = Data()
 
@@ -172,6 +190,11 @@ def _execute(session) -> Data:
         history = account.retrieve(session['userid'])['history']
     else:
         history = [{'desc': 'Error', 'action': None}]
+
+    # lesson states are applied as an override on top of the base history; they are
+    # never merged into the student's stored history (lessons are strictly sandboxed).
+    if history_override:
+        history = history + history_override
 
     for item in history:
         if item['action']:

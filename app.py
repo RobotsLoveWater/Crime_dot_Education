@@ -15,16 +15,20 @@ from flask import session
 from flask import request
 from flask import redirect, url_for
 
+from markupsafe import Markup, escape
+
 import html
+import re
 
 import util
 import make_history
 import moc
 import account
+import lessons
 
 from data import Data
 
-from cache import get_data, get_moc_options, _execute
+from cache import get_data, get_moc_options, _execute, history_text_to_item
 
 # create the app
 app = Flask(__name__)
@@ -37,6 +41,30 @@ codes = ['']
 
 # MOC data is an object imported from another python file
 MOC = moc.MnOffenseCodes
+
+
+@app.template_filter('lesson_body')
+def lesson_body(text):
+    # Minimal, dependency-free markdown for lesson step bodies. The markdown-vs-HTML
+    # question is still open (see LEARNING_MODULES_PROMPTS.md Appendix C); this covers the
+    # small subset the fixtures use: paragraphs, **bold**, `inline code`, and "- " bullet lists.
+    # Author text is HTML-escaped FIRST, so nothing here can inject markup.
+    if not text:
+        return Markup('')
+
+    text = str(escape(text))
+    text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
+    text = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', text)
+
+    blocks = []
+    for block in re.split(r'\n\s*\n', text):
+        lines = [ln for ln in block.split('\n') if ln.strip() != '']
+        if lines and all(ln.startswith('- ') for ln in lines):
+            blocks.append('<ul>' + ''.join('<li>' + ln[2:] + '</li>' for ln in lines) + '</ul>')
+        elif lines:
+            blocks.append('<p>' + '<br>'.join(lines) + '</p>')
+
+    return Markup(''.join(blocks))
 
 
 # homepage
@@ -444,13 +472,101 @@ def admin():
 
 
 @app.route('/lesson')
-def lesson():
-    return not_implemented()
+def lesson_catalog():
+    if is_logged_in():
+        user = account.retrieve(session['userid'])
+
+        modules = lessons.list_modules()
+
+        return render_template('lesson_catalog.html', modules=modules, user=user)
+
+    else:
+        return not_logged_in()
 
 
-@app.route('/lesson/get_started/<page>')
-def lesson_guide():
-    return not_implemented()
+@app.route('/lesson/<module_id>')
+def lesson_overview(module_id):
+    if is_logged_in():
+        user = account.retrieve(session['userid'])
+
+        # a bad/unknown module id just bounces back to the catalog
+        try:
+            module = lessons.get_module(module_id)
+        except lessons.LessonError:
+            return redirect(url_for('lesson_catalog'))
+
+        return render_template('lesson.html', module=module, user=user)
+
+    else:
+        return not_logged_in()
+
+
+@app.route('/lesson/<module_id>/<int:step>')
+def lesson_step(module_id, step):
+    if is_logged_in():
+        user = account.retrieve(session['userid'])
+
+        try:
+            module = lessons.get_module(module_id)
+        except lessons.LessonError:
+            return redirect(url_for('lesson_catalog'))
+
+        steps = module['steps']
+
+        # out-of-range step falls back to the module overview
+        if step < 0 or step >= len(steps):
+            return redirect(url_for('lesson_overview', module_id=module_id))
+
+        current = steps[step]
+
+        # explore steps materialize their data state in a sandbox (never the student's history)
+        explore = None
+        if current['type'] == 'explore':
+            explore = build_explore(module_id, current)
+
+        return render_template('lesson_step.html', module=module, step=current,
+                               step_index=step, total=len(steps), explore=explore, user=user)
+
+    else:
+        return not_logged_in()
+
+
+def build_explore(module_id, step):
+    # Reconstruct the step's data state as a sandboxed override and summarize it inline.
+    # A step with its own `state` sets the module's active state; otherwise it inherits the
+    # active state recorded on the student's progress. The student's own history is untouched.
+
+    if 'state' in step:
+        active_state = step['state']
+        account.set_lesson_state(session['userid'], module_id, active_state)
+    else:
+        active_state = account.get_progress(session['userid'], module_id).get('state', [])
+
+    # tokens -> history items, applied on top of the base dataset only (session=None)
+    override = [history_text_to_item(token) for token in active_state]
+    summary = get_data(None, history_override=override)
+
+    focus = step.get('focus') or {}
+    column_info = None
+    deeplink = None
+
+    if focus.get('view') == 'info' and focus.get('column') in summary['column_list']:
+        column = focus['column']
+        column_info = get_data(None, column, 'occurrence', override)['column_info']
+        deeplink = url_for('info_specific', column=column, sorting='occurrence')
+
+    elif focus.get('view') == 'table':
+        deeplink = url_for('table', dependant=focus['dependant'],
+                           x_axis=focus['x_axis'], y_axis=focus['y_axis'])
+
+    return {
+        'state': active_state,
+        'entries': summary['entries'],
+        'focus': focus,
+        'column_info': column_info,
+        'deeplink': deeplink
+    }
+
 
 def is_logged_in(): return 'userid' in session
 def not_loaded(): return redirect(url_for('load'))

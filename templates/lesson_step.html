@@ -1,0 +1,76 @@
+{% extends "layout.html" %}
+{% block head %}
+<title>Minnesota Sentencing Explorer - {{ module['title'] }}</title>
+{% endblock %}
+
+{% block body %}
+<body>
+
+    <div class="container">
+        <p><a href="/lesson/{{ module['id'] }}">&larr; {{ module['title'] }}</a></p>
+
+        <!-- progress indicator -->
+        <p><strong>Step {{ step_index + 1 }} of {{ total }}</strong></p>
+        <div style="background: var(--color-border); border-radius: 4px; height: 8px; margin-bottom: 2rem;">
+            <div style="background: var(--color-accent); border-radius: 4px; height: 8px; width: {{ ((step_index + 1) / total * 100)|round(0, 'floor') }}%;"></div>
+        </div>
+
+        <h1>{{ step['title'] }}</h1>
+
+        <div class="lesson-body">
+            {{ step['body']|lesson_body }}
+        </div>
+
+        {% if step['type'] == 'explore' and explore %}
+        <!-- Sandboxed lesson dataset: reconstructed from the step's state, not the student's history. -->
+        <div class="card" style="text-align: left; margin: 2rem 0;">
+            <h3>Lesson data</h3>
+            <p><strong>{{ explore['entries'] }}</strong> matching records.</p>
+            {% if explore['state'] %}
+            <p style="color: var(--color-muted);">Filter:
+                {% for token in explore['state'] %}<code>{{ token }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+            </p>
+            {% endif %}
+
+            {% if explore['column_info'] %}
+            <p><strong>{{ explore['column_info']['header'] }}</strong> &mdash; {{ explore['column_info']['nan'] }}</p>
+            {% if explore['column_info']['numeric'] == True %}
+            <p>Mean {{ explore['column_info']['mean'] }} &middot;
+               Median {{ explore['column_info']['mdn'] }} &middot;
+               Std {{ explore['column_info']['std'] }}</p>
+            {% endif %}
+            {% endif %}
+
+            {% if explore['deeplink'] %}
+            <div class="btn-bar">
+                <a href="{{ explore['deeplink'] }}" class="btn">Open in analysis view &rarr;</a>
+            </div>
+            {% endif %}
+        </div>
+        {% elif step['type'] != 'read' %}
+        <!-- question / checkpoint steps are gradeable; those arrive in later phases. -->
+        <div class="card" style="text-align: left; margin: 2rem 0;">
+            <h3>Interactive step &mdash; coming next phase</h3>
+            <p>This is a <strong>{{ step['type'] }}</strong> step. Questions and grading
+               are not wired up yet; for now you can read the description above and continue.</p>
+        </div>
+        {% endif %}
+
+        <!-- Prev / Next navigation -->
+        <div class="btn-bar">
+            {% if step_index > 0 %}
+                <a href="/lesson/{{ module['id'] }}/{{ step_index - 1 }}" class="btn">&larr; Previous</a>
+            {% else %}
+                <a href="/lesson/{{ module['id'] }}" class="btn">&larr; Overview</a>
+            {% endif %}
+
+            {% if step_index + 1 < total %}
+                <a href="/lesson/{{ module['id'] }}/{{ step_index + 1 }}" class="btn">Next &rarr;</a>
+            {% else %}
+                <a href="/lesson" class="btn">Finish &check;</a>
+            {% endif %}
+        </div>
+    </div>
+
+</body>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+{% block head %}
+<title>Minnesota Sentencing Explorer - {{ module['title'] }}</title>
+{% endblock %}
+
+{% block body %}
+<body>
+
+    <div class="container">
+        <p><a href="/lesson">&larr; All Lessons</a></p>
+
+        <h1>{{ module['title'] }}</h1>
+        <p>{{ module['description'] }}</p>
+
+        {% if module['objectives'] %}
+        <h2>What you'll learn</h2>
+        <ul>
+            {% for objective in module['objectives'] %}
+            <li>{{ objective }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <p><em>{{ module['steps']|length }} steps</em></p>
+
+        <div class="btn-bar">
+            <a href="/lesson/{{ module['id'] }}/0" class="btn">Start Lesson</a>
+        </div>
+    </div>
+
+</body>
+{% endblock %}
