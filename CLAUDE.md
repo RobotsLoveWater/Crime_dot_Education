@@ -213,6 +213,35 @@ security boundary** (the app has no real auth). Educators use `/admin` + `/admin
 create/edit modules scoped to their own `classcode`; `require_educator()` guards those routes
 and `slugify()` sanitizes the module id before it reaches the filesystem.
 
+## Planned: uv migration (tooling — not yet done)
+
+Plan to switch dependency/venv management from pip + `requirements.txt` + stdlib `venv` to
+**[uv](https://docs.astral.sh/uv/)** (Astral's fast resolver/installer). **Docs-only so far — no
+tooling has changed.** Phased implementation prompts live in `UV_MIGRATION_PROMPTS.md`; work
+through them one phase at a time.
+
+**Why:** faster installs, a committed lockfile for reproducible environments (useful for the
+grant/handoff), and one tool for Python-version pinning + venv + dependency resolution.
+
+**Current state (the starting point):** `requirements.txt` (mixed pinned/unpinned), a stdlib
+`.venv/` (git-ignored), Python 3.13, `pip install -r requirements.txt`, `flask --app app run`,
+and the one-time `python cache.py` data bootstrap. No `pyproject.toml`, no lockfile, no CI.
+
+**Target (recommended):** a `pyproject.toml` declaring the deps, a committed `uv.lock`, and a
+`.python-version` pinning 3.13 — `uv sync` to build the env, `uv run …` to launch. A
+lighter-touch fallback keeps `requirements.txt` as the source of truth and only swaps the
+commands (`uv venv` + `uv pip sync requirements.txt`).
+
+**Touch points when it happens:** the "Running it" and "Data flow / bootstrap" sections here,
+`README.md` (setup + run), `.gitignore` (commit `uv.lock` / `.python-version`; `.venv/` stays
+ignored), and the fate of `requirements.txt` (drop it, or regenerate via `uv export` for tools
+that still expect it).
+
+**Gotchas:** the binary deps (`pandas`, `numpy`, `matplotlib`, `pyreadstat`, `Pillow`) already
+have 3.13 wheels — the app runs today, and uv pulls the same PyPI wheels — but this repo is
+Windows, so confirm a fresh `uv sync` resolves those wheels on Windows before retiring the old
+flow. uv also defaults to a `.venv/` directory, so the existing git-ignore already covers it.
+
 ## Git remotes
 
 - `origin` → GitLab (`gitlab.com/sidallen-scsu/cde.git`).
