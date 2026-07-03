@@ -11,7 +11,7 @@ framework"; read that section first.
 - Do the phases **in order** — later phases assume the earlier ones exist.
 - Each prompt is written to be pasted whole. It names the files to read, what to build, and
   how to know it's done. Keep the "Global constraints" below in scope for every phase.
-- After each phase: run the app (`flask --app app run`), click through, commit, then move on.
+- After each phase: run the app (`uv run flask --app app run`), click through, commit, then move on.
 
 ## Global constraints (apply to every phase)
 
@@ -25,7 +25,7 @@ framework"; read that section first.
 - **Never reach into `user/` or `cache/` as committable content** (git-ignored, private/large).
   `lessons/` *is* committable authored content.
 - **No heavy new dependencies.** Prefer stdlib `json`; if markdown rendering is wanted, keep it
-  optional/minimal. Add anything new to `requirements.txt`.
+  optional/minimal. Add anything new via `uv add <pkg>` (updates `pyproject.toml` + `uv.lock`).
 - **Data states are history tokens.** A step's `state` is a list of tokens in the exact
   `f.col.op.val` / `o.col.op.v1~v2` encoding from `cache.history_item_to_text`. Reuse that
   encoder/decoder — do not invent a parallel format.

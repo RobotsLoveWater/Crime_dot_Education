@@ -42,7 +42,7 @@ The runtime does **not** read `dataset.sav` directly. It reads `cache/raw.csv`.
 
 ```
 dataset.sav (SPSS, ~141 MB, git-ignored)
-    │  one-time precompute:  python cache.py   (its __main__ block)
+    │  one-time precompute:  uv run python cache.py   (its __main__ block)
     ▼
 cache/raw.csv  (~242 MB, git-ignored)   ← DATAFILE that _execute() loads at runtime
     │  optional: also pre-caches per-column stats into cache/data/
@@ -51,16 +51,18 @@ runtime: cache._execute() loads cache/raw.csv, replays user history filters
 ```
 
 To stand the app up on a fresh machine you must obtain `dataset.sav` (not in git), then run
-`python cache.py` and answer `y` to both prompts to generate `cache/raw.csv` and warm the cache.
+`uv run python cache.py` and answer `y` to both prompts to generate `cache/raw.csv` and warm the cache.
 `DATAFILE = 'cache/raw.csv'` and `DATAPATH = 'cache/data/'` are defined at the top of `cache.py`.
 
 ## Running it
 
-No `app.run()` exists in `app.py`. Launch via the Flask CLI (Python 3.13, see `requirements.txt`):
+No `app.run()` exists in `app.py`. The environment is managed by **uv** (`pyproject.toml` +
+`uv.lock`; Python 3.13 pinned via `.python-version`). Build the env once, then launch via the
+Flask CLI through uv:
 
 ```
-pip install -r requirements.txt
-flask --app app run          # add --debug for reload
+uv sync                        # build .venv from the lockfile (installs Python 3.13 if needed)
+uv run flask --app app run     # add --debug for reload
 ```
 
 ## Module map
@@ -213,34 +215,47 @@ security boundary** (the app has no real auth). Educators use `/admin` + `/admin
 create/edit modules scoped to their own `classcode`; `require_educator()` guards those routes
 and `slugify()` sanitizes the module id before it reaches the filesystem.
 
-## Planned: uv migration (tooling — not yet done)
+## Tooling: uv (dependency & environment management)
 
-Plan to switch dependency/venv management from pip + `requirements.txt` + stdlib `venv` to
-**[uv](https://docs.astral.sh/uv/)** (Astral's fast resolver/installer). **Docs-only so far — no
-tooling has changed.** Phased implementation prompts live in `UV_MIGRATION_PROMPTS.md`; work
-through them one phase at a time.
+Dependencies, the virtualenv, and the Python version are managed by
+**[uv](https://docs.astral.sh/uv/)**. The source of truth is `pyproject.toml` + the committed
+`uv.lock`; `.python-version` pins **Python 3.13**. `uv sync` builds `.venv/` from the lockfile
+(installing a managed Python 3.13 if the machine lacks it), and `uv run …` runs inside it — see
+"Running it" and "Data flow / bootstrap" above. (Migrated from pip + `requirements.txt` + stdlib
+`venv`; the phased plan is in `UV_MIGRATION_PROMPTS.md` — all phases (0–4) complete.)
 
-**Why:** faster installs, a committed lockfile for reproducible environments (useful for the
-grant/handoff), and one tool for Python-version pinning + venv + dependency resolution.
+**Why it mattered here:** the old stdlib `.venv/` was synced between machines via OneDrive and
+was non-portable — it hard-coded another machine's Python path (`C:\Users\sid07\...`) and could
+not run on this one. With uv, each machine runs `uv sync` to build its own local `.venv` from the
+lockfile and never shares the venv itself. (If the repo lives under OneDrive, exclude `.venv/`
+from OneDrive sync.)
 
-**Current state (the starting point):** `requirements.txt` (mixed pinned/unpinned), a stdlib
-`.venv/` (git-ignored), Python 3.13, `pip install -r requirements.txt`, `flask --app app run`,
-and the one-time `python cache.py` data bootstrap. No `pyproject.toml`, no lockfile, no CI.
+**Dependency pinning (important).** `[project].dependencies` mirrors the old `requirements.txt`
+exactly — the same intentional hard pins (`Flask==3.0.0`, `bcrypt==4.1.2`, …) and the same 8 deps
+left loose (`contourpy`, `kiwisolver`, `matplotlib`, `numpy`, `pandas`, `Pillow`, `pyreadstat`,
+`seaborn`). Those 8 are held at known-good versions by `[tool.uv] constraint-dependencies`, so
+`uv.lock` reproduces the environment the app was developed against instead of pulling newer
+majors (pandas 3.x, Pillow 12.x, …). **Upgrading is deliberate:** delete a line from
+`constraint-dependencies` and re-run `uv lock`. The project is `package = false` (an app, not a
+library, so uv manages the env without trying to build it).
 
-**Target (recommended):** a `pyproject.toml` declaring the deps, a committed `uv.lock`, and a
-`.python-version` pinning 3.13 — `uv sync` to build the env, `uv run …` to launch. A
-lighter-touch fallback keeps `requirements.txt` as the source of truth and only swaps the
-commands (`uv venv` + `uv pip sync requirements.txt`).
+**`requirements.txt` has been removed** (Phase 4) — `pyproject.toml` + `uv.lock` are the single
+source of truth. If a tool or host ever needs a `requirements.txt`, generate one on demand with
+`uv export --format requirements-txt --no-hashes`; never hand-maintain one alongside the lockfile
+(they would drift). Rolling back to the old pip flow, if ever needed, is via git history.
 
-**Touch points when it happens:** the "Running it" and "Data flow / bootstrap" sections here,
-`README.md` (setup + run), `.gitignore` (commit `uv.lock` / `.python-version`; `.venv/` stays
-ignored), and the fate of `requirements.txt` (drop it, or regenerate via `uv export` for tools
-that still expect it).
+**Windows gotchas (this machine):**
+- `pip.exe` is blocked by an Application Control policy — standardize on uv. The reference freeze
+  (`requirements.lock.txt`, git-ignored throwaway) was recovered from
+  `.venv/Lib/site-packages/*.dist-info` because pip and the old venv were both unusable.
+- uv installs a *managed* CPython 3.13 (only 3.12 was present globally). A first
+  `uv venv --python 3.13` once errored mid-download on uv's internal "minor version link"
+  bookkeeping; pointing uv at the concrete interpreter path — or re-running once the download
+  settled — fixes it.
+- The binary deps (`pandas`, `numpy`, `matplotlib`, `pyreadstat`, `Pillow`) have 3.13 Windows
+  wheels — uv pulls the same PyPI wheels the app already used.
 
-**Gotchas:** the binary deps (`pandas`, `numpy`, `matplotlib`, `pyreadstat`, `Pillow`) already
-have 3.13 wheels — the app runs today, and uv pulls the same PyPI wheels — but this repo is
-Windows, so confirm a fresh `uv sync` resolves those wheels on Windows before retiring the old
-flow. uv also defaults to a `.venv/` directory, so the existing git-ignore already covers it.
+`.venv/` stays git-ignored; `uv.lock` and `.python-version` are committed.
 
 ## Git remotes
 

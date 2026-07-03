@@ -1,0 +1,65 @@
+[project]
+name = "mn-sentencing-explorer"
+version = "0.1.0"
+description = "Flask web app for exploring Minnesota felony sentencing data, 2001-2019 (Crime[dot]Education / Minnesota Sentencing Explorer)."
+readme = "README.md"
+requires-python = ">=3.13"
+authors = [{ name = "Sidney D. Allen" }]
+
+# Carried over verbatim from requirements.txt: intentional hard pins are preserved
+# (Flask, bcrypt, Werkzeug, Jinja2, ...); the 8 deps that were left unpinned there stay loose
+# here (contourpy, kiwisolver, matplotlib, numpy, pandas, Pillow, pyreadstat, seaborn). Exact
+# versions are recorded by uv.lock, not by this list. See [tool.uv] below for why the loose
+# ones are still resolved to specific (known-good) versions during this migration.
+dependencies = [
+    "bcrypt==4.1.2",
+    "blinker==1.7.0",
+    "click==8.1.7",
+    "colorama==0.4.6",
+    "contourpy",
+    "cycler==0.12.1",
+    "Flask==3.0.0",
+    "Flask-Bcrypt==1.0.1",
+    "fonttools==4.47.0",
+    "itsdangerous==2.1.2",
+    "Jinja2==3.1.2",
+    "kiwisolver",
+    "MarkupSafe==2.1.3",
+    "matplotlib",
+    "numpy",
+    "packaging==23.2",
+    "pandas",
+    "Pillow",
+    "pyparsing==3.1.1",
+    "pyreadstat",
+    "python-dateutil==2.8.2",
+    "pytz==2023.3.post1",
+    "seaborn",
+    "six==1.16.0",
+    "tzdata==2023.3",
+    "Werkzeug==3.0.1",
+]
+
+[tool.uv]
+# This is a Flask *application*, not a distributable library: manage the environment but do not
+# try to build/install the project itself as a package.
+package = false
+
+# --- uv migration parity constraints (Phase 2) --------------------------------------------
+# requirements.txt left these 8 deps unpinned, and [project.dependencies] above keeps them loose
+# to match. These constraints pin them to the Phase 0 "known-good" freeze versions so that
+# `uv lock` reproduces the exact environment the app was developed and tested against, instead of
+# resolving to newer majors (pandas 3.x, Pillow 12.x, numpy 2.5.x, matplotlib 3.11, ...). The uv
+# migration is a TOOLING switch, not a dependency bump (see CLAUDE.md "Planned: uv migration").
+# Upgrading is a separate, deliberate change: delete the relevant line(s) here and re-run
+# `uv lock` to let that dependency float to the newest compatible release.
+constraint-dependencies = [
+    "contourpy==1.3.2",
+    "kiwisolver==1.4.8",
+    "matplotlib==3.10.3",
+    "numpy==2.3.1",
+    "pandas==2.3.0",
+    "Pillow==11.2.1",
+    "pyreadstat==1.2.9",
+    "seaborn==0.13.2",
+]

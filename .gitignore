@@ -5,6 +5,9 @@
 cache/
 user/
 
+# uv migration Phase 0 reference freeze (throwaway snapshot, not a source of truth)
+requirements.lock.txt
+
 # Python
 __pycache__/
 *.py[cod]
@@ -12,6 +15,9 @@ __pycache__/
 .venv/
 venv/
 env/
+
+# uv: the environment (.venv/, above) is ignored, but the lockfile and Python pin are
+# intentionally COMMITTED for reproducibility — do NOT add uv.lock or .python-version here.
 
 # IDE
 .idea/workspace.xml

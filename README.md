@@ -52,25 +52,38 @@ developed toward a grant, with an emphasis on **education and public disseminati
 
 ## Getting started
 
-Requires **Python 3.13**.
+This project uses **[uv](https://docs.astral.sh/uv/)** for environment and dependency
+management. The committed `pyproject.toml`, `uv.lock`, and `.python-version` (which pins
+**Python 3.13**) let a fresh checkout reproduce the exact environment — with no manual
+virtualenv and no `pip`.
 
-```
-pip install -r requirements.txt
-```
+1. **Install uv** if you don't have it (see the
+   [install guide](https://docs.astral.sh/uv/getting-started/installation/)). On Windows:
+   ```
+   winget install astral-sh.uv
+   ```
+2. **Build the environment** — uv fetches Python 3.13 if needed and installs the locked
+   dependencies into `.venv/`:
+   ```
+   uv sync
+   ```
 
 The runtime does **not** read the SPSS file directly — it loads `cache/raw.csv`. The raw data
 files are large and are **not** committed to git, so first-time setup is a one-time precompute:
 
-1. Obtain `dataset.sav` (the SPSS source, ~141 MB) and place it in the project root.
-2. Build the runtime CSV and warm the cache:
+3. Obtain `dataset.sav` (the SPSS source, ~141 MB) and place it in the project root.
+4. Build the runtime CSV and warm the cache — this writes `cache/raw.csv` (~242 MB) and
+   pre-computes per-column stats into `cache/data/`:
    ```
-   python cache.py        # answer "y" to both prompts
+   uv run python cache.py        # answer "y" to both prompts
    ```
-   This writes `cache/raw.csv` (~242 MB) and pre-computes per-column stats into `cache/data/`.
-3. Run the app:
+5. Run the app:
    ```
-   flask --app app run    # add --debug for auto-reload
+   uv run flask --app app run    # add --debug for auto-reload
    ```
+
+Every command runs inside uv's managed environment via `uv run …`, so there is no separate
+"activate the virtualenv" step.
 
 ## Project status
 
