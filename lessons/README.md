@@ -55,7 +55,9 @@ Sets/deep-links a data state so the student can inspect a filtered dataset.
 
 ### `question`
 Poses a question with a gradeable `answer`. Fields: `title`, `body`, `answer`.
-Optionally `state` (defaults to the active state — see below). See "Answer types".
+Optional: `state` (defaults to the active state — see below); `require_answer` (bool,
+default `false`) — when `true`, the step's **Next** button is locked until the student has
+submitted an answer (correct or not). See "Answer types".
 
 ### `checkpoint`
 Asserts the student's current active state matches an expected one. Fields: `title`, `body`,

@@ -21,10 +21,21 @@
         </ul>
         {% endif %}
 
+        {% if status == 'completed' %}
+        <p style="color: #1a7f37; font-weight: 600;">&check; You've completed this lesson.</p>
+        {% endif %}
+
         <p><em>{{ module['steps']|length }} steps</em></p>
 
         <div class="btn-bar">
+            {% if status == 'not_started' %}
             <a href="/lesson/{{ module['id'] }}/0" class="btn">Start Lesson</a>
+            {% elif status == 'in_progress' %}
+            <a href="/lesson/{{ module['id'] }}/{{ resume }}" class="btn">Resume</a>
+            <a href="/lesson/{{ module['id'] }}/0" class="btn">Start over</a>
+            {% else %}
+            <a href="/lesson/{{ module['id'] }}/0" class="btn">Review from start</a>
+            {% endif %}
         </div>
     </div>
 

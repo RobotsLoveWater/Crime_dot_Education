@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block head %}
+<title>Minnesota Sentencing Explorer - {% if editing %}Edit{% else %}New{% endif %} module</title>
+{% endblock %}
+
+{% block body %}
+<body>
+
+    <div class="container">
+        <p><a href="/admin">&larr; Authoring</a></p>
+        <h1>{% if editing %}Edit{% else %}New{% endif %} module</h1>
+        <!-- validation errors are rendered by layout.html's error block -->
+
+        <form method="post">
+            <p><label>Module id (used in the lesson URL; letters, numbers, dashes)<br>
+                <input type="text" name="module_id" value="{{ form['module_id'] }}"
+                       {% if editing %}readonly{% endif %} required></label></p>
+
+            <p><label>Title<br>
+                <input type="text" name="title" value="{{ form['title'] }}" required></label></p>
+
+            <p><label>Description<br>
+                <textarea name="description" rows="2" style="width: 100%;">{{ form['description'] }}</textarea></label></p>
+
+            <p><label>Objectives (one per line)<br>
+                <textarea name="objectives" rows="4" style="width: 100%;">{{ form['objectives'] }}</textarea></label></p>
+
+            <p><label>Steps (JSON array &mdash; see <code>lessons/README.md</code> for the schema)<br>
+                <textarea name="steps" rows="16" style="width: 100%; font-family: monospace;">{{ form['steps'] }}</textarea></label></p>
+
+            <p><button type="submit">Save module</button></p>
+        </form>
+    </div>
+
+</body>
+{% endblock %}

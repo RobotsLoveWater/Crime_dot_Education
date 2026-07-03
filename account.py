@@ -14,10 +14,24 @@ import pickle
 
 NO_CLASS_CODE = 'unmanaged'
 
+# classcode convention: signing up with a classcode like 'edu-smith' grants educator
+# (authoring) rights, scoped to that classcode. This is a convenience convention, NOT a
+# security boundary -- the app has no real authentication (see CLAUDE.md known issues).
+EDUCATOR_CLASSCODE_PREFIX = 'edu-'
+
 
 def clean_classcode(classcode) -> str:
     if classcode is None or classcode == '': return NO_CLASS_CODE
     else: return classcode
+
+
+def is_educator_classcode(classcode) -> bool:
+    return clean_classcode(classcode).startswith(EDUCATOR_CLASSCODE_PREFIX)
+
+
+def is_educator(userid) -> bool:
+    # backwards-compatible read: accounts created before roles have no 'is_educator' key
+    return retrieve(userid).get('is_educator', False)
 
 
 def get_classcode_list() -> list[str]: return os.listdir('user')
@@ -79,7 +93,8 @@ def create(username, classcode, password, overwrite=False) -> dict:
         'password': password,
         'history': [{'desc': 'Loaded complete Minnesota felony sentencing data for 2001 to 2019', 'action': None}],
         'saved': [],
-        'progress': {}
+        'progress': {},
+        'is_educator': is_educator_classcode(classcode)
     }
 
     if not os.path.exists('user/' + classcode): os.mkdir('user/' + classcode)  # create directory if needed
@@ -128,7 +143,7 @@ def get_progress(userid, module_id) -> dict:
     return user.get('progress', {}).get(module_id, {})
 
 
-def set_progress(userid, module_id, step, answers=None, completed=False) -> None:
+def set_progress(userid, module_id, step, answers=None, completed=None) -> None:
 
     user = retrieve(userid)
 
@@ -139,9 +154,15 @@ def set_progress(userid, module_id, step, answers=None, completed=False) -> None
     # sibling keys such as 'state' (set by lesson exploration) or prior answers
     module_progress = progress.get(module_id, {})
     module_progress['step'] = step
-    module_progress['completed'] = completed
     if answers is not None:
         module_progress['answers'] = answers
+
+    # completed=None means "leave as-is" (so merely recording a step, e.g. on resume,
+    # does not un-complete a finished module); initialize it to False on first write
+    if completed is not None:
+        module_progress['completed'] = completed
+    elif 'completed' not in module_progress:
+        module_progress['completed'] = False
 
     progress[module_id] = module_progress
     user['progress'] = progress

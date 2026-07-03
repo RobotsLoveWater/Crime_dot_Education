@@ -26,6 +26,7 @@
       "type": "question",
       "title": "Average presumptive sentence",
       "body": "Reading the summary for `time` on the assault-filtered data (`moc1 == A`): to the nearest **0.1 months**, what is the **mean** presumptive sentence?",
+      "require_answer": true,
       "answer": {
         "type": "numeric",
         "compute": { "stat": "mean", "column": "time" },

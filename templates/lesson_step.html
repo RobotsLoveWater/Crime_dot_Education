@@ -47,14 +47,54 @@
             </div>
             {% endif %}
         </div>
+        {% elif step['type'] == 'question' and question %}
+        <!-- Answers are graded server-side; the client never submits a correctness flag. -->
+        <div class="card" style="text-align: left; margin: 2rem 0;">
+            <form method="post">
+                {% if question['type'] == 'numeric' %}
+                    <label>Your answer:
+                        <input type="number" step="any" name="answer" required
+                               value="{% if question['prior'] %}{{ question['prior']['value'] }}{% endif %}">
+                    </label>
+                {% elif question['type'] == 'choice' %}
+                    {% for option in question['options'] %}
+                    <label style="display: block; margin: 0.4rem 0;">
+                        <input type="radio" name="answer" value="{{ loop.index0 }}" required
+                               {% if question['prior'] and question['prior']['value'] == loop.index0 %}checked{% endif %}>
+                        {{ option }}
+                    </label>
+                    {% endfor %}
+                {% elif question['type'] == 'free' %}
+                    <label>Your response:<br>
+                        <textarea name="answer" rows="4" style="width: 100%;">{% if question['prior'] %}{{ question['prior']['value'] }}{% endif %}</textarea>
+                    </label>
+                {% endif %}
+                <p><button type="submit">Submit answer</button></p>
+            </form>
+
+            {% if question['answered'] %}
+                {% if question['prior']['correct'] == True %}
+                    <p style="color: #1a7f37; font-weight: 600;">&check; Correct!</p>
+                {% elif question['prior']['correct'] == False %}
+                    <p style="color: #c0392b; font-weight: 600;">&times; Not quite &mdash; try again.</p>
+                {% else %}
+                    <p style="font-weight: 600;">Answer submitted.</p>
+                    {% if question['model_answer'] %}
+                    <p style="color: var(--color-muted);"><em>Model answer:</em> {{ question['model_answer'] }}</p>
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+        </div>
         {% elif step['type'] != 'read' %}
-        <!-- question / checkpoint steps are gradeable; those arrive in later phases. -->
+        <!-- checkpoint steps assert the student's state; that arrives in a later phase. -->
         <div class="card" style="text-align: left; margin: 2rem 0;">
             <h3>Interactive step &mdash; coming next phase</h3>
-            <p>This is a <strong>{{ step['type'] }}</strong> step. Questions and grading
-               are not wired up yet; for now you can read the description above and continue.</p>
+            <p>This is a <strong>{{ step['type'] }}</strong> step. It is not wired up yet;
+               for now you can read the description above and continue.</p>
         </div>
         {% endif %}
+
+        {% set next_locked = question and question['require_answer'] and not question['answered'] %}
 
         <!-- Prev / Next navigation -->
         <div class="btn-bar">
@@ -65,9 +105,17 @@
             {% endif %}
 
             {% if step_index + 1 < total %}
-                <a href="/lesson/{{ module['id'] }}/{{ step_index + 1 }}" class="btn">Next &rarr;</a>
+                {% if next_locked %}
+                    <span class="btn disabled" title="Answer this question to continue">Next &rarr;</span>
+                {% else %}
+                    <a href="/lesson/{{ module['id'] }}/{{ step_index + 1 }}" class="btn">Next &rarr;</a>
+                {% endif %}
             {% else %}
-                <a href="/lesson" class="btn">Finish &check;</a>
+                {% if next_locked %}
+                    <span class="btn disabled" title="Answer this question to continue">Finish &check;</span>
+                {% else %}
+                    <a href="/lesson/{{ module['id'] }}/complete" class="btn">Finish &check;</a>
+                {% endif %}
             {% endif %}
         </div>
     </div>

@@ -141,6 +141,8 @@ def _validate_step(step, where) -> None:
         _validate_answer(step.get('answer'), where + ".answer")
         if 'state' in step:
             _validate_state(step['state'], where + ".state")
+        if 'require_answer' in step and not isinstance(step['require_answer'], bool):
+            raise LessonError(where + ": 'require_answer' must be true or false")
 
     elif stype == 'checkpoint':
         if 'expect_state' not in step:
@@ -240,6 +242,20 @@ def _validate_state(tokens, where) -> None:
                 raise LessonError(where + ": token '" + tok + "' has an empty value")
             if '~' in value:
                 raise LessonError(where + ": single-filter token '" + tok + "' must not contain '~'")
+
+
+def save_module(module) -> str:
+    # validate BEFORE writing; validate() enforces id == [a-z0-9-], so the path cannot
+    # escape LESSONS_DIR (no slashes/dots from form input reach the filesystem).
+    validate(module)
+
+    if not os.path.isdir(LESSONS_DIR):
+        os.makedirs(LESSONS_DIR, exist_ok=True)
+
+    with open(_module_path(module['id']), 'w', encoding='utf-8') as handle:
+        json.dump(module, handle, indent=2)
+
+    return module['id']
 
 
 def _module_path(module_id) -> str:

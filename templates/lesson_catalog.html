@@ -10,14 +10,21 @@
         <h1>Guided Lessons</h1>
         <p>Step-by-step activities that walk you through the data and the statistics behind it.</p>
 
-        {% if modules %}
+        {% if catalog %}
         <section class="features" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; padding: 2rem 0;">
-            {% for module in modules %}
+            {% for item in catalog %}
             <div class="card" style="text-align: left;">
-                <h3>{{ module['title'] }}</h3>
-                <p>{{ module['description'] }}</p>
+                {% if item['status'] == 'completed' %}
+                <p style="color: #1a7f37; font-weight: 600;">&check; Completed</p>
+                {% elif item['status'] == 'in_progress' %}
+                <p style="color: var(--color-accent); font-weight: 600;">In progress</p>
+                {% else %}
+                <p style="color: var(--color-muted); font-weight: 600;">Not started</p>
+                {% endif %}
+                <h3>{{ item['module']['title'] }}</h3>
+                <p>{{ item['module']['description'] }}</p>
                 <div class="btn-bar">
-                    <a href="/lesson/{{ module['id'] }}" class="btn">Open Lesson</a>
+                    <a href="/lesson/{{ item['module']['id'] }}" class="btn">Open Lesson</a>
                 </div>
             </div>
             {% endfor %}

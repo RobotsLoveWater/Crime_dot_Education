@@ -19,6 +19,8 @@ from markupsafe import Markup, escape
 
 import html
 import re
+import json
+import datetime
 
 import util
 import make_history
@@ -67,6 +69,12 @@ def lesson_body(text):
     return Markup(''.join(blocks))
 
 
+@app.context_processor
+def inject_globals():
+    # layout.html footer references current_year on every page; inject it once here
+    return {'current_year': datetime.date.today().year}
+
+
 # homepage
 @app.route("/")
 @app.route("/landing")
@@ -79,7 +87,17 @@ def index():
 
     else: user = None
 
-    return render_template('index.html', user=user)
+    # real lesson metrics for the homepage cards (replaces the hardcoded 0)
+    modules = lessons.list_modules()
+    lesson_count = len(modules)
+
+    lessons_completed = 0
+    if user:
+        progress = user.get('progress', {})
+        lessons_completed = sum(1 for m in modules if progress.get(m['id'], {}).get('completed'))
+
+    return render_template('index.html', user=user, lesson_count=lesson_count,
+                           lessons_completed=lessons_completed, hero_image_url='')
 
 
 @app.route("/guide")
@@ -466,9 +484,133 @@ def settings():
         return not_logged_in()
 
 
+# a helpful starting point for the steps textarea when authoring a new module
+DEFAULT_STEPS_JSON = json.dumps([
+    {"type": "read", "title": "Introduction", "body": "Write your lesson introduction here."}
+], indent=2)
+
+
+def require_educator():
+    # authoring guard: returns a redirect response if the user may not author, else None.
+    # logged-out -> login; logged-in non-educator -> home.
+    if not is_logged_in():
+        return not_logged_in()
+    if not account.is_educator(session['userid']):
+        return redirect(url_for('index'))
+    return None
+
+
+def slugify(text):
+    # sanitize a raw id into a filename-/URL-safe slug ([a-z0-9-]); prevents path traversal
+    return re.sub(r'[^a-z0-9-]+', '-', text.strip().lower()).strip('-')
+
+
 @app.route('/admin')
 def admin():
-    return not_implemented()
+    blocked = require_educator()
+    if blocked:
+        return blocked
+
+    user = account.retrieve(session['userid'])
+    classcode = user['classcode']
+
+    # educators manage the modules scoped to their own classcode
+    mine = [m for m in lessons.list_modules() if m.get('author') == classcode]
+
+    return render_template('admin.html', user=user, modules=mine, classcode=classcode)
+
+
+@app.route('/admin/edit', methods=['GET', 'POST'])
+@app.route('/admin/edit/<module_id>', methods=['GET', 'POST'])
+def admin_edit(module_id=None):
+    blocked = require_educator()
+    if blocked:
+        return blocked
+
+    user = account.retrieve(session['userid'])
+    classcode = user['classcode']
+    error = []
+
+    if request.method == 'POST':
+        new_id = slugify(request.form.get('module_id', ''))
+        form = {
+            'module_id': new_id,
+            'title': request.form.get('title', '').strip(),
+            'description': request.form.get('description', '').strip(),
+            'objectives': request.form.get('objectives', ''),
+            'steps': request.form.get('steps', '')
+        }
+
+        if not new_id:
+            error.append('Module id must contain at least one letter or number.')
+
+        # never let one class overwrite another class's module
+        try:
+            prior = lessons.get_module(new_id)
+            if prior.get('author') != classcode:
+                error.append("A module named '" + new_id + "' already exists in another class.")
+        except lessons.LessonError:
+            pass
+
+        steps = None
+        try:
+            steps = json.loads(form['steps'] or '[]')
+        except ValueError as e:
+            error.append('Steps must be valid JSON: ' + str(e))
+
+        if not error:
+            module = {
+                'id': new_id,
+                'title': form['title'],
+                'description': form['description'],
+                'author': classcode,  # scoped to the educator; cannot be spoofed from the form
+                'objectives': [ln.strip() for ln in form['objectives'].splitlines() if ln.strip()],
+                'steps': steps
+            }
+            try:
+                lessons.save_module(module)
+                return redirect(url_for('lesson_overview', module_id=new_id))
+            except lessons.LessonError as e:
+                error.append(str(e))
+
+        return render_template('admin_edit.html', user=user, form=form, error=error, editing=bool(module_id))
+
+    # GET: blank template for new, or prefill from an existing (owned) module
+    form = {'module_id': '', 'title': '', 'description': '', 'objectives': '', 'steps': DEFAULT_STEPS_JSON}
+
+    if module_id:
+        try:
+            existing = lessons.get_module(module_id)
+        except lessons.LessonError:
+            return redirect(url_for('admin'))
+        if existing.get('author') != classcode:
+            return redirect(url_for('admin'))
+        form = {
+            'module_id': existing['id'],
+            'title': existing['title'],
+            'description': existing['description'],
+            'objectives': '\n'.join(existing['objectives']),
+            'steps': json.dumps(existing['steps'], indent=2)
+        }
+
+    return render_template('admin_edit.html', user=user, form=form, error=error, editing=bool(module_id))
+
+
+def module_status(entry):
+    # derive a module's status from its stored progress entry (no data replay)
+    if not entry:
+        return 'not_started'
+    if entry.get('completed'):
+        return 'completed'
+    return 'in_progress'
+
+
+def resume_step(entry, total):
+    # where "Resume" jumps to: last-viewed step, clamped; completed modules restart at 0
+    if not entry or entry.get('completed'):
+        return 0
+    step = entry.get('step', 0)
+    return max(0, min(step, total - 1))
 
 
 @app.route('/lesson')
@@ -476,9 +618,11 @@ def lesson_catalog():
     if is_logged_in():
         user = account.retrieve(session['userid'])
 
-        modules = lessons.list_modules()
+        progress = user.get('progress', {})
+        catalog = [{'module': m, 'status': module_status(progress.get(m['id']))}
+                   for m in lessons.list_modules()]
 
-        return render_template('lesson_catalog.html', modules=modules, user=user)
+        return render_template('lesson_catalog.html', catalog=catalog, user=user)
 
     else:
         return not_logged_in()
@@ -495,13 +639,17 @@ def lesson_overview(module_id):
         except lessons.LessonError:
             return redirect(url_for('lesson_catalog'))
 
-        return render_template('lesson.html', module=module, user=user)
+        entry = user.get('progress', {}).get(module_id)
+
+        return render_template('lesson.html', module=module, user=user,
+                               status=module_status(entry),
+                               resume=resume_step(entry, len(module['steps'])))
 
     else:
         return not_logged_in()
 
 
-@app.route('/lesson/<module_id>/<int:step>')
+@app.route('/lesson/<module_id>/<int:step>', methods=['GET', 'POST'])
 def lesson_step(module_id, step):
     if is_logged_in():
         user = account.retrieve(session['userid'])
@@ -519,16 +667,57 @@ def lesson_step(module_id, step):
 
         current = steps[step]
 
+        # POST an answer -> grade it server-side, persist, then redirect back (Post/Redirect/Get)
+        if request.method == 'POST' and current['type'] == 'question':
+            grade_and_store(module_id, step, current)
+            return redirect(url_for('lesson_step', module_id=module_id, step=step))
+
+        # record the resume pointer, but only when it actually moves (avoid redundant writes)
+        if account.get_progress(session['userid'], module_id).get('step') != step:
+            account.set_progress(session['userid'], module_id, step=step)
+
         # explore steps materialize their data state in a sandbox (never the student's history)
         explore = None
         if current['type'] == 'explore':
             explore = build_explore(module_id, current)
 
+        # question steps render their form + any prior answer/feedback read back from progress
+        question = None
+        if current['type'] == 'question':
+            question = build_question(module_id, step, current)
+
         return render_template('lesson_step.html', module=module, step=current,
-                               step_index=step, total=len(steps), explore=explore, user=user)
+                               step_index=step, total=len(steps),
+                               explore=explore, question=question, user=user)
 
     else:
         return not_logged_in()
+
+
+@app.route('/lesson/<module_id>/complete')
+def lesson_complete(module_id):
+    if is_logged_in():
+
+        try:
+            module = lessons.get_module(module_id)
+        except lessons.LessonError:
+            return redirect(url_for('lesson_catalog'))
+
+        # mark the module finished; the overview then shows the completion state
+        account.set_progress(session['userid'], module_id,
+                             step=len(module['steps']) - 1, completed=True)
+
+        return redirect(url_for('lesson_overview', module_id=module_id))
+
+    else:
+        return not_logged_in()
+
+
+def resolve_lesson_state(module_id, step):
+    # a step's own `state` overrides; otherwise inherit the module's active state from progress
+    if 'state' in step:
+        return step['state']
+    return account.get_progress(session['userid'], module_id).get('state', [])
 
 
 def build_explore(module_id, step):
@@ -537,10 +726,9 @@ def build_explore(module_id, step):
     # active state recorded on the student's progress. The student's own history is untouched.
 
     if 'state' in step:
-        active_state = step['state']
-        account.set_lesson_state(session['userid'], module_id, active_state)
-    else:
-        active_state = account.get_progress(session['userid'], module_id).get('state', [])
+        account.set_lesson_state(session['userid'], module_id, step['state'])
+
+    active_state = resolve_lesson_state(module_id, step)
 
     # tokens -> history items, applied on top of the base dataset only (session=None)
     override = [history_text_to_item(token) for token in active_state]
@@ -565,6 +753,81 @@ def build_explore(module_id, step):
         'focus': focus,
         'column_info': column_info,
         'deeplink': deeplink
+    }
+
+
+# maps answer.compute.stat -> the key Data.get_column_info returns it under
+_STAT_KEY = {'mean': 'mean', 'median': 'mdn', 'std': 'std'}
+
+
+def compute_expected(module_id, step):
+    # Live-compute the expected numeric answer from the step's data state via Data
+    # (never hardcoded), so grading stays correct if the state's filters change.
+    compute = step['answer']['compute']
+    override = [history_text_to_item(token) for token in resolve_lesson_state(module_id, step)]
+
+    summary = get_data(None, history_override=override)
+
+    if compute['stat'] == 'count':
+        return float(summary['entries'])
+
+    # mean/median/std need a real numeric column present in the filtered data
+    if compute['column'] not in summary['column_list']:
+        return None
+
+    info = get_data(None, compute['column'], 'occurrence', override)['column_info']
+    value = info[_STAT_KEY[compute['stat']]]
+    return float(value) if value is not None else None
+
+
+def grade_and_store(module_id, step_index, step):
+    # Grade a submitted answer entirely server-side. The client never sends a "correct" flag.
+    answer = step['answer']
+    atype = answer['type']
+    submitted = request.form.get('answer', '').strip()
+
+    record = {'type': atype, 'value': submitted, 'correct': None}
+
+    if atype == 'numeric':
+        try:
+            value = float(submitted)
+        except ValueError:
+            value = None
+        if value is None:
+            record['correct'] = False
+        else:
+            record['value'] = value
+            expected = compute_expected(module_id, step)
+            record['correct'] = expected is not None and abs(value - expected) <= answer['tolerance'] + 1e-9
+
+    elif atype == 'choice':
+        try:
+            index = int(submitted)
+        except ValueError:
+            index = -1
+        record['value'] = index
+        record['correct'] = (index == answer['correct'])
+
+    # 'free' is not auto-graded: keep value, leave correct = None
+
+    progress = account.get_progress(session['userid'], module_id)
+    answers = dict(progress.get('answers', {}))
+    answers[str(step_index)] = record
+    account.set_progress(session['userid'], module_id, step=step_index, answers=answers)
+
+
+def build_question(module_id, step_index, step):
+    # GET-render context for a question step: the form inputs plus any prior answer/feedback.
+    answer = step['answer']
+    prior = account.get_progress(session['userid'], module_id).get('answers', {}).get(str(step_index))
+
+    return {
+        'type': answer['type'],
+        'options': answer.get('options'),          # choice
+        'model_answer': answer.get('model_answer'),  # free
+        'prior': prior,                            # {'type','value','correct'} or None
+        'answered': prior is not None,
+        'require_answer': step.get('require_answer', False)
     }
 
 
