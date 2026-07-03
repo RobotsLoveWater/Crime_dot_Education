@@ -70,14 +70,17 @@ flask --app app run          # add --debug for reload
 | `app.py` | Flask routes + the `is_logged_in` / `not_logged_in` helpers. Thin controller layer. |
 | `data.py` | `Data` class — the actual pandas analysis engine: filtering, cross-tabs, per-column stats, MOC filtering. Also `format_column_info()` (sorting for display). |
 | `cache.py` | The history→cache→dataframe machinery: `get_data`, `get_moc_options`, `_execute`. `__main__` builds `cache/raw.csv` from `dataset.sav`. (Header comment calls it `precache.py`.) |
-| `account.py` | User accounts as pickles under `user/`. Create/retrieve/history-add/history-revert. |
+| `account.py` | User accounts as pickles under `user/`. Create/retrieve/history-add/revert, plus **learning-module `progress`/`state` helpers** (`get_progress`, `set_progress`, `set_lesson_state`) and the `is_educator` role flag. |
+| `lessons.py` | Learning-modules loader/validator: `list_modules`, `get_module`, `validate`, `save_module` over `lessons/*.json`. Pure stdlib module (no Flask), mirrors `account.py`. |
 | `make_history.py` | Builds history entry dicts (`action` list + human-readable `desc`). |
 | `moc.py` | `MnOffenseCodes.CODES` — a huge (~1800-line) nested dict decoding the Minnesota Offense Code. Pure data + structure. |
 | `util.py` | `ordinal()` and bcrypt `get_hashed_password` / `check_password`. (Header comment is wrong — says `make_history.py`.) |
 | `codebook.xml` | Maps dataset column names → human descriptions (161 entries). Loaded by `Data.__init__`. |
 | `settings.xml` | seaborn palette/style (`deep` / `darkgrid`). Not heavily used yet. |
 | `test.py` | Ad-hoc scratch script for the history→cache-key encoding. Not a real test suite. |
-| `templates/` | Jinja2. `layout.html` is the base (nav + history table + error block); others extend it. |
+| `templates/` | Jinja2. `layout.html` is the base (nav + history table + error block); others extend it. Learning-modules views: `lesson_catalog.html`, `lesson.html`, `lesson_step.html`, `admin.html`, `admin_edit.html`. |
+| `lessons/` | Authored learning-module content (`<id>.json`) + `README.md` schema. **Safe to commit** (unlike `user/`). |
+| `LEARNING_MODULES_PROMPTS.md` | Phased build plan for the learning-modules feature. All phases are now implemented; the doc still reads as forward-looking. |
 | `static/css/style.css` | Styling; theme via CSS variables (`--color-accent`, etc.). |
 
 ## Key data structures
@@ -113,7 +116,10 @@ CODES['A'] = [ 'Assault',                 # [0] title (comment '# Complete' = fu
 - `/info/`, `/info/<column>/<sorting>` — descriptive stats per column. `sorting` ∈ `Data.VALID_SORTING`.
 - `/table`, `/table/<dependant>/<x_axis>/<y_axis>` — cross-tab (N, mean, median, std). `dependant == '#'` means count only.
 - `/filter/` menu; `/filter/boolean/<column>/<sorting>` — comparison filters (single or OR-multiple); `/filter/moc/...` — offense-code drill-down.
-- `/load` — revert/clear history. `/download`, `/save`, `/other`, `/settings`, `/admin`, `/lesson*` — **stubs** returning "WIP, Feature Not Implemented".
+- `/load` — revert/clear history.
+- **Learning modules:** `/lesson` (catalog), `/lesson/<module_id>` (overview), `/lesson/<module_id>/<step>` (render; POST grades a `question`), `/lesson/<module_id>/complete` (mark done). See "Learning Modules" below.
+- **Authoring (educators only):** `/admin` (list your class's modules), `/admin/edit[/<module_id>]` (create/edit → writes validated JSON to `lessons/`). Guarded by `require_educator()`.
+- `/guide` — static guide page (replaced the old buggy `/lesson/get_started` stub). `/download`, `/save`, `/other`, `/settings` — still **stubs** returning "WIP, Feature Not Implemented".
 
 Every data route follows the pattern: `if is_logged_in(): ... else: return not_logged_in()`.
 
@@ -142,59 +148,70 @@ Every data route follows the pattern: `if is_logged_in(): ... else: return not_l
   **public** GitHub repo — do not treat this key as secret; rotate + move to env var if productionizing.
 - `account.create` returns `retrieve(username)` on an existing user (should be `userid`) — latent bug.
 - `/new` sets `session['userid']` but not `session['username']`/`session['classcode']`.
-- Templates reference `hero_image_url` and `current_year`, but no route passes them → they render empty.
 - Stubbed/`pass`-only: `Data.filter_and`, `filter_or_diff` (partial), `make_history.filter_or_diff`, `filter_and`, `moc_or`; the `d` and `a` action codes are not handled by `_execute` (raise `ValueError`).
+- **Learning-module `checkpoint` steps are not wired up.** `lessons.py` validates a step's `expect_state`, but `app.lesson_step` builds no context for `checkpoint` and `lesson_step.html` falls through to the generic "Interactive step — coming next phase" placeholder — nothing compares the student's active state to `expect_state`. The shipped `intro-descriptive-stats` lesson *ends* on such a step. (Note: `current_year` is now injected globally via a context processor and `index` passes `hero_image_url`, so those earlier template-variable gaps are resolved.)
 
-## Planned: Learning Modules framework (next phase — NOT yet built)
+## Learning Modules (implemented)
 
-Design for the upcoming "learning modules" / guided-lessons feature. The UI already
-anticipates it (`index.html` advertises "Guided Lessons" and a hardcoded "Interactive
-Lessons: 0"; the `/lesson*` routes are stubs). **None of this is implemented yet — it is a
-plan.** Detailed, phased implementation prompts live in `LEARNING_MODULES_PROMPTS.md`; work
-through them one phase at a time.
+Guided lessons that reuse the history/cache substrate. Built across the phases in
+`LEARNING_MODULES_PROMPTS.md` — **all phases are now implemented** on the `learning-modules`
+branch. That doc and `lessons/README.md` still read as forward-looking plans (e.g. README says
+"Phase 0 is data only"); treat **this section** as the current-state authority.
 
-**Core idea — reuse the history/cache substrate.** A lesson is an ordered sequence of
-*steps*; each step optionally carries a **data state** expressed as history tokens (the same
-`f.col.op.val` encoding `cache.history_item_to_text` already produces). Because every
-statistic in the app is a deterministic function of a history, a step can (a) reconstruct
-exactly the filtered dataset the lesson wants via the existing `_execute`/cache path, and
-(b) **auto-grade numeric questions by computing the answer live** (`Data.get_column_info`,
-`Data.get_table`) rather than hardcoding it — so answers stay correct if the data changes.
-This shared data-state abstraction is what "links the statistical analysis" to lesson content.
+**Core idea — reuse the history/cache substrate.** A lesson is an ordered list of *steps*; a
+step can carry a **data state** expressed as history tokens (the same `f.col.op.val` /
+`o.col.op.v1~v2` encoding `cache.history_item_to_text` produces). Because every statistic is a
+deterministic function of a history, a step reconstructs its exact filtered dataset via the
+existing `_execute`/`get_data` path, and numeric questions are **graded live**
+(`Data.get_column_info`) rather than hardcoded — so answers stay correct if the data changes.
 
-**Module/step data model (file-based, no DB — matches the rest of the app):**
-- `lessons/<module_id>.json` — a module: `id`, `title`, `description`, `author` (classcode),
-  `objectives`, and an ordered `steps` list.
-- Step types: `read` (markdown only), `explore` (sets a data `state` + deep-links into
-  `/info` or `/table`), `question` (`choice` / `numeric` / `free` answers; `numeric` graded
-  against live computation on the step's state), `checkpoint` (assert the user's current state
-  matches an expected one).
-- Loader: a new `lessons.py` that lists/parses `lessons/` (mirrors how `account.py` lists
-  `user/`). `lessons/` is author-supplied content and **safe to commit** (unlike `user/`).
+**Files:**
+- `lessons/<id>.json` — one module: `id`, `title`, `description`, `author` (classcode),
+  `objectives`, ordered `steps`. Schema is documented in `lessons/README.md`. `id` must be
+  `[a-z0-9-]` and match the filename stem (enforced by `lessons.validate`; also blocks path
+  traversal). One shipped example: `lessons/intro-descriptive-stats.json`.
+- `lessons.py` — loader/validator: `list_modules`, `get_module`, `validate`, `save_module`.
 
-**Progress & sandboxing (key design decisions):**
-- Store progress on the user pickle under a new **`progress`** key
-  (`{module_id: {step, answers, completed}}`), defaulting to `{}` when the key is absent —
-  the same backwards-compatible pattern as `saved`.
-- **Lessons are strictly sandboxed (decided).** A lesson's data state must **never** be
-  copied into, merged with, or mutate the student's own exploration `history` — there is no
-  carry-over. Render lesson states via an **override history** instead of touching the account.
-  Note:
-  `cache.get_data` already has a half-wired `history_override` parameter that is currently a
-  **no-op** (`full_history + history_override` is computed but never assigned, cache.py:54);
-  completing it — and adding the same override to `_execute` — is the intended hook for
-  lesson-scoped state.
+**Step types:** `read` (body only), `explore` (sets/deep-links a data `state`; `focus` links
+into `/info/<column>` or `/table/...`), `question` (`numeric` graded live within `tolerance` /
+`choice` graded by index / `free` stored ungraded), `checkpoint` (declared + validated but
+**not yet functional** — see Known issues).
 
-**Routes to flesh out (currently stubs in `app.py`):** `/lesson` (catalog),
-`/lesson/<module_id>` (overview), `/lesson/<module_id>/<step>` (render + POST to answer/
-advance). The existing `/lesson/get_started/<page>` stub is also buggy — its view function
-`lesson_guide()` omits the `page` argument. New templates extend `layout.html`:
-`lesson_catalog.html`, `lesson.html`, `lesson_step.html`.
+**Data-state override (the sandbox).** Lesson states are applied through the `history_override`
+parameter on `cache.get_data` / `cache._execute`, appended on top of the base dataset (or the
+student's history) **without ever mutating `user['history']`** — this completes the formerly
+no-op `history_override` hook. `cache.history_text_to_item` decodes a token back into a history
+`action` for this path. `app.build_explore` / `compute_expected` drive it with `session=None`
+so only the lesson's own tokens apply.
 
-**Roles/authoring:** educators author modules as files scoped to their `classcode`; the stub
-`/admin` route is the intended authoring surface. There is currently **no role system** (all
-accounts are equal) — adding an educator flag to the account pickle is a prerequisite for
-authoring/permissions.
+**Progress & state** live on the user pickle under `progress` (backwards-compatible via
+`user.get('progress', {})`):
+```python
+user['progress'] = {
+  '<module_id>': {
+    'step': 3,                          # last-viewed step index (resume pointer)
+    'completed': False,
+    'answers': {'2': {'type': 'numeric', 'value': 41.7, 'correct': True}},  # keyed by step index
+    'state': ['f.moc1.eq.A']            # active lesson data state — NEVER merged into history
+  }
+}
+```
+Helpers in `account.py`: `get_progress`, `set_progress` (merges — won't clobber sibling keys),
+`set_lesson_state`. An `explore` step with its own `state` **sets** the active state; later
+steps inherit it unless they carry their own.
+
+**Grading is entirely server-side** (`app.grade_and_store` never trusts a client "correct"
+flag). `numeric` recomputes the expected value from the step's active state via
+`app.compute_expected` (`count` → dataset `entries`; `mean|median|std` → `get_column_info`'s
+`mean`/`mdn`/`std`), correct if `abs(submitted - expected) <= tolerance`. `require_answer: true`
+locks the Next button until an answer is submitted (a soft, URL-bypassable gate).
+
+**Roles / authoring.** `account.is_educator(userid)` reads an `is_educator` flag set at account
+creation from a **classcode convention**: a classcode starting `edu-`
+(`account.EDUCATOR_CLASSCODE_PREFIX`) grants authoring rights. This is a convenience, **not a
+security boundary** (the app has no real auth). Educators use `/admin` + `/admin/edit` to
+create/edit modules scoped to their own `classcode`; `require_educator()` guards those routes
+and `slugify()` sanitizes the module id before it reaches the filesystem.
 
 ## Git remotes
 

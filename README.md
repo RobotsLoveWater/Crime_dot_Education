@@ -1,93 +1,100 @@
-# cde
+# MN Analysis of Sentencing Trends (MAST)
 
+*Product name in the UI: **Minnesota Sentencing Explorer**, also styled **Crime[dot]Education**.*
 
+A Flask web application for exploring **Minnesota felony sentencing data (2001–2019,
+~294,000 sentenced counts)**. Social scientists, educators, and students log in, apply a chain
+of filters to the dataset, and read descriptive statistics, cross-tabulations, and **guided
+learning modules** built on top of the same data.
+
+The project began as analysis for a senior thesis at St. Cloud State University and is now
+developed toward a grant, with an emphasis on **education and public dissemination** of the data.
+
+## Background
+
+- **Data source:** the Minnesota Sentencing Commission — felony sentences from the
+  sentencing-guidelines era onward. The working dataset used in development is restricted to
+  **2001–2019**; broader historical coverage is a roadmap item (see [`ROADMAP.md`](ROADMAP.md)).
+- **This repository is the web application.** A prior command-line tool (pandas + Seaborn
+  graphing, tables, CSV export) predates it and is *not* included here — only fossils remain in
+  the code (comments marked `cli-legacy`).
+
+## Features
+
+- **Chained filtering / exploration.** Build a dataset view by appending filters: compare any
+  column with `eq, ne, gt, ge, lt, le` (so `ne` = *exclude by row value*), OR across several
+  values of one column, or drill down through the **Minnesota Offense Code (MOC)** one digit at
+  a time.
+- **Descriptive statistics.** Per-column summaries — counts and percentage breakdown of each
+  value, plus mean / median / std for numeric columns, in several sort orders.
+- **Cross-tabulation tables.** N, mean, median, and std of a dependent variable across two
+  grouping columns.
+- **Guided learning modules.** Author-written lessons ("preset data views with commentary")
+  made of `read` / `explore` / `question` steps. `explore` steps reconstruct a specific
+  filtered dataset; `question` steps are **auto-graded live** against the data (numeric answers
+  computed from the current filter, choice answers checked server-side). Per-student progress
+  and completion are tracked.
+- **Accounts & classes.** Users are scoped by an optional *classcode*; a classcode beginning
+  `edu-` grants **educator** rights to author modules for that class.
+
+## Architecture (at a glance)
+
+- **Stack:** Flask 3 + Jinja2 templates; pandas / numpy for analysis; SPSS `.sav` read via
+  `pyreadstat`.
+- **No database.** User accounts are pickle files under `user/`; computed results are a
+  content-addressed disk cache under `cache/data/`.
+- **History-driven state.** There is no live per-session dataframe. Each account stores an
+  ordered **history** of filter operations; the app replays (or reads from cache) that history
+  to rebuild the filtered dataframe on demand. Each filter serializes to a token (e.g.
+  `f.moc1.eq.A`) that doubles as the cache directory key. Learning-module data states reuse this
+  same encoding through a sandboxed override that never touches the student's own history.
+- **Deeper architectural notes for contributors live in [`CLAUDE.md`](CLAUDE.md).**
 
 ## Getting started
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+Requires **Python 3.13**.
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/sidallen-scsu/cde.git
-git branch -M main
-git push -uf origin main
+pip install -r requirements.txt
 ```
 
-## Integrate with your tools
+The runtime does **not** read the SPSS file directly — it loads `cache/raw.csv`. The raw data
+files are large and are **not** committed to git, so first-time setup is a one-time precompute:
 
-- [ ] [Set up project integrations](https://gitlab.com/sidallen-scsu/cde/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
+1. Obtain `dataset.sav` (the SPSS source, ~141 MB) and place it in the project root.
+2. Build the runtime CSV and warm the cache:
+   ```
+   python cache.py        # answer "y" to both prompts
+   ```
+   This writes `cache/raw.csv` (~242 MB) and pre-computes per-column stats into `cache/data/`.
+3. Run the app:
+   ```
+   flask --app app run    # add --debug for auto-reload
+   ```
 
 ## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+
+This is an **active academic / research prototype**, not a hardened production service. Known
+limitations (see [`ROADMAP.md`](ROADMAP.md) and [`CLAUDE.md`](CLAUDE.md) for the full list):
+
+- **Authentication is not production-grade.** Login only checks that a username exists — it does
+  *not* verify the password — and the Flask `secret_key` is a hardcoded development placeholder.
+  Do not deploy as-is with real or sensitive user data.
+- **No data export yet** (`/download` is a stub) and **no charts/figures** in the web UI (the
+  CLI's Seaborn graphing has not been reintroduced, though the dependencies remain).
+- **`checkpoint` lesson steps** are validated but not yet functional.
+
+## Team
+
+Maintained by a team at **St. Cloud State University**:
+
+- Dr. Lindsey Vigesaa
+- Dr. Mary Clifford
+- David Hudson
+- Sidney Allen
+
+With additional thanks to **Indigo Allen**.
+
+## License
+
+Released under the **MIT License** — see [`LICENSE`](LICENSE). Note that this repository is public.
