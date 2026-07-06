@@ -148,7 +148,11 @@ Every data route follows the pattern: `if is_logged_in(): ... else: return not_l
   `/login` only checks that the username exists, then creates a session. Treat auth as insecure.
 - **Hardcoded Flask `secret_key`** in `app.py` (marked "DEVELOPMENT ONLY"). The repo is a
   **public** GitHub repo — do not treat this key as secret; rotate + move to env var if productionizing.
-- `account.create` returns `retrieve(username)` on an existing user (should be `userid`) — latent bug.
+- **Account create/login existence checks — fixed.** `get_user_list` now returns bare usernames
+  (it used to return `.pickle`-suffixed filenames, so `/new` never detected duplicates — it fell
+  through to `create` and crashed — and `/login` rejected every existing user); and
+  `account.create` now returns `retrieve(userid)` (was `retrieve(username)`) on the already-exists
+  path. Login still does **not** verify the password (see above).
 - `/new` sets `session['userid']` but not `session['username']`/`session['classcode']`.
 - Stubbed/`pass`-only: `Data.filter_and`, `filter_or_diff` (partial), `make_history.filter_or_diff`, `filter_and`, `moc_or`; the `d` and `a` action codes are not handled by `_execute` (raise `ValueError`).
 - **Learning-module `checkpoint` steps are not wired up.** `lessons.py` validates a step's `expect_state`, but `app.lesson_step` builds no context for `checkpoint` and `lesson_step.html` falls through to the generic "Interactive step — coming next phase" placeholder — nothing compares the student's active state to `expect_state`. The shipped `intro-descriptive-stats` lesson *ends* on such a step. (Note: `current_year` is now injected globally via a context processor and `index` passes `hero_image_url`, so those earlier template-variable gaps are resolved.)

@@ -44,7 +44,10 @@ def get_user_list(classcode) -> list[str]:
 
     if os.path.exists('user/' + classcode):
 
-        return os.listdir('user/' + classcode)
+        # accounts are stored as '<username>.pickle'; strip the extension so callers can
+        # compare against a submitted username (the /new and /login existence checks)
+        return [name[:-len('.pickle')] for name in os.listdir('user/' + classcode)
+                if name.endswith('.pickle')]
 
     else:
 
@@ -83,7 +86,7 @@ def create(username, classcode, password, overwrite=False) -> dict:
     userid = form_userid(username, classcode)
 
     if not overwrite and os.path.exists(get_user_directory(userid)):
-        return retrieve(username)
+        return retrieve(userid)
 
     # structure of user account
     user = {
