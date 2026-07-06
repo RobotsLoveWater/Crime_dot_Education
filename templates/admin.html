@@ -1,50 +1,100 @@
 {% extends "layout.html" %}
-{% block title %} — Authoring{% endblock %}
+{% block title %} — Educator portal{% endblock %}
 
 {% block body %}
 
 <header class="view-header">
     <div class="view-heading">
-        <h1>Lesson authoring</h1>
-        <p class="view-subtitle">Modules scoped to class <code>{{ classcode }}</code>.</p>
-    </div>
-    <div class="view-actions">
-        <a class="btn btn-primary" href="{{ url_for('admin_edit') }}">New module</a>
+        <h1>Educator portal</h1>
+        <p class="view-subtitle">Classes and lessons for <code>{{ classcode }}</code>.</p>
     </div>
 </header>
 
-{% if modules %}
-<div class="table-wrapper">
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th scope="col">Title</th>
-                <th scope="col">Id</th>
-                <th scope="col" class="num">Steps</th>
-                <th scope="col">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for m in modules %}
-            <tr>
-                <td>{{ m['title'] }}</td>
-                <td><code>{{ m['id'] }}</code></td>
-                <td class="num">{{ m['steps']|length }}</td>
-                <td>
-                    <a href="{{ url_for('admin_edit', module_id=m['id']) }}">Edit</a> ·
-                    <a href="{{ url_for('lesson_overview', module_id=m['id']) }}">View</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% else %}
-<div class="empty-state">
-    <h2>No modules yet</h2>
-    <p>Use <strong>New module</strong> to create your first lesson.</p>
-    <a class="btn btn-primary" href="{{ url_for('admin_edit') }}">New module</a>
-</div>
-{% endif %}
+<section class="portal-section">
+    <header class="view-header">
+        <div class="view-heading">
+            <h2>Classes</h2>
+        </div>
+        <div class="view-actions">
+            <a class="btn btn-primary" href="{{ url_for('admin_classes') }}">Manage classes</a>
+        </div>
+    </header>
+
+    {% if classes %}
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Join code</th>
+                    <th scope="col" class="num">Students</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in classes %}
+                <tr>
+                    <td>{{ c['name'] }}</td>
+                    <td><code>{{ c['join_code'] }}</code></td>
+                    <td class="num">{{ c['roster']|length }}</td>
+                    <td><a href="{{ url_for('admin_class', class_id=c['class_id']) }}">Open</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h2>No classes yet</h2>
+        <p>Create a class to get a join code students can use to enroll.</p>
+        <a class="btn btn-primary" href="{{ url_for('admin_classes') }}">New class</a>
+    </div>
+    {% endif %}
+</section>
+
+<section class="portal-section">
+    <header class="view-header">
+        <div class="view-heading">
+            <h2>Lessons</h2>
+        </div>
+        <div class="view-actions">
+            <a class="btn btn-primary" href="{{ url_for('admin_edit') }}">New module</a>
+        </div>
+    </header>
+
+    {% if modules %}
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th scope="col">Title</th>
+                    <th scope="col">Id</th>
+                    <th scope="col" class="num">Steps</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in modules %}
+                <tr>
+                    <td>{{ m['title'] }}</td>
+                    <td><code>{{ m['id'] }}</code></td>
+                    <td class="num">{{ m['steps']|length }}</td>
+                    <td>
+                        <a href="{{ url_for('admin_edit', module_id=m['id']) }}">Edit</a> ·
+                        <a href="{{ url_for('lesson_overview', module_id=m['id']) }}">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h2>No modules yet</h2>
+        <p>Use <strong>New module</strong> to create your first lesson.</p>
+        <a class="btn btn-primary" href="{{ url_for('admin_edit') }}">New module</a>
+    </div>
+    {% endif %}
+</section>
 
 {% endblock %}

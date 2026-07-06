@@ -257,6 +257,20 @@ reserves its height so the footer is never covered.
   multi-digit sections render as **one** merged slot. Below it, an options table lists each
   choice for the active slot with the case count it would leave. The offense category is a
   leading fixed (dashed) slot.
+- **Copy affordance** (e.g. a class join code). The value itself always renders as visible,
+  selectable text (`<code>`, `--fs-2xl`, accent-subtle background) so it's readable/copyable
+  with no JS. A `.js-only` "Copy" button (`[data-copy]` pointing at the value's selector) is a
+  pure enhancement: `navigator.clipboard.writeText`, falling back to a `Range`/`execCommand('copy')`
+  selection for older browsers; the button reads "Copied!" for 2s, and a failure raises the
+  standard danger toast rather than silently doing nothing.
+- **Educator portal** (`/admin*`). Portal home (`/admin`) has two `.portal-section` areas —
+  Classes and Lessons — each a `view-header` + `.data-table` (or `.empty-state`) + a primary
+  "New …" action, mirroring the existing lesson-authoring list. `/admin/classes` adds a
+  `.filter-form`-width create form (name + an optional email-policy fieldset: a checkbox plus
+  a comma-separated allowed-domains input) above the same list. `/admin/classes/<id>` shows the
+  join code (copy affordance above), a roster `.data-table` (username only — no email; minimal
+  PII per `EDUCATOR_PORTAL.md`), the email-policy form again (now editable in place), and
+  disabled (`aria-disabled`) placeholder buttons for progress/assignments (later phases).
 
 ## Charts (Chart.js)
 

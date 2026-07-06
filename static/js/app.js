@@ -116,6 +116,44 @@
     });
   }
 
+  /* ---------- Copy to clipboard ([data-copy], e.g. the class join code) ---------- */
+
+  document.addEventListener('click', function (e) {
+    var button = e.target && e.target.closest ? e.target.closest('[data-copy]') : null;
+    if (!button) return;
+    var target = document.querySelector(button.getAttribute('data-copy'));
+    if (!target) return;
+    var text = target.textContent.trim();
+
+    var label = button.textContent;
+    function copied() {
+      button.textContent = 'Copied!';
+      setTimeout(function () { button.textContent = label; }, 2000);
+    }
+    function failed() {
+      showToast('Could not copy — select and copy the code manually.', 'danger');
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(copied, failed);
+      return;
+    }
+
+    // fallback for browsers without the async Clipboard API
+    var range = document.createRange();
+    range.selectNodeContents(target);
+    var selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    try {
+      document.execCommand('copy');
+      copied();
+    } catch (err) {
+      failed();
+    }
+    selection.removeAllRanges();
+  });
+
   /* ---------- Sidebar drawer (<1024px) ----------
      Opened by any [aria-controls="sidebar"] trigger: the top-bar ☰ at tablet
      width and the full-width data-state bar on phones. Focus is trapped and

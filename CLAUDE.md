@@ -472,9 +472,12 @@ existing `_execute`/`get_data` path, and numeric questions are **graded live**
 - `lessons/<id>.json` — one module: `id`, `title`, `description`, `author` (classcode), optional
   `order` (catalog sort position — lower shows first, missing sorts last), `objectives`, ordered
   `steps`. Schema is documented in `lessons/README.md`. `id` must be `[a-z0-9-]` and match the
-  filename stem (enforced by `lessons.validate`; also blocks path traversal). Two shipped lessons,
-  sequenced via `order`: `intro-explorer-basics.json` (a hands-on tour of the Explorer's tools,
-  `order: 1`) then `intro-descriptive-stats.json` (`order: 2`).
+  filename stem (enforced by `lessons.validate`; also blocks path traversal). Three shipped
+  lessons, sequenced via `order`: `intro-what-this-data-is.json` (data provenance/interpretation
+  primer — where the dataset sits in the criminal-justice funnel, unit of analysis, description
+  vs. explanation — `order: 0`, read/question-heavy with one `explore` step), then
+  `intro-explorer-basics.json` (a hands-on tour of the Explorer's tools, `order: 1`), then
+  `intro-descriptive-stats.json` (`order: 2`).
 - `lessons.py` — loader/validator: `list_modules`, `get_module`, `validate`, `save_module`.
 
 **Step types:** `read` (body only), `explore` (sets a data `state`; `focus` picks the main-area

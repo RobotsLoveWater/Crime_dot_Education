@@ -64,6 +64,22 @@ submitted an answer (correct or not). See "Answer types".
 Asserts the student's current active state matches an expected one. Fields: `title`, `body`,
 `expect_state` (token[]).
 
+## Markdown
+
+`body` text is rendered by the `lesson_body` Jinja filter (`app.py`) — a small, dependency-free
+subset, not a full Markdown implementation. Author text is HTML-escaped *first*, so nothing in
+`body` can inject markup. Supported:
+
+- Paragraphs, separated by a blank line.
+- `**bold**` and `*italic*` (nest at your own risk — the converter is regex-based, not a parser).
+- `` `inline code` ``.
+- A block where every line starts with `- ` becomes a `<ul>` bullet list.
+- A block that is a lone `---` line becomes a horizontal rule (`<hr>`) — the idiom used to
+  separate a step's body from a trailing references block in citation-heavy lessons.
+
+Not supported (renders as literal text — check before authoring): numbered lists, links
+(`[text](url)`), headings, blockquotes, tables. Keep references as plain text/URLs.
+
 ## Answer types (`question.answer`)
 
 | `type` | Fields | Grading |

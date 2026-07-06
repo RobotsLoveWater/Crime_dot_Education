@@ -82,7 +82,9 @@ EXCLUDED_NOTE = 'Excluded from analysis — identifies individual people or case
 def lesson_body(text):
     # Minimal, dependency-free markdown for lesson step bodies. The markdown-vs-HTML
     # question is still open (see LEARNING_MODULES_PROMPTS.md Appendix C); this covers the
-    # small subset the fixtures use: paragraphs, **bold**, `inline code`, and "- " bullet lists.
+    # subset the fixtures use: paragraphs, **bold**, *italic*, `inline code`, "- " bullet
+    # lists, and a lone "---" line as a horizontal rule (citation-heavy lessons use it to
+    # separate body text from a references block).
     # Author text is HTML-escaped FIRST, so nothing here can inject markup.
     if not text:
         return Markup('')
@@ -90,11 +92,14 @@ def lesson_body(text):
     text = str(escape(text))
     text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
     text = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'\*([^*\n]+)\*', r'<em>\1</em>', text)
 
     blocks = []
     for block in re.split(r'\n\s*\n', text):
         lines = [ln for ln in block.split('\n') if ln.strip() != '']
-        if lines and all(ln.startswith('- ') for ln in lines):
+        if len(lines) == 1 and lines[0].strip() == '---':
+            blocks.append('<hr>')
+        elif lines and all(ln.startswith('- ') for ln in lines):
             blocks.append('<ul>' + ''.join('<li>' + ln[2:] + '</li>' for ln in lines) + '</ul>')
         elif lines:
             blocks.append('<p>' + '<br>'.join(lines) + '</p>')
@@ -1272,9 +1277,33 @@ def require_educator():
     return None
 
 
+def require_class_owner(class_id):
+    # per-class portal guard: educator AND owns this class, else a redirect response (else
+    # None). Layered on require_educator() so a non-educator gets the same bounce as /admin.
+    blocked = require_educator()
+    if blocked:
+        return blocked
+    try:
+        class_obj = classroom.get_class(class_id)
+    except classroom.ClassError:
+        flash("That class doesn't exist.", 'danger')
+        return redirect(url_for('admin_classes'))
+    if class_obj['owner'] != session['userid']:
+        flash("That class belongs to another educator.", 'danger')
+        return redirect(url_for('admin_classes'))
+    return None
+
+
 def slugify(text):
     # sanitize a raw id into a filename-/URL-safe slug ([a-z0-9-]); prevents path traversal
     return re.sub(r'[^a-z0-9-]+', '-', text.strip().lower()).strip('-')
+
+
+def parse_email_policy(form):
+    # shared "email policy" fieldset parsing (new-class form + class-detail form): a checkbox
+    # plus a comma/whitespace-separated domain list.
+    domains = [d.strip() for d in re.split(r'[,\s]+', form.get('email_domains', '')) if d.strip()]
+    return {'required': form.get('email_required') == 'on', 'domains': domains}
 
 
 @app.route('/admin')
@@ -1286,10 +1315,62 @@ def admin():
     user = account.retrieve(session['userid'])
     classcode = user['classcode']
 
+    classes = classroom.list_classes(session['userid'])
     # educators manage the modules scoped to their own classcode
     mine = [m for m in lessons.list_modules() if m.get('author') == classcode]
 
-    return render_template('admin.html', user=user, modules=mine, classcode=classcode)
+    return render_template('admin.html', user=user, classes=classes, modules=mine, classcode=classcode)
+
+
+@app.route('/admin/classes', methods=['GET', 'POST'])
+def admin_classes():
+    blocked = require_educator()
+    if blocked:
+        return blocked
+
+    user = account.retrieve(session['userid'])
+    error = []
+    form = {'name': '', 'email_required': False, 'email_domains': ''}
+
+    if request.method == 'POST':
+        form = {'name': request.form.get('name', ''),
+                'email_required': request.form.get('email_required') == 'on',
+                'email_domains': request.form.get('email_domains', '')}
+
+        try:
+            class_obj = classroom.create_class(session['userid'], form['name'],
+                                               parse_email_policy(request.form))
+            flash('Class created — share the join code with students.', 'success')
+            return redirect(url_for('admin_class', class_id=class_obj['class_id']))
+        except classroom.ClassError as e:
+            error.append(str(e))
+
+    classes = classroom.list_classes(session['userid'])
+    return render_template('admin_classes.html', user=user, classes=classes, form=form, error=error)
+
+
+@app.route('/admin/classes/<class_id>', methods=['GET', 'POST'])
+def admin_class(class_id):
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    user = account.retrieve(session['userid'])
+
+    if request.method == 'POST':
+        classroom.set_email_policy(class_id, parse_email_policy(request.form))
+        flash('Email policy updated.', 'success')
+        return redirect(url_for('admin_class', class_id=class_id))
+
+    class_obj = classroom.get_class(class_id)
+    policy = class_obj.get('email_policy', {'required': False, 'domains': []})
+    # roster entries are userids ("<class_id>/<username>") — split for display, no account
+    # reads needed (classes hold no PII beyond userids; see classroom.py)
+    roster = [{'userid': u, 'username': u.split('/', 1)[1] if '/' in u else u}
+              for u in class_obj['roster']]
+
+    return render_template('admin_class.html', user=user, class_obj=class_obj,
+                           roster=roster, policy=policy)
 
 
 @app.route('/admin/edit', methods=['GET', 'POST'])
