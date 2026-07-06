@@ -155,7 +155,7 @@ Every data route follows the pattern: `if is_logged_in(): ... else: return not_l
   path. Login still does **not** verify the password (see above).
 - `/new` sets `session['userid']` but not `session['username']`/`session['classcode']`.
 - Stubbed/`pass`-only: `Data.filter_and`, `filter_or_diff` (partial), `make_history.filter_or_diff`, `filter_and`, `moc_or`; the `d` and `a` action codes are not handled by `_execute` (raise `ValueError`).
-- **Learning-module `checkpoint` steps are not wired up.** `lessons.py` validates a step's `expect_state`, but `app.lesson_step` builds no context for `checkpoint` and `lesson_step.html` falls through to the generic "Interactive step — coming next phase" placeholder — nothing compares the student's active state to `expect_state`. The shipped `intro-descriptive-stats` lesson *ends* on such a step. (Note: `current_year` is now injected globally via a context processor and `index` passes `hero_image_url`, so those earlier template-variable gaps are resolved.)
+- **Learning-module `checkpoint` steps are not wired up.** `lessons.py` validates a step's `expect_state`, but `app.lesson_step` builds no context for `checkpoint` and `lesson_step.html` falls through to the generic "Interactive step — coming next phase" placeholder — nothing compares the student's active state to `expect_state`. Both shipped lessons (`intro-explorer-basics`, `intro-descriptive-stats`) *end* on such a step. (Note: `current_year` is now injected globally via a context processor and `index` passes `hero_image_url`, so those earlier template-variable gaps are resolved.)
 
 ## Learning Modules (implemented)
 
@@ -172,10 +172,12 @@ existing `_execute`/`get_data` path, and numeric questions are **graded live**
 (`Data.get_column_info`) rather than hardcoded — so answers stay correct if the data changes.
 
 **Files:**
-- `lessons/<id>.json` — one module: `id`, `title`, `description`, `author` (classcode),
-  `objectives`, ordered `steps`. Schema is documented in `lessons/README.md`. `id` must be
-  `[a-z0-9-]` and match the filename stem (enforced by `lessons.validate`; also blocks path
-  traversal). One shipped example: `lessons/intro-descriptive-stats.json`.
+- `lessons/<id>.json` — one module: `id`, `title`, `description`, `author` (classcode), optional
+  `order` (catalog sort position — lower shows first, missing sorts last), `objectives`, ordered
+  `steps`. Schema is documented in `lessons/README.md`. `id` must be `[a-z0-9-]` and match the
+  filename stem (enforced by `lessons.validate`; also blocks path traversal). Two shipped lessons,
+  sequenced via `order`: `intro-explorer-basics.json` (a hands-on tour of the Explorer's tools,
+  `order: 1`) then `intro-descriptive-stats.json` (`order: 2`).
 - `lessons.py` — loader/validator: `list_modules`, `get_module`, `validate`, `save_module`.
 
 **Step types:** `read` (body only), `explore` (sets/deep-links a data `state`; `focus` links

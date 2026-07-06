@@ -27,6 +27,7 @@ hardcoded. See `CLAUDE.md` → "Planned: Learning Modules framework" and
 | `title` | string | yes | Human-readable module title. |
 | `description` | string | yes | One-to-two sentence summary for the catalog. |
 | `author` | string | yes | Owning **classcode** (`unmanaged` is the default classcode). |
+| `order` | integer | no | Catalog sort position (lower shows first). Modules without it sort last, ties broken by `id`. |
 | `objectives` | string[] | yes | Learning objectives shown on the overview page. |
 | `steps` | Step[] | yes | Ordered list; step index (0-based) is the `/lesson/<id>/<step>` segment. |
 

@@ -57,6 +57,10 @@ def list_modules() -> list:
 
         modules.append(module)
 
+    # optional 'order' controls catalog sequence (lower first); modules without it sort last,
+    # ties broken by id. Both the catalog (/lesson) and the homepage read this order.
+    modules.sort(key=lambda m: (m.get('order', 10**9), m['id']))
+
     return modules
 
 
@@ -102,6 +106,11 @@ def validate(module, source=None) -> dict:
     objectives = module.get('objectives')
     if not isinstance(objectives, list) or not all(isinstance(o, str) for o in objectives):
         raise LessonError(tag + ": 'objectives' must be a list of strings")
+
+    # optional: catalog ordering. Lower sorts first; missing sorts last (see list_modules).
+    # bool is a subclass of int, so exclude it explicitly.
+    if 'order' in module and (isinstance(module['order'], bool) or not isinstance(module['order'], int)):
+        raise LessonError(tag + ": 'order' must be an integer")
 
     steps = module.get('steps')
     if not isinstance(steps, list) or len(steps) == 0:

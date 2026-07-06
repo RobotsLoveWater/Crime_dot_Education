@@ -1,31 +1,84 @@
 {
   "id": "intro-descriptive-stats",
-  "title": "Reading Descriptive Statistics",
-  "description": "Use the Minnesota Sentencing Explorer to read means, medians, and distributions of presumptive sentence length, and learn what the gap between mean and median tells you about a distribution.",
+  "title": "What the Numbers Say: Reading Descriptive Statistics",
+  "description": "Learn to read the five summaries the Explorer computes - value counts, percentages, mean, median, and standard deviation - and what each one can and cannot tell you about Minnesota felony sentences.",
   "author": "unmanaged",
+  "order": 2,
   "objectives": [
-    "Describe what one row in the sentencing dataset represents",
-    "Apply an offense-code filter and read the resulting dataset summary",
-    "Distinguish the mean from the median of a numeric column",
-    "Infer distribution shape (skew) from the mean-vs-median gap"
+    "Identify the mode of a categorical column and explain when percentages beat raw counts",
+    "Distinguish the mean from the median and infer distribution shape from the gap between them",
+    "Explain what a large or small standard deviation says about a column",
+    "Explain why spread often shrinks inside a filtered subgroup (variance as composition)",
+    "Check N before trusting any statistic"
   ],
   "steps": [
     {
       "type": "read",
-      "title": "What is in this dataset?",
-      "body": "This tool explores roughly **294,000 Minnesota felony sentencing records** from **2001-2019**. Each row is a single sentenced count. Two columns you will use here:\n\n- `sentyear` - the **Year Sentenced** (2001-2019).\n- `time` - the **Presumptive Sentence** in **months** (what the sentencing guidelines recommend).\n\nWe will filter the data down to one kind of offense and then read the descriptive statistics the Explorer computes for `time`."
+      "title": "Describing is not explaining",
+      "body": "As always: **keep this lesson open in its own tab** and drive the Explorer in a second tab, mirroring each step yourself.\n\nEvery number in this module is a **descriptive statistic** - a summary of *what is in the current view*. Descriptive statistics report patterns; they never explain why a pattern exists. Keep that line bright today.\n\nThe Explorer computes five summaries. For **categorical** columns (labels): value **counts** and **percentages**. For **numeric** columns: those plus the **mean**, **median**, and **standard deviation (std)**. Columns you will use:\n\n- `time` - presumptive sentence, in months.\n- `moc1`, `moc2`, `moc4` - characters of the MN Offense Code.\n- `sex` - the sentenced person's sex as recorded by the court.\n- `history` - the criminal-history score (`0` = no criminal history).\n- `tweight` - the combined severity weight of additional felony counts at sentencing."
     },
     {
       "type": "explore",
-      "title": "Narrow to assault cases",
-      "body": "The **MN Offense Code** is decoded one character at a time. Its first character, `moc1`, is the top-level offense category. `moc1 = A` means **Assault**.\n\nWe apply the filter `moc1 == A` and view the descriptive statistics for the presumptive-sentence column `time`. Note the reported **N** (how many rows survived the filter), the **mean**, and the **median**.",
-      "state": ["f.moc1.eq.A"],
+      "title": "The most common offense",
+      "body": "Start with a categorical column on the **unfiltered** dataset. In your other tab: open the **Descriptive** tab, select `moc1`, and sort by **Most Common**. The first row is the **mode** - the single most frequent value.\n\nRead its three parts: the **value** (an offense category), its **count** (how many rows), and its **percentage** (that count as a share of all rows in view).",
+      "state": [],
+      "focus": { "view": "info", "column": "moc1" }
+    },
+    {
+      "type": "question",
+      "title": "Name the mode",
+      "body": "Sorted by Most Common, which top-level offense category (`moc1`) is the **mode** of the full dataset?",
+      "answer": {
+        "type": "choice",
+        "options": ["Drug offenses (D)", "Assault (A)", "Weapons (W)", "Theft"],
+        "correct": 0
+      }
+    },
+    {
+      "type": "read",
+      "title": "Counts lie when groups differ in size",
+      "body": "A raw count answers *how many*. A percentage answers *how common*. Those are different questions, and they can disagree.\n\nIf group 1 is ten times larger than group 2, group 1 will out-count group 2 on almost everything - even things that are actually *rarer* within group 1. Whenever you compare groups of different sizes, the percentage is usually the honest comparison. The next two views walk straight into this trap so you can see it."
+    },
+    {
+      "type": "explore",
+      "title": "Short sentences among women",
+      "body": "This view is filtered to `sex == Female`, showing the value counts of `time`. Scroll to the value **12.03 months** - that oddly precise number is 366 days, the traditional **'year and a day'** sentence. Note two things about that row: its **count** and its **percentage**.\n\nAlso glance at the total **N** for this view - women are a small minority of all sentenced counts.",
+      "state": ["f.sex.eq.Female"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "explore",
+      "title": "Short sentences among men",
+      "body": "Same summary, now filtered to `sex == Male`. Find the **12.03-month** row again and compare against what you just saw: the **count** here is far larger, but the **percentage** is far smaller.\n\nThis is a well-documented descriptive pattern in criminal justice data: women appear in the system far less often, and when they do, their sentences run shorter. *Why* that pattern exists is a genuinely hard question - one a later module takes up properly. Today's job is only to read the pattern correctly.",
+      "state": ["f.sex.eq.Male"],
       "focus": { "view": "info", "column": "time" }
     },
     {
       "type": "question",
-      "title": "Average presumptive sentence",
-      "body": "Reading the summary for `time` on the assault-filtered data (`moc1 == A`): to the nearest **0.1 months**, what is the **mean** presumptive sentence?",
+      "title": "Count or percentage?",
+      "body": "Men have far **more** year-and-a-day sentences than women by raw count, yet such sentences make up a much **larger share** of women's sentences. Which number is the fairer way to compare how common short sentences are for each group?",
+      "answer": {
+        "type": "choice",
+        "options": ["The percentage - it adjusts for the fact that far fewer women appear in the data at all", "The raw count - bigger numbers always mean more common", "Neither - counts and percentages always agree anyway"],
+        "correct": 0
+      }
+    },
+    {
+      "type": "read",
+      "title": "Two kinds of middle",
+      "body": "For numeric columns you get two measures of the center:\n\n- **Mean** - add every value, divide by N.\n- **Median** - sort the values; take the middle one. Half the rows sit below it, half above.\n\nTry it on five numbers: **2, 3, 4, 5, 26**. The median is **4** (the middle value). The mean is **8** - twice the median, dragged upward by that single 26. Hold onto this tiny example; it is the whole story of the next few steps."
+    },
+    {
+      "type": "explore",
+      "title": "A well-behaved column",
+      "body": "First, a view where mean and median agree. This one is filtered to `moc1 == A` (Assault), then `moc2 == 9` - **terroristic threats**. Threats carry short expected sentences, and the truly serious cases tend to get charged as something more severe - so this view holds mostly short sentences with few extreme values. No long tail.\n\nRead the summary of `time`: the **mean** and **median** sit close together. That closeness is what a roughly symmetric distribution looks like in numbers.",
+      "state": ["f.moc1.eq.A", "f.moc2.eq.9"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "Read the mean",
+      "body": "For terroristic-threats cases (`moc1 == A`, `moc2 == 9`): to the nearest **0.1 months**, what is the **mean** of `time`?",
       "require_answer": true,
       "answer": {
         "type": "numeric",
@@ -34,26 +87,120 @@
       }
     },
     {
+      "type": "explore",
+      "title": "Now the whole dataset",
+      "body": "Clear the filters and read `time` across **all** felonies. Most sentences here are short - drug offenses, the biggest single block, typically carry around a year. But the view also contains murder, where sentences run to **decades**. Those rare, huge values are a **long right tail**.\n\nCompare the **mean** and **median** now: the mean sits well **above** the median. Same arithmetic as 2, 3, 4, 5, 26 - the tail drags the mean, and the median stays put.",
+      "state": [],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
       "type": "question",
-      "title": "Mean vs. median",
-      "body": "For these assault cases the **mean** of `time` is noticeably **larger** than the **median**. When the mean sits well above the median, the distribution is most likely...",
+      "title": "Reading the gap",
+      "body": "For these unfiltered sentences the **mean** of `time` is noticeably **larger** than the **median**. When the mean sits well above the median, the distribution most likely has...",
       "answer": {
         "type": "choice",
-        "options": ["Right-skewed (a long tail of long sentences)", "Left-skewed (a long tail of short sentences)", "Perfectly symmetric"],
+        "options": ["A long right tail - many short sentences plus a few very long ones", "A long left tail - many long sentences plus a few very short ones", "No tail - it is roughly symmetric"],
+        "correct": 0
+      }
+    },
+    {
+      "type": "read",
+      "title": "Why criminologists report medians (and when the mean still matters)",
+      "body": "Go back to **2, 3, 4, 5, 26** one more time - and now change the 26 to a 6. The mean falls from 8 to 4. The median never moves. One value changed; one statistic changed with it.\n\nStatisticians say the median is **robust**: it resists extreme values. The mean is not - every value pulls on it, so a single decades-long murder sentence shifts the mean of an entire year of data. And in felony sentencing the long tail is not a fluke to be cleaned away; it is a permanent feature of the system. That is why researchers - and careful journalists - habitually report the **median** sentence as the 'typical' one. When you see 'the average sentence for X is 40 months', your first question should be: *mean or median?*\n\nBut the mean is not a mistake to be avoided - it answers a different question. Because the mean multiplied by N gives the **total**, it is the right tool whenever the total burden matters. A corrections department planning prison capacity cares about total months to be served: means. A budget office estimating cost per year: means. A reporter describing what happens to a typical defendant: medians.\n\nThe skill is not 'median good, mean bad'. It is matching the statistic to the question - *typical case* or *total burden* - and noticing which one a claim is quietly using."
+    },
+    {
+      "type": "read",
+      "title": "Spread: the standard deviation",
+      "body": "Two views can share the same mean and still look nothing alike - one huddled tightly around it, the other scattered everywhere. The **standard deviation (std)** measures that: roughly, the *typical distance of a row from the mean*.\n\n- **Large std** - values scattered widely; the mean tells you little about any individual case.\n- **Small std** - values huddled close; the mean is a good guess for almost every case.\n\nNo formula needed at this stage. Like the mean-median gap, std is a number you learn to read **by comparison**."
+    },
+    {
+      "type": "read",
+      "title": "Seeing spread",
+      "body": "You have already met both extremes today, without being told:\n\n- The **whole dataset** (two views back): sentences from probation-length up to decades - the std of `time` there is enormous, comparable to the mean itself.\n- **Terroristic threats** (`moc1 == A`, `moc2 == 9`): short sentences, tightly bunched - a small std.\n\nFlip back to each view in your other tab and read the two std values side by side.\n\n*[FIGURE PLACEHOLDER 1: distribution of `time`, full dataset - wide, right-skewed]*\n\n*[FIGURE PLACEHOLDER 2: distribution of `time`, terroristic threats only - narrow, compact]*\n\nSame statistic, same column - the only difference is how alike the cases in the view are."
+    },
+    {
+      "type": "question",
+      "title": "What a big std means",
+      "body": "In one view, the std of `time` is nearly as large as its mean. What does that tell you?",
+      "answer": {
+        "type": "choice",
+        "options": ["The sentences are scattered widely - the mean is a poor guess for any individual case", "Most sentences are nearly identical", "The mean must have been computed incorrectly", "The view must contain very few rows"],
+        "correct": 0
+      }
+    },
+    {
+      "type": "question",
+      "title": "What a tiny std means",
+      "body": "A different view shows a std of `time` close to **zero**. What does that tell you?",
+      "answer": {
+        "type": "choice",
+        "options": ["Nearly every sentence in the view is close to the mean - the cases are highly alike", "The view contains no data", "The mean and median must be far apart", "The distribution has a long right tail"],
         "correct": 0
       }
     },
     {
       "type": "explore",
-      "title": "Does length vary by group?",
-      "body": "Descriptive statistics get more interesting when broken out by group. Here we cross-tabulate the mean of `time` by offender **`race`** (columns) and **`sex`** (rows), still within assault cases. Skim the table: do the cell means differ across groups?",
-      "focus": { "view": "table", "dependant": "time", "x_axis": "race", "y_axis": "sex" }
+      "title": "Where does spread come from? A baseline",
+      "body": "Here is the deepest idea in this module. Read the summary of `tweight` - the combined severity weight of additional felony counts - on the **unfiltered** dataset, and note its **std**. It is large: sentenced counts differ enormously in how much extra felony weight comes along with them.\n\nNow ask: is that spread because sentencing is erratic - or because this view **mixes very different kinds of cases together**?",
+      "state": [],
+      "focus": { "view": "info", "column": "tweight" }
+    },
+    {
+      "type": "explore",
+      "title": "Filter to first-timers",
+      "body": "In your other tab, filter `history == 0` - people with **no criminal history** - and read `tweight` again. The std collapses to roughly **a sixteenth** of what it was.\n\nNothing about the measurement changed. What changed is the **composition** of the view: within a group of similar cases, the cases are - unsurprisingly - similar. Much of the spread you see in any big dataset is not randomness; it is *mixture*. This is why filtering is not just a search tool: every filter is a question of the form 'how much of the pattern survives when I hold this constant?' Keep that move in your pocket - it is the heart of a later module.",
+      "state": ["f.history.eq.0"],
+      "focus": { "view": "info", "column": "tweight" }
+    },
+    {
+      "type": "question",
+      "title": "Read the collapsed spread",
+      "body": "With `history == 0` applied: to the nearest **0.1**, what is the **std** of `tweight`?",
+      "require_answer": true,
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "std", "column": "tweight" },
+        "tolerance": 0.1
+      }
+    },
+    {
+      "type": "question",
+      "title": "Put it all together",
+      "body": "A column of sentence lengths reports: **mean 45 months, median 21 months, std 60 months**. Which description best fits?",
+      "answer": {
+        "type": "choice",
+        "options": ["Most sentences are fairly short, a few are much longer (long right tail), and overall the values are spread very widely", "Sentences cluster tightly around 45 months", "Exactly half of all sentences equal 45 months", "Most sentences are long, with a few very short ones dragging the mean down"],
+        "correct": 0
+      }
+    },
+    {
+      "type": "read",
+      "title": "One last rule: check N first",
+      "body": "The recap, in one breath: **mode** (via Most Common) for categories; **percentages**, not counts, when groups differ in size; **median** for the typical case, **mean** for totals; the **mean-median gap** for shape; **std** for spread - and remember that spread often reflects *mixture*, not chaos.\n\nOne rule remains, and you will earn it the fun way. In your other tab, clear your history and build this view:\n\n1. Filter `moc1` **equals** `W` - weapons offenses.\n2. Filter `moc4` **equals** `8` - the fireworks sub-code. (Use the ordinary column filter; the drill-down moves one character at a time, but any `moc` digit can be filtered directly.)\n\nThen look at what the statistics are resting on."
+    },
+    {
+      "type": "explore",
+      "title": "Every weapons-by-fireworks felony in Minnesota",
+      "body": "Here is the same view. In roughly two decades of data, Minnesota sentenced exactly **four** weapons felonies involving fireworks: three for possession of illegal fireworks, one for altering serial numbers.\n\nThe Explorer will still dutifully compute a mean, a median, and a std for `time` here - to two decimal places. But with **N = 4**, those are not statistics; they are four anecdotes wearing a lab coat. Every summary in this module is only as trustworthy as the N beneath it. **Check N first, always.**",
+      "state": ["f.moc1.eq.W", "f.moc4.eq.8"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "How many cases is that?",
+      "body": "In this weapons-by-fireworks view, what is the **count** - the N that all of its statistics rest on?",
+      "require_answer": true,
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "count", "column": "time" },
+        "tolerance": 0
+      }
     },
     {
       "type": "checkpoint",
-      "title": "Confirm your filter",
-      "body": "Before finishing, confirm your working data is still filtered to assault offenses (`moc1 == A`). The next lesson builds on this filtered view.",
-      "expect_state": ["f.moc1.eq.A"]
+      "title": "Rebuild the rare view",
+      "body": "Confirm your own working data is filtered to `moc1 == W` and then `moc4 == 8`, in that order. If your N is 4, you have driven every tool this module covers - and you know better than to trust what those four rows 'show'.",
+      "expect_state": ["f.moc1.eq.W", "f.moc4.eq.8"]
     }
   ]
 }

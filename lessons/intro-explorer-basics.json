@@ -1,0 +1,164 @@
+{
+  "id": "intro-explorer-basics",
+  "title": "Driving the Explorer",
+  "description": "A guided tour of the Minnesota Sentencing Explorer itself: filter the data, read descriptive statistics, revert and clear your filter history, and read a cross-tabulation. No statistics background required.",
+  "author": "unmanaged",
+  "order": 1,
+  "objectives": [
+    "Work with the lesson in one browser tab and the Explorer in another",
+    "Describe what one row in the sentencing dataset represents",
+    "Apply, chain, revert, and clear filters, and explain how the filter history works",
+    "Locate the row count (N), mean, and median in a column summary",
+    "Read a single cell of a cross-tabulation and explain what data it describes"
+  ],
+  "steps": [
+    {
+      "type": "read",
+      "title": "Before you start: open two tabs",
+      "body": "**Keep this lesson open in its own browser tab for the whole module.** Open the Explorer in a **second tab** and switch back and forth: this lesson will *show* you each tool, and you should immediately *try* the same action yourself in your other tab. At the end, you will be asked to rebuild a data view on your own.\n\nWhat you are exploring: roughly **294,000 Minnesota felony sentencing records** from **2001-2019**. Each row is **one sentenced count** - not one person, and not one crime committed. Columns you will use today:\n\n- `sentyear` - the **Year Sentenced**.\n- `time` - the **Presumptive Sentence** in **months**.\n- `moc1` - the first character of the **MN Offense Code** (the top-level offense category).\n\nThe five skills in this module: **filter**, **descriptive stats**, **revert**, **clear**, and **crosstab**."
+    },
+    {
+      "type": "explore",
+      "title": "The whole dataset",
+      "body": "We start with **no filters applied** - every row in the dataset is included. You are looking at the summary of the `time` column. Near the top of the summary is the **count** (often written **N**): the number of rows currently in view.\n\nEvery step in this module comes back to N, so find it before moving on. In your other tab, make sure your own view has no filters and find the same number.",
+      "state": [],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "How big is the dataset?",
+      "body": "Reading the summary for `time` with **no filters applied**: what is the **count** - the number of rows in the full dataset?",
+      "require_answer": true,
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "count", "column": "time" },
+        "tolerance": 0
+      }
+    },
+    {
+      "type": "read",
+      "title": "What a filter does",
+      "body": "A **filter** keeps only the rows that match a condition and hides the rest. The comparisons available are: `eq` (equals), `ne` (does not equal), `gt` / `ge` (greater than / or equal), and `lt` / `le` (less than / or equal).\n\nTwo things to remember:\n\n1. Filtering never deletes data - it narrows what you are *looking at*.\n2. Filters **chain**: each new filter applies to the rows that survived the previous one. The Explorer keeps this chain as your **filter history**, and the list you see on screen *is* that history."
+    },
+    {
+      "type": "explore",
+      "title": "Apply one filter",
+      "body": "Here we apply the filter `sentyear >= 2015` - keep only counts sentenced in **2015 or later**. Notice two changes: the filter now appears in the history list, and **N is smaller** than it was in the full dataset.\n\nDo the same in your other tab: filter `sentyear` with `ge` and the value `2015`, then open the summary for `time`.",
+      "state": ["f.sentyear.ge.2015"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "How many rows survived?",
+      "body": "With the filter `sentyear >= 2015` applied: what is the **count** now? (Write this number down - you will need it again in a few steps.)",
+      "require_answer": true,
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "count", "column": "time" },
+        "tolerance": 0
+      }
+    },
+    {
+      "type": "read",
+      "title": "Reading a column summary",
+      "body": "For a numeric column like `time`, the summary reports (among other things):\n\n- **mean** - the arithmetic average: add every value, divide by N.\n- **median** - the middle value: half the rows sit below it, half above.\n\nThey answer slightly different questions, and they are often *not* the same number. Sentencing data is a good example of why: a small number of very long sentences can pull the **mean** upward while barely moving the **median**. A later lesson digs into what that gap tells you - for now, just be able to find both rows in the summary and keep them straight."
+    },
+    {
+      "type": "question",
+      "title": "Find the median",
+      "body": "Still on the `sentyear >= 2015` view: to the nearest **0.1 months**, what is the **median** of `time`? Careful - the mean and the median sit near each other in the summary.",
+      "require_answer": true,
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "median", "column": "time" },
+        "tolerance": 0.1
+      }
+    },
+    {
+      "type": "read",
+      "title": "Chaining filters and the offense-code drill",
+      "body": "Filters stack. If you now add a second filter, it applies only to the rows that survived the first - the history grows by one entry, and N can only stay the same or shrink.\n\nThe **MN Offense Code (MOC)** gets special treatment: instead of typing a full code, you **drill down one character at a time**. The first character, `moc1`, is the top-level offense category - for example, `moc1 = A` is **Assault**. Drilling into a category is just a filter like any other, and it joins the same history."
+    },
+    {
+      "type": "explore",
+      "title": "Two filters at once",
+      "body": "On top of `sentyear >= 2015`, we drill the offense code into **Assault** (`moc1 == A`). The history now shows **two** entries, in the order they were applied.\n\nRepeat this in your other tab, then compare the new N to the number you wrote down two steps ago.",
+      "state": ["f.sentyear.ge.2015", "f.moc1.eq.A"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "What did chaining do to N?",
+      "body": "Compared to the view with **only** the year filter, the row count after adding the assault drill-down is...",
+      "answer": {
+        "type": "choice",
+        "options": ["Smaller - the second filter kept only some of the surviving rows", "Larger - adding filters brings rows back", "Unchanged - filters do not affect the count"],
+        "correct": 0
+      }
+    },
+    {
+      "type": "read",
+      "title": "Revert vs. clear",
+      "body": "Because the Explorer stores your filters as an ordered **history**, undoing is precise:\n\n- **Revert** removes the **most recent** entry - one step back.\n- **Clear** empties the **entire** history - back to the full dataset.\n\nNothing is ever lost: the data itself is untouched either way, and any view can be rebuilt by re-applying the same filters in the same order. In your other tab, try **revert** now - your history should drop back to just the year filter."
+    },
+    {
+      "type": "explore",
+      "title": "After one revert",
+      "body": "This is the view after reverting once: the assault drill-down is gone, and only `sentyear >= 2015` remains in the history.\n\nIf revert really does step back to an earlier point in the history, then N here should be a number you have already seen.",
+      "state": ["f.sentyear.ge.2015"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "Prove the revert worked",
+      "body": "After reverting the assault filter, what is the **count**? (If revert took us back one step, this should exactly match the number you wrote down earlier.)",
+      "require_answer": true,
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "count", "column": "time" },
+        "tolerance": 0
+      }
+    },
+    {
+      "type": "read",
+      "title": "Cross-tabulation: comparing groups",
+      "body": "A **cross-tabulation** (crosstab) splits the data by **two** grouping columns at once and reports, in every cell, the N, mean, median, and std of a third, numeric column. It answers questions shaped like: *how does presumptive sentence length differ across offense categories, year by year?*\n\nOne caution to carry with you from day one: a difference between two cells is a **description** of the data, not an **explanation** of why the difference exists. A later module is devoted entirely to that distinction.\n\nFor the next view we **clear** the history first (our second undo tool in action) and start fresh."
+    },
+    {
+      "type": "explore",
+      "title": "A crosstab of sentence length",
+      "body": "The history was cleared, then one filter applied - `sentyear >= 2016` - to keep the table a manageable width. You are looking at the mean of `time` (the dependent variable) broken out by **`sentyear`** across the columns and **`moc1`** down the rows.\n\nHow to read it: pick a row (an offense category), pick a column (a year) - the cell where they meet describes *only* the sentences in that category **and** that year. Find the cell for **Assault (`A`) in 2018** and note its **mean**.",
+      "state": ["f.sentyear.ge.2016"],
+      "focus": { "view": "table", "dependant": "time", "x_axis": "sentyear", "y_axis": "moc1" }
+    },
+    {
+      "type": "explore",
+      "title": "A cell is just a filter",
+      "body": "Here is the trick that makes crosstabs make sense: **every cell of a crosstab is a filtered dataset you could have built by hand.** This view rebuilds the *Assault in 2018* cell as an ordinary filter chain - `sentyear == 2018`, then `moc1 == A` - and shows the summary of `time`.\n\nThe mean in this summary and the mean in that cell of the table are the same number, computed from the same rows.",
+      "state": ["f.sentyear.eq.2018", "f.moc1.eq.A"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "Read one cell",
+      "body": "To the nearest **0.1 months**, what is the **mean** presumptive sentence for **assault counts sentenced in 2018** - the value you found in the crosstab cell, now confirmed by the filtered summary?",
+      "require_answer": true,
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "mean", "column": "time" },
+        "tolerance": 0.1
+      }
+    },
+    {
+      "type": "read",
+      "title": "You can drive",
+      "body": "The five skills, in one breath: **filter** narrows the view and joins the history; **descriptive stats** summarize any column of the current view; **revert** steps the history back once; **clear** empties it; and a **crosstab** compares a numeric column across two groupings - where every cell is itself just a filtered view.\n\nOne last task, on your own. In your **other tab**, clear your history, then build this exact view from scratch:\n\n1. Filter `sentyear` **equals** `2018`.\n2. Drill the offense code into **Assault** (`moc1 == A`) - in that order.\n\nWhen your history matches, continue to the checkpoint below."
+    },
+    {
+      "type": "checkpoint",
+      "title": "Rebuild the view yourself",
+      "body": "Confirm that your own working data is filtered to `sentyear == 2018` and then `moc1 == A`, in that order. This is the same state as the *Assault in 2018* cell - and the next lesson, **Reading Descriptive Statistics**, starts from a view you now know how to build.",
+      "expect_state": ["f.sentyear.eq.2018", "f.moc1.eq.A"]
+    }
+  ]
+}
