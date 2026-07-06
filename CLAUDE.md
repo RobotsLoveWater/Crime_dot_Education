@@ -85,7 +85,9 @@ uv run flask --app app run     # add --debug for reload
 | `templates/` | Jinja2. `layout.html` is the base (nav + history table + error block); others extend it. Learning-modules views: `lesson_catalog.html`, `lesson.html`, `lesson_step.html`, `admin.html`, `admin_edit.html`. |
 | `lessons/` | Authored learning-module content (`<id>.json`) + `README.md` schema. **Safe to commit** (unlike `user/`). |
 | `LEARNING_MODULES_PROMPTS.md` | Phased build plan for the learning-modules feature. All phases are now implemented; the doc still reads as forward-looking. |
-| `static/css/style.css` | Styling; theme via CSS variables (`--color-accent`, etc.). |
+| `UI_OVERHAUL_PROMPTS.md` | Phased build plan for the UI/UX overhaul (sidebar workbench redesign). **Not yet implemented** — see "Planned: UI/UX overhaul" below. |
+| `STYLEGUIDE.md` | **Design authority** for all UI work: tokens (light+dark), typography, layout, components, htmx conventions, a11y checklist. Read it before touching `templates/` or `static/`. |
+| `static/css/style.css` | Current (pre-overhaul) styling; theme via CSS variables (`--color-accent`, etc.). Slated for replacement by the token system specified in `STYLEGUIDE.md`. |
 
 ## Key data structures
 
@@ -139,6 +141,7 @@ Every data route follows the pattern: `if is_logged_in(): ... else: return not_l
 
 ## Conventions & gotchas
 
+- **UI/styling changes follow `STYLEGUIDE.md`** — tokens only (no raw hex in components), no inline styles, both themes, no runtime CDN assets. Sequencing for the redesign is in `UI_OVERHAUL_PROMPTS.md`.
 - **X/Y axes are intentionally flipped** in `/table` form handling (`app.py` comments: "flipped due to display issues"). Don't "fix" without checking the template.
 - `float64` columns coerce filter values to float so `16 == 16.0`. Numeric-only comparisons (`gt/ge/lt/le`) are validated against `float()` in the boolean-filter route.
 - Rounding idiom throughout `data.py`: `round(x * 10**precision) / 10**precision`.
@@ -160,6 +163,31 @@ Every data route follows the pattern: `if is_logged_in(): ... else: return not_l
 - `/new` sets `session['userid']` but not `session['username']`/`session['classcode']`.
 - Stubbed/`pass`-only: `Data.filter_and`, `filter_or_diff` (partial), `make_history.filter_or_diff`, `filter_and`, `moc_or`; the `d` and `a` action codes are not handled by `_execute` (raise `ValueError`).
 - **Learning-module `checkpoint` steps are not wired up.** `lessons.py` validates a step's `expect_state`, but `app.lesson_step` builds no context for `checkpoint` and `lesson_step.html` falls through to the generic "Interactive step — coming next phase" placeholder — nothing compares the student's active state to `expect_state`. Both shipped lessons (`intro-explorer-basics`, `intro-descriptive-stats`) *end* on such a step. (Note: `current_year` is now injected globally via a context processor and `index` passes `hero_image_url`, so those earlier template-variable gaps are resolved.)
+
+## Planned: UI/UX overhaul (`ui-overhaul` branch)
+
+A full redesign of the presentation layer, planned with the author (2026-07) but **not yet
+implemented**. The routes, templates, and CSS described elsewhere in this file are the
+**pre-overhaul state**; update those sections as phases land.
+
+**Locked direction** (author-approved): sidebar **workbench** IA (`/explore` with htmx
+fragment swaps), hand-rolled CSS token system (no build step), Chart.js visuals, light+dark
+themes from day one, **docked lesson panel** (lessons run beside live data), fully responsive
+including phones, all assets vendored (no runtime CDN — school networks filter them).
+
+**The two documents that govern the work:**
+- `STYLEGUIDE.md` — design authority: tokens, typography, layout/breakpoints, component
+  specs, htmx conventions, a11y checklist, voice/copy. Any template or CSS change — overhaul
+  or not — must follow it; deviations get folded back into it in the same commit.
+- `UI_OVERHAUL_PROMPTS.md` — the build order: 8 phases (0 hygiene/tokens → 1 shell →
+  2 explore views → 3 crosstab → 4 filters → 5 docked lessons + **checkpoint wiring** →
+  6 auth/landing → 7 responsive/a11y/dark QA), each with read-first files, acceptance
+  criteria, and don'ts. Old URLs keep working via redirects at every phase boundary; cache
+  compatibility (same filters → same cache dirs) is a hard constraint.
+
+Note: Phase 5 fixes the "checkpoint steps not wired up" known issue above; Phase 6 fixes the
+`/new` session-keys issue. Password verification and the hardcoded `secret_key` stay **out of
+scope** (separate branch — see the prompts doc's Appendix C).
 
 ## Learning Modules (implemented)
 
