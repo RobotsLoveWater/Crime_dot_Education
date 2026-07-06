@@ -259,6 +259,7 @@ source of truth. If a tool or host ever needs a `requirements.txt`, generate one
 
 ## Git remotes
 
-- `origin` → GitLab (`gitlab.com/sidallen-scsu/cde.git`).
-- `github` → `github.com/RobotsLoveWater/Crime_dot_Education.git` (public). Auth is via the `gh`
-  CLI over HTTPS (no SSH key is configured on this machine — the `git@github.com:` SSH URL will fail).
+- `github` → `github.com/RobotsLoveWater/Crime_dot_Education.git` (public) — the **canonical
+  remote**; push here. Auth is via the `gh` CLI over HTTPS (no SSH key is configured on this
+  machine — the `git@github.com:` SSH URL will fail).
+- `origin` → GitLab (`gitlab.com/sidallen-scsu/cde.git`) — legacy mirror, not used for pushing.
