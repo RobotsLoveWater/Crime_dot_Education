@@ -269,8 +269,21 @@ reserves its height so the footer is never covered.
   `.filter-form`-width create form (name + an optional email-policy fieldset: a checkbox plus
   a comma-separated allowed-domains input) above the same list. `/admin/classes/<id>` shows the
   join code (copy affordance above), a roster `.data-table` (username only — no email; minimal
-  PII per `EDUCATOR_PORTAL.md`), the email-policy form again (now editable in place), and
-  disabled (`aria-disabled`) placeholder buttons for progress/assignments (later phases).
+  PII per `EDUCATOR_PORTAL.md`), the email-policy form again (now editable in place), a
+  **"Progress dashboard"** link, and a disabled (`aria-disabled`) placeholder button for
+  assignments (Phase 6).
+- **Progress dashboard** (`/admin/classes/<id>/progress`, Phase 5). Exception-first
+  (principle 1): a **"Needs attention"** `.attention-list` at the top — warning-accented cards
+  (`.attention-item`, left `--color-warning` border) naming each flagged student and their
+  reasons (a `.attention-tag` "Stuck"/"Inactive" chip + a sentence), or a reassuring empty
+  state. Below it a **per-student** `.data-table` (sticky first column; the student is a
+  `th scope="row"`) with **URL-backed sortable headers** — `.col-sort` links carrying
+  `aria-sort` and a direction glyph (`.col-sort-glyph`), the active header accent-colored — and
+  score cells showing accuracy % (a `.muted-cell` "—" when not started, a `.cell-done` ✓ when
+  the lesson is complete). Then a **per-lesson rollup** table (completion rate, median score)
+  and per-lesson **item-level miss rates** in `<details>` (`.rollup-detail`). New badge
+  `.badge-warning` (warning-subtle) flags at-risk rows. Numbers only ever come from stored
+  progress/attempt logs — nothing is re-graded at render time.
 
 ## Charts (Chart.js)
 

@@ -947,6 +947,88 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
   border-radius: var(--radius-sm);
 }
 
+/* ---------- Progress dashboard (Phase 5) ---------- */
+/* Sortable column headers: a link + a small direction glyph; the active column gets accent
+   text. .data-table th already handles sticky/positioning. */
+.col-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: inherit;
+  text-decoration: none;
+}
+.col-sort:hover { color: var(--color-text); }
+th[aria-sort="ascending"] .col-sort,
+th[aria-sort="descending"] .col-sort { color: var(--color-accent); }
+.col-sort-glyph { font-size: var(--fs-xs); }
+
+/* faint placeholder inside a numeric cell (no data / not started) */
+.muted-cell { color: var(--color-text-faint); }
+.cell-done { color: var(--color-success); }
+
+.dashboard-note {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+}
+.dashboard-subhead { margin-top: var(--space-5); }
+
+/* "Needs attention" triage list — warning-accented cards, exception-first (principle 1) */
+.attention-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.attention-item {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+.attention-name {
+  font-size: var(--fs-base);
+  margin: 0 0 var(--space-2);
+}
+.attention-reasons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.attention-tag {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.attention-tag-stuck {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+.attention-tag-idle {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+
+.rollup-detail {
+  margin-bottom: var(--space-3);
+}
+.rollup-detail > summary {
+  cursor: pointer;
+  padding: var(--space-2) 0;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.rollup-detail > summary:hover { color: var(--color-accent); }
+
 /* ---------- Footer ---------- */
 .site-footer {
   padding: var(--space-3);

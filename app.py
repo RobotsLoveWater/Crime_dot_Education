@@ -27,6 +27,7 @@ import datetime
 import io
 import csv
 import collections
+import statistics
 
 import util
 import make_history
@@ -34,6 +35,7 @@ import moc
 import account
 import classroom
 import lessons
+import analytics
 
 from data import Data
 
@@ -1373,6 +1375,229 @@ def admin_class(class_id):
                            roster=roster, policy=policy)
 
 
+# ---------------------------------------------------------------------------
+# Progress dashboard + "needs attention" triage (educator portal, Phase 5, features 1 & 2)
+# ---------------------------------------------------------------------------
+
+# Triage heuristic (paired with analytics.STUCK_ATTEMPTS for repeated misses): a student with
+# no graded activity for this many days while a module is still in progress is surfaced in the
+# "needs attention" list. Kept here because judging inactivity needs wall-clock "now".
+INACTIVE_DAYS = 7
+
+# per-student table sort keys that aren't a specific module column
+_BASE_SORT_KEYS = {'student', 'started', 'completed', 'last_active'}
+
+
+def _parse_ts(ts):
+    # attempt-log timestamps are ISO-8601 with a 'Z' suffix (analytics.now_iso). Parse to an
+    # aware datetime; return None on anything malformed so one torn log line never breaks the page.
+    if not isinstance(ts, str):
+        return None
+    try:
+        return datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+
+
+def graded_step_indices(module):
+    # step indices of the auto-graded questions (numeric/choice); 'free' answers carry no
+    # correct/incorrect, so they never count toward a score.
+    return [i for i, step in enumerate(module['steps'])
+            if step.get('type') == 'question'
+            and step.get('answer', {}).get('type') in ('numeric', 'choice')]
+
+
+def _student_module_cell(graded, prog):
+    # One student's standing in one module, read from STORED progress (never re-graded): the
+    # status plus an accuracy score over the graded questions they have ANSWERED so far.
+    answers = prog.get('answers', {})
+    answered = [i for i in graded if str(i) in answers]
+    correct = sum(1 for i in answered if answers[str(i)].get('correct'))
+    return {
+        'status': module_status(prog),
+        'answered': len(answered),
+        'correct': correct,
+        'total': len(graded),
+        # accuracy over answered questions; None until they've answered one (so a just-started
+        # student doesn't show a misleading 0%)
+        'score': (correct / len(answered)) if answered else None,
+    }
+
+
+def _sort_rows(rows, sort, direction):
+    # Server-side sort for the per-student table (URL-backed, so it works with JS off). Rows
+    # missing the sort value (no activity yet, or a module not started) always sink to the
+    # bottom regardless of direction, so "sort by last active" never buries active students
+    # under students who have no timestamp at all.
+    reverse = (direction == 'desc')
+
+    if sort == 'student':
+        return sorted(rows, key=lambda r: r['username'].lower(), reverse=reverse)
+    if sort in ('started', 'completed'):
+        return sorted(rows, key=lambda r: r[sort], reverse=reverse)
+
+    if sort == 'last_active':
+        def is_missing(r):
+            return r['last_active'] is None
+
+        def value(r):
+            return r['last_active']
+    else:  # 'mod:<module id>' — sort by that module's score
+        mid = sort.split(':', 1)[1]
+
+        def is_missing(r):
+            return r['cells'].get(mid, {}).get('score') is None
+
+        def value(r):
+            return r['cells'][mid]['score']
+
+    present = sorted((r for r in rows if not is_missing(r)), key=value, reverse=reverse)
+    return present + [r for r in rows if is_missing(r)]
+
+
+def build_class_dashboard(class_obj, sort='last_active', direction='desc'):
+    # Cross-account aggregation for the class progress dashboard. Reads each rostered student's
+    # stored progress (one pickle) and attempt log (one JSONL) ONCE, never re-grades a cell, and
+    # never touches a student outside this class's roster (privacy). Returns everything the
+    # template renders: the triage list, the per-student rows, and the per-module rollups.
+    modules = lessons.list_modules()
+    graded = {m['id']: graded_step_indices(m) for m in modules}
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    rows = []
+    attention = []
+    # per-module accumulators for the rollup
+    started_count = {m['id']: 0 for m in modules}
+    completed_count = {m['id']: 0 for m in modules}
+    scores = {m['id']: [] for m in modules}   # accuracy scores of students who've answered ≥1
+    items = {m['id']: {} for m in modules}    # step(str) -> {'attempts','correct'} across roster
+
+    for userid in class_obj.get('roster', []):
+        try:
+            student = account.retrieve(userid)
+        except FileNotFoundError:
+            continue  # roster entry with no account (shouldn't happen) — skip defensively
+
+        username = student.get('username') or userid.split('/', 1)[-1]
+        progress = student.get('progress', {})
+        attempts = analytics.read_attempts(userid)
+
+        cells = {}
+        started = completed = 0
+        for m in modules:
+            mid = m['id']
+            prog = progress.get(mid, {})
+            cell = _student_module_cell(graded[mid], prog)
+            cells[mid] = cell
+
+            if cell['status'] != 'not_started':
+                started += 1
+                started_count[mid] += 1
+            if cell['status'] == 'completed':
+                completed += 1
+                completed_count[mid] += 1
+            if cell['score'] is not None:
+                scores[mid].append(cell['score'])
+
+            # fold this student's item-level attempts into the class totals (attempt-level, so
+            # repeats count — that's the item-difficulty signal, distinct from the score above)
+            for step, counts in analytics.item_stats(attempts, mid).items():
+                agg = items[mid].setdefault(step, {'attempts': 0, 'correct': 0})
+                agg['attempts'] += counts['attempts']
+                agg['correct'] += counts['correct']
+
+        last_ts = analytics.last_active_ts(attempts)
+        last_dt = _parse_ts(last_ts)
+        last_days = (now - last_dt).days if last_dt else None
+
+        # ---- triage reasons for this student ----
+        reasons = []
+        for m in modules:
+            for sq in analytics.stuck_questions(attempts, m['id']):
+                step = sq['step']
+                title = m['steps'][step]['title'] if step < len(m['steps']) else 'a question'
+                reasons.append({'kind': 'stuck', 'module': m['title'],
+                                'question': title, 'misses': sq['misses']})
+        # inactivity: quiet too long while something is still in progress
+        in_progress = [m['title'] for m in modules if cells[m['id']]['status'] == 'in_progress']
+        if last_days is not None and last_days >= INACTIVE_DAYS and in_progress:
+            reasons.append({'kind': 'inactive', 'days': last_days, 'modules': in_progress})
+
+        if reasons:
+            attention.append({'username': username, 'reasons': reasons})
+
+        rows.append({
+            'userid': userid, 'username': username,
+            'started': started, 'completed': completed,
+            'last_active': last_ts, 'last_days': last_days,
+            'flagged': bool(reasons),
+            'cells': cells,
+        })
+
+    roster_size = len(rows)
+
+    # triage first (principle 1): stuck students ahead of merely-inactive ones, then most reasons
+    attention.sort(key=lambda a: (
+        -sum(1 for r in a['reasons'] if r['kind'] == 'stuck'),
+        -len(a['reasons']), a['username'].lower()))
+
+    # per-module rollup: completion rate, median score, and item-level miss rates
+    rollups = []
+    for m in modules:
+        mid = m['id']
+        item_rows = []
+        for i in graded[mid]:
+            counts = items[mid].get(str(i), {'attempts': 0, 'correct': 0})
+            attempts_n = counts['attempts']
+            item_rows.append({
+                'step': i,
+                'question': m['steps'][i]['title'],
+                'attempts': attempts_n,
+                'correct': counts['correct'],
+                'miss_rate': ((attempts_n - counts['correct']) / attempts_n) if attempts_n else None,
+            })
+        rollups.append({
+            'id': mid, 'title': m['title'],
+            'started': started_count[mid], 'completed': completed_count[mid],
+            'completion_rate': (completed_count[mid] / roster_size) if roster_size else None,
+            'median_score': statistics.median(scores[mid]) if scores[mid] else None,
+            'graded': len(graded[mid]),
+            'items': item_rows,
+        })
+
+    rows = _sort_rows(rows, sort, direction)
+
+    return {
+        'modules': [{'id': m['id'], 'title': m['title']} for m in modules],
+        'rows': rows, 'attention': attention, 'rollups': rollups,
+        'roster_size': roster_size, 'sort': sort, 'direction': direction,
+    }
+
+
+@app.route('/admin/classes/<class_id>/progress')
+def admin_class_progress(class_id):
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    user = account.retrieve(session['userid'])
+    class_obj = classroom.get_class(class_id)
+
+    # validate the sort controls (untrusted query args): a base key, or 'mod:<known module id>'
+    sort = request.args.get('sort', 'last_active')
+    module_ids = {m['id'] for m in lessons.list_modules()}
+    if sort not in _BASE_SORT_KEYS and not (
+            sort.startswith('mod:') and sort.split(':', 1)[1] in module_ids):
+        sort = 'last_active'
+    direction = request.args.get('dir', 'desc')
+    if direction not in ('asc', 'desc'):
+        direction = 'desc'
+
+    dashboard = build_class_dashboard(class_obj, sort, direction)
+    return render_template('admin_class_progress.html', user=user,
+                           class_obj=class_obj, dashboard=dashboard)
+
+
 @app.route('/admin/edit', methods=['GET', 'POST'])
 @app.route('/admin/edit/<module_id>', methods=['GET', 'POST'])
 def admin_edit(module_id=None):
@@ -1754,6 +1979,20 @@ def grade_and_store(module_id, step_index, step):
     answers = dict(progress.get('answers', {}))
     answers[str(step_index)] = record
     account.set_progress(session['userid'], module_id, step=step_index, answers=answers)
+
+    # append-only attempt history (feature 5): distinct from progress['answers'] above, which
+    # only keeps the latest answer per step -- this is the full history item analytics reads.
+    # Only graded attempt types are logged ('free' has no correct/incorrect to aggregate).
+    if atype != 'free':
+        analytics.log_attempt(session['userid'], {
+            'ts': analytics.now_iso(),
+            'module': module_id,
+            'step': step_index,
+            'type': atype,
+            'correct': record['correct'],
+            'submitted': record['value'],
+            'state': resolve_lesson_state(module_id, step),
+        })
 
 
 def build_question(module_id, step_index, step):

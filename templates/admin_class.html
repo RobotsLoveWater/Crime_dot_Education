@@ -68,9 +68,9 @@
 </section>
 
 <section class="portal-section">
-    <h2>Coming soon</h2>
+    <h2>Class tools</h2>
     <div class="view-actions">
-        <span class="btn btn-secondary" aria-disabled="true">Progress dashboard</span>
+        <a class="btn btn-primary" href="{{ url_for('admin_class_progress', class_id=class_obj['class_id']) }}">Progress dashboard</a>
         <span class="btn btn-secondary" aria-disabled="true">Module assignments</span>
     </div>
 </section>

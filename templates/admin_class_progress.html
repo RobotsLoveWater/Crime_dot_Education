@@ -1,0 +1,194 @@
+{% extends "layout.html" %}
+{% block title %} — {{ class_obj['name'] }} progress{% endblock %}
+
+{# Sortable column header: a real link (works with JS off) carrying aria-sort + a direction
+   glyph. Clicking an inactive column sorts ascending; the active column toggles direction. #}
+{% macro sortth(label, key, numeric=False) %}
+    {% set active = dashboard['sort'] == key %}
+    {% set dir = dashboard['direction'] %}
+    {% set next_dir = 'asc' if not active else ('desc' if dir == 'asc' else 'asc') %}
+    {% set aria = 'none' if not active else ('ascending' if dir == 'asc' else 'descending') %}
+    <th scope="col"{% if numeric %} class="num"{% endif %} aria-sort="{{ aria }}">
+        <a class="col-sort" href="{{ url_for('admin_class_progress', class_id=class_obj['class_id'], sort=key, dir=next_dir) }}">
+            {{ label }}<span class="col-sort-glyph" aria-hidden="true">{{ '▲' if active and dir == 'asc' else ('▼' if active else '') }}</span>
+        </a>
+    </th>
+{% endmacro %}
+
+{% block body %}
+
+<p><a class="dock-back" href="{{ url_for('admin_class', class_id=class_obj['class_id']) }}">&larr; {{ class_obj['name'] }}</a></p>
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Progress</h1>
+        <p class="view-subtitle">
+            {{ dashboard['roster_size'] }} student{{ '' if dashboard['roster_size'] == 1 else 's' }}
+            across {{ dashboard['modules']|length }} lesson{{ '' if dashboard['modules']|length == 1 else 's' }}.
+        </p>
+    </div>
+</header>
+
+{# ---- Triage first (principle 1): who needs attention today ---- #}
+<section class="portal-section">
+    <h2>Needs attention</h2>
+    {% if dashboard['attention'] %}
+    <ul class="attention-list">
+        {% for item in dashboard['attention'] %}
+        <li class="attention-item">
+            <h3 class="attention-name">{{ item['username'] }}</h3>
+            <ul class="attention-reasons">
+                {% for reason in item['reasons'] %}
+                {% if reason['kind'] == 'stuck' %}
+                <li><span class="attention-tag attention-tag-stuck">Stuck</span>
+                    {{ reason['misses'] }} incorrect attempts on
+                    <strong>{{ reason['question'] }}</strong> in {{ reason['module'] }}.</li>
+                {% else %}
+                <li><span class="attention-tag attention-tag-idle">Inactive</span>
+                    No activity for {{ reason['days'] }} days —
+                    {{ reason['modules']|join(', ') }} still in progress.</li>
+                {% endif %}
+                {% endfor %}
+            </ul>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+        <h3>Nobody needs attention right now</h3>
+        <p>No student is stuck on a question or inactive mid-lesson. Check back after the next class.</p>
+    </div>
+    {% endif %}
+</section>
+
+{# ---- Per-student detail ---- #}
+<section class="portal-section">
+    <h2>Students</h2>
+    {% if dashboard['rows'] %}
+    <div class="table-wrapper">
+        <div class="table-scroll">
+            <table class="data-table">
+                <caption class="visually-hidden">Per-student progress. Column headers sort the table.</caption>
+                <thead>
+                    <tr>
+                        {{ sortth('Student', 'student') }}
+                        {{ sortth('Started', 'started', numeric=True) }}
+                        {{ sortth('Completed', 'completed', numeric=True) }}
+                        {{ sortth('Last active', 'last_active', numeric=True) }}
+                        {% for m in dashboard['modules'] %}
+                        {{ sortth(m['title'], 'mod:' + m['id'], numeric=True) }}
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in dashboard['rows'] %}
+                    <tr>
+                        <th scope="row">
+                            {{ row['username'] }}
+                            {% if row['flagged'] %}<span class="badge badge-warning">Needs attention</span>{% endif %}
+                        </th>
+                        <td class="num">{{ row['started'] }}</td>
+                        <td class="num">{{ row['completed'] }}</td>
+                        <td class="num">
+                            {% if row['last_days'] is none %}
+                            <span class="muted-cell">—</span>
+                            {% else %}
+                            <span title="{{ row['last_active'] }}">{{
+                                'today' if row['last_days'] == 0 else
+                                'yesterday' if row['last_days'] == 1 else
+                                (row['last_days'] ~ ' days ago') }}</span>
+                            {% endif %}
+                        </td>
+                        {% for m in dashboard['modules'] %}
+                        {% set c = row['cells'][m['id']] %}
+                        {% if c['status'] == 'not_started' %}
+                        <td class="num"><span class="muted-cell">—</span></td>
+                        {% elif c['answered'] == 0 %}
+                        <td class="num"><span class="muted-cell" title="Started — no questions answered yet">started</span></td>
+                        {% else %}
+                        <td class="num" title="{{ c['correct'] }} of {{ c['answered'] }} answered correct{% if c['status'] == 'completed' %} · completed{% endif %}">
+                            {{ (100 * c['score'])|round|int }}%{% if c['status'] == 'completed' %} <span class="cell-done" aria-hidden="true">✓</span>{% endif %}
+                        </td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <p class="dashboard-note">Score is the share of the questions a student has answered that
+        were correct; ✓ marks a completed lesson.</p>
+    {% else %}
+    <div class="empty-state">
+        <h3>No students enrolled yet</h3>
+        <p>Share the join code from the class page to start enrolling students.</p>
+    </div>
+    {% endif %}
+</section>
+
+{# ---- Per-class rollup: completion, median score, item-level miss rates ---- #}
+<section class="portal-section">
+    <h2>By lesson</h2>
+    <div class="table-wrapper">
+        <table class="data-table">
+            <caption class="visually-hidden">Per-lesson completion and median score.</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Lesson</th>
+                    <th scope="col" class="num">Completed</th>
+                    <th scope="col" class="num">Completion rate</th>
+                    <th scope="col" class="num">Median score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in dashboard['rollups'] %}
+                <tr>
+                    <th scope="row">{{ r['title'] }}</th>
+                    <td class="num">{{ r['completed'] }} / {{ dashboard['roster_size'] }}</td>
+                    <td class="num">{% if r['completion_rate'] is none %}—{% else %}{{ (100 * r['completion_rate'])|round|int }}%{% endif %}</td>
+                    <td class="num">{% if r['median_score'] is none %}—{% else %}{{ (100 * r['median_score'])|round|int }}%{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h3 class="dashboard-subhead">Question-level miss rates</h3>
+    <p class="dashboard-note">Miss rate is the share of <em>all</em> attempts on a question that
+        were incorrect (repeat attempts included) — a signal of which items to reteach.</p>
+    {% for r in dashboard['rollups'] %}
+    <details class="rollup-detail"{% if loop.first %} open{% endif %}>
+        <summary>{{ r['title'] }}</summary>
+        {% if r['items'] %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <caption class="visually-hidden">Per-question attempt and miss rates for {{ r['title'] }}.</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Question</th>
+                        <th scope="col" class="num">Attempts</th>
+                        <th scope="col" class="num">Correct</th>
+                        <th scope="col" class="num">Miss rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in r['items'] %}
+                    <tr>
+                        <th scope="row">{{ item['question'] }}</th>
+                        <td class="num">{{ item['attempts'] }}</td>
+                        <td class="num">{{ item['correct'] }}</td>
+                        <td class="num">{% if item['miss_rate'] is none %}<span class="muted-cell">—</span>{% else %}{{ (100 * item['miss_rate'])|round|int }}%{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="dashboard-note">This lesson has no graded questions.</p>
+        {% endif %}
+    </details>
+    {% endfor %}
+</section>
+
+{% endblock %}

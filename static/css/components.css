@@ -97,6 +97,10 @@
   background: var(--color-border);
   color: var(--color-text-muted);
 }
+.badge-warning {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
 
 /* ---------- Filter chips (data-state module) ---------- */
 .chip-chain {

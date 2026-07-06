@@ -242,10 +242,13 @@ Phases 0–4 deliver the P0 set; Phase 5 is the P1 fast-follows; P2 stays grant 
 
 ## Open questions (resolve before or during implementation)
 
-1. **Attempt logging format** — one append-only log per student, or per class? (File contention
-   vs. the semester-archive story.) Either way, log `{question id, correct, timestamp,
-   filter-state token}` and hook it at `grade_and_store` so features 5 and 9 share one source.
-   *Open.*
+1. **Resolved** — attempt logging is **one append-only JSONL log per student**,
+   `user/<class_id>/<username>.attempts.jsonl` (mirrors the account pickle's own path; avoids
+   class-wide write contention; the class folder is the semester archive). A new pure-stdlib
+   `analytics.py` provides `log_attempt`/`read_attempts`/`question_stats`; `grade_and_store`
+   appends `{ts, module, step, type, correct, submitted, state}` (state = the resolved lesson
+   state tokens at answer time) for every graded (non-`free`) attempt. See
+   `EDUCATOR_PORTAL_PROMPTS.md` Appendix B.
 2. **Resolved** — class-level config lives in a **git-ignored `classes/` directory** (mirroring
    `user/`), one `classes/<class_id>.json` per class, managed by a new pure-stdlib `classroom.py`.
    See "Class & identity model."

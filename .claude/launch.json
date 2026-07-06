@@ -58,6 +58,20 @@
       "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5163"],
       "port": 5163,
       "autoPort": false
+    },
+    {
+      "name": "explorer-edu-phase4",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5174"],
+      "port": 5174,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-edu-phase5",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5185"],
+      "port": 5185,
+      "autoPort": false
     }
   ]
 }
