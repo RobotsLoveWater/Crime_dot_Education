@@ -82,15 +82,16 @@ uv run flask --app app run     # add --debug for reload
 | `codebook.xml` | Maps dataset column names → human descriptions; each entry also carries a `group` attribute placing the column in an explore column-browser category (display order in `Data.GROUP_ORDER`). Loaded by `Data.__init__` (descriptions → `self.codebook`, groups → `self.groups`). Some entry names don't match real dataset columns (see gotchas). |
 | `settings.xml` | seaborn palette/style (`deep` / `darkgrid`). Not heavily used yet. |
 | `test.py` | Ad-hoc scratch script for the history→cache-key encoding. Not a real test suite. |
-| `templates/` | Jinja2. `layout.html` is the base — the Phase 1 **workbench shell**: top bar (nav + theme toggle + identity), data-state **sidebar** (count badge, filter chips, Clear data; `{% block sidebar_extra %}` hosts view-specific modules), toast region, confirm `<dialog>`, htmx progress bar; others extend it via `{% block body %}`. `explore.html` + `templates/partials/` (`column_browser.html`, `explore_landing.html`, `explore_column.html`) are the Phase 2 statistics workbench — partials render standalone on htmx fragment requests (`fragment=True` adds the `<title>` htmx uses to retitle the page) and are `{% include %}`d on full loads. `error.html` renders the styled 404/500 handlers. Learning-modules views: `lesson_catalog.html`, `lesson.html`, `lesson_step.html`, `admin.html`, `admin_edit.html`. (`info.html`/`info_menu.html` were deleted in Phase 2.) |
+| `templates/` | Jinja2. `layout.html` is the base — the Phase 1 **workbench shell**: top bar (nav + theme toggle + identity), data-state **sidebar** (count badge, filter chips, Clear data; `{% block sidebar_extra %}` hosts view-specific modules), toast region, confirm `<dialog>`, htmx progress bar; others extend it via `{% block body %}`. `explore.html` + `templates/partials/` (`column_browser.html`, `explore_landing.html`, `explore_column.html`) are the Phase 2 statistics workbench — partials render standalone on htmx fragment requests (`fragment=True` adds the `<title>` htmx uses to retitle the page) and are `{% include %}`d on full loads. `compare.html` + `partials/compare_builder.html`/`compare_results.html` are the Phase 3 crosstab workbench on the same pattern (replacing the deleted `perm_menu.html`/`perm.html`). `error.html` renders the styled 404/500 handlers. Learning-modules views: `lesson_catalog.html`, `lesson.html`, `lesson_step.html`, `admin.html`, `admin_edit.html`. (`info.html`/`info_menu.html` were deleted in Phase 2.) |
 | `lessons/` | Authored learning-module content (`<id>.json`) + `README.md` schema. **Safe to commit** (unlike `user/`). |
 | `LEARNING_MODULES_PROMPTS.md` | Phased build plan for the learning-modules feature. All phases are now implemented; the doc still reads as forward-looking. |
-| `UI_OVERHAUL_PROMPTS.md` | Phased build plan for the UI/UX overhaul (sidebar workbench redesign). **Phases 0 (hygiene/tokens/vendored assets), 1 (workbench shell), and 2 (explore workbench) are done**; Phases 3–7 remain — see "In progress: UI/UX overhaul" below. |
+| `UI_OVERHAUL_PROMPTS.md` | Phased build plan for the UI/UX overhaul (sidebar workbench redesign). **Phases 0 (hygiene/tokens/vendored assets), 1 (workbench shell), 2 (explore workbench), and 3 (compare workbench + CSV export) are done**; Phases 4–7 remain — see "In progress: UI/UX overhaul" below. |
 | `STYLEGUIDE.md` | **Design authority** for all UI work: tokens (light+dark), typography, layout, components, htmx conventions, a11y checklist. Read it before touching `templates/` or `static/`. |
 | `static/css/tokens.css`, `static/css/base.css` | Phase 0 token system: all design tokens (both themes, exact `STYLEGUIDE.md` tables — plus `--overlay` for drawer/dialog backdrops) and reset/typography/focus/reduced-motion. Loaded first; theme switches via `data-theme` on `<html>` (FOUC-guard inline script in `layout.html` — which also sets a `js` class gating JS-only CSS — toggle in `static/js/theme.js`, persisted to `localStorage.theme`, fires a `themechange` event). |
 | `static/css/components.css`, `static/css/views.css` | Phase 1 shell styles per the styleguide's file organization: `components.css` = buttons/badges/chips/toasts/dialog/alerts/empty-state/loading; `views.css` = top bar, workbench grid, sidebar + tablet drawer, breakpoints. Loaded **after** `style.css` so new shell rules win ties. |
 | `static/css/style.css` | **Legacy** pre-overhaul component styles, re-pointed at the tokens (old names like `--color-panel`/`--color-muted` are aliases in its `:root`). Phase 1 removed its header/nav/flash/footer rules (shell-owned now); the rest is retired once its last consumer is rebuilt. |
-| `static/js/app.js` | Phase 1 shell behaviors (vanilla, no build step): toast auto-dismiss + `HX-Trigger`/`htmx:responseError` toast paths, `[data-confirm]` dialog interception, sidebar drawer with focus trap, htmx-bound global progress bar, `[data-loading]` submit feedback ("Computing statistics…"). |
+| `static/js/app.js` | Phase 1 shell behaviors (vanilla, no build step): toast auto-dismiss + `HX-Trigger`/`htmx:responseError` toast paths, `[data-confirm]` dialog interception, sidebar drawer with focus trap, htmx-bound global progress bar, `[data-loading]` submit feedback ("Computing statistics…"). Phase 3 added the **searchable picker**: a `[data-picker]` wrapper around a native `<select>` gets a filtering combobox (arrows/Enter/Esc); the hidden select keeps carrying the form value (and is the no-JS fallback). |
+| `static/js/compare.js` | Phase 3 compare behaviors: stat toggle (sets `data-stat` on the crosstab — pure CSS show/hide, since all four stats ship in the markup — updates `aria-pressed`, and re-shades the `.heat-N` heatmap from each cell's `data-heat-<stat>` attributes) and the grouped-bar companion chart (theme-aware, ≤8×8 tables only, re-rendered on `themechange` and htmx swaps/history restores). Loaded (with `chart.umd.min.js`) only via `compare.html`'s `{% block head %}`. |
 | `static/js/explore.js` | Phase 2 explore behaviors: distribution chart (Chart.js; colors read from CSS tokens at render time, re-rendered on `themechange` and htmx swaps/history restores; horizontal bars when labels run long), column-browser search, value-table search + "show more" pagination, active-column `aria-current` sync, tablet-drawer auto-close on column pick. Loaded (with `chart.umd.min.js`) only via `explore.html`'s `{% block head %}`. |
 | `static/js/vendor/` | Vendored, pinned htmx 2.0.10 + Chart.js 4.5.1 (`VERSIONS.md` is the manifest; never hand-edit). Inter variable font at `static/fonts/InterVariable.woff2`. htmx is loaded by `layout.html`; Chart.js only by `explore.html`. |
 
@@ -134,7 +135,27 @@ CODES['A'] = [ 'Assault',                 # [0] title (comment '# Complete' = fu
   with a flash. **Legacy redirects:** `/info/` → `/explore`, `/info/<column>[/<sorting>]` →
   `/explore/column/...` — endpoint names `info_menu`/`info_specific` survive because
   `build_explore` still emits `/info/...` deep links (updated in Phase 5).
-- `/table`, `/table/<dependant>/<x_axis>/<y_axis>` — cross-tab (N, mean, median, std). `dependant == '#'` means count only.
+- `/explore/table` (builder) and `/explore/table/<dependant>/<x_axis>/<y_axis>` (results) —
+  the Phase 3 **Compare (crosstab) workbench**, same shared-renderer pattern
+  (`render_compare` + `wants_fragment()`). Builder: three searchable pickers (Measure =
+  `#` count-of-cases or a numeric column; Rows; Columns) posting to `/explore/table`,
+  which validates and redirects to the results URL. **Orientation:** `data.get_table`
+  renders `x_axis` values as row headers and `y_axis` as column headers; the old UI's
+  X/Y labels were backwards — the flip is contained (and commented) in the POST handler
+  (Rows → `x_axis`, Columns → `y_axis`; users only see "Rows"/"Columns"). Results: all
+  four stats (N/mean/median/std) ship in the markup, a JS segmented toggle shows one at a
+  time (no refetch; no-JS shows them stacked with labels), 8-step heatmap on the active
+  stat, N row/column totals (NaN rows/cols dropped from display), sticky headers, and a
+  grouped-bar Chart.js companion for tables ≤8×8. Crosstabs are computed fresh per request
+  (never disk-cached — matches pre-overhaul behavior). `dependant == '#'` means count only.
+  **Legacy redirects:** `/table` → `/explore/table`, `/table/<d>/<x>/<y>` → results —
+  endpoint names `table_menu`/`table` survive because `build_explore` still emits
+  `/table/...` deep links (updated in Phase 5).
+- `/download?measure=<d>&rows=<x>&cols=<y>` — **implemented in Phase 3**: CSV export of
+  that crosstab (`crosstab_csv` reuses the exact `get_table` + `build_crosstab` path, so
+  numbers match the screen; UTF-8 BOM for Excel; `Content-Disposition` filename
+  `crosstab-<measure>-<rows>-by-<cols>.csv`). Count-only exports one N table with totals;
+  a measure adds mean/median/std sections.
 - `/filter/` menu; `/filter/boolean/<column>/<sorting>` — comparison filters (single or OR-multiple); `/filter/moc/...` — offense-code drill-down.
 - `/load` — clear history (revert to the base full-dataset entry); no longer linked from the
   nav (the sidebar's confirmed "Clear data" button hits `/revert/1` instead). `/revert/<n>` —
@@ -144,7 +165,7 @@ CODES['A'] = [ 'Assault',                 # [0] title (comment '# Complete' = fu
   all `flash()` a message that `layout.html` renders as a toast.
 - **Learning modules:** `/lesson` (catalog), `/lesson/<module_id>` (overview), `/lesson/<module_id>/<step>` (render; POST grades a `question`), `/lesson/<module_id>/complete` (mark done). See "Learning Modules" below.
 - **Authoring (educators only):** `/admin` (list your class's modules), `/admin/edit[/<module_id>]` (create/edit → writes validated JSON to `lessons/`). Guarded by `require_educator()`.
-- `/guide` — static guide page (replaced the old buggy `/lesson/get_started` stub). `/download`, `/save`, `/other`, `/settings` — still **stubs** returning "WIP, Feature Not Implemented".
+- `/guide` — static guide page (replaced the old buggy `/lesson/get_started` stub). `/save`, `/other`, `/settings` — still **stubs** returning "WIP, Feature Not Implemented" (`/download` was implemented in Phase 3, see above).
 
 Every data route follows the pattern: `if is_logged_in(): ... else: return not_logged_in()`.
 (`not_logged_in()` is htmx-aware: on an `HX-Request` it answers with an `HX-Redirect` header
@@ -167,7 +188,7 @@ view. `hx_toast()` sets the `HX-Trigger` header for htmx-response toasts (used f
 ## Conventions & gotchas
 
 - **UI/styling changes follow `STYLEGUIDE.md`** — tokens only (no raw hex in components), no inline styles, both themes, no runtime CDN assets. Sequencing for the redesign is in `UI_OVERHAUL_PROMPTS.md`.
-- **X/Y axes are intentionally flipped** in `/table` form handling (`app.py` comments: "flipped due to display issues"). Don't "fix" without checking the template.
+- **Crosstab X/Y orientation:** `data.get_table(d, x, y)` uses `x` values as row headers and `y` as column headers. The pre-overhaul form labeled these backwards ("flipped due to display issues"); since Phase 3 the flip is **contained in `explore_table`'s POST handler** (Rows → `x_axis`, Columns → `y_axis`, commented there). Don't rename `get_table`'s args or the `dependant/x_axis/y_axis` route args — legacy URLs and lesson deep links depend on them.
 - `float64` columns coerce filter values to float so `16 == 16.0`. Numeric-only comparisons (`gt/ge/lt/le`) are validated against `float()` in the boolean-filter route.
 - Rounding idiom throughout `data.py`: `round(x * 10**precision) / 10**precision`.
 - Cache-path bug guard: trailing `/` is stripped in `get_data` before appending `_data.bin`.
@@ -182,7 +203,8 @@ view. `hx_toast()` sets the `HX-Trigger` header for htmx-response toasts (used f
 - **Cached pickles can hold stale codebook text.** `_data.bin` stores the codebook-description
   dict and `<column>.bin` stores a `header`, both frozen at cache-build time. The explore views
   therefore read display names from the live codebook parse (`CODEBOOK` in `app.py`), never
-  from the cache; only legacy views (crosstab menu) still show cached descriptions.
+  from the cache; the Phase 3 compare views do the same (the old crosstab menu, which showed
+  cached descriptions, is gone).
 - Line-ending: repo is on Windows; git may warn about LF→CRLF. Harmless.
 
 ## Known issues / incomplete (don't assume these work)
@@ -202,8 +224,8 @@ view. `hx_toast()` sets the `HX-Trigger` header for htmx-response toasts (used f
 
 ## In progress: UI/UX overhaul (`ui-overhaul` branch)
 
-A full redesign of the presentation layer, planned with the author (2026-07). **Phases 0–2
-are done** (see below); Phases 3–7 are not started. The crosstab/filter view layouts described
+A full redesign of the presentation layer, planned with the author (2026-07). **Phases 0–3
+are done** (see below); Phases 4–7 are not started. The filter view layouts described
 elsewhere in this file are still the pre-overhaul state; update those sections as phases land.
 
 **Phase 0 (done — foundations, no redesign):** every child template's nested `<body>` (and
@@ -246,6 +268,23 @@ with search + "show more", and a "Filter this column" CTA into the Phase 4-pendi
 route. Display headers come from the live codebook parse, never cached pickles. Codebook
 fixes: duplicate `<preason2>` → `<preason3>`, stray `>` in `pper`. New files: `explore.html`,
 `templates/partials/*`, `explore.js`; deleted `info.html`/`info_menu.html`.
+
+**Phase 3 (done — compare workbench + CSV export):** `/explore/table` (builder) +
+`/explore/table/<d>/<x>/<y>` (results) replace the `/table` crosstab views (old URLs
+redirect; endpoint names kept for lesson deep links until Phase 5). The 161-row × 3-radio
+builder became three **searchable pickers** (native selects enhanced by the new
+`[data-picker]` combobox in `app.js` — keyboard-complete, no-JS falls back to the plain
+selects): honest "Measure / Rows / Columns" labels with the internal X/Y flip contained
+and commented in the POST handler. Results: segmented **stat toggle** (N/mean/median/std
+— all four ship in the markup; `compare.js` swaps `data-stat`, no refetch; no-JS shows
+them stacked with labels), **8-step heatmap** on the active stat (`.heat-N` +
+`color-mix` ramp, text flips to `--color-on-accent` at step 7 — spec folded into
+`STYLEGUIDE.md`), N row/column totals with NaN rows/cols dropped, sticky
+row/column/totals headers, grouped-bar Chart.js companion (≤8×8), and the `/download`
+stub implemented as the crosstab **CSV export** (same compute path as the view; UTF-8
+BOM; `Content-Disposition` filename). New files: `compare.html`,
+`partials/compare_builder.html`, `partials/compare_results.html`, `compare.js`; deleted
+`perm.html`/`perm_menu.html`.
 
 **Locked direction** (author-approved): sidebar **workbench** IA (`/explore` with htmx
 fragment swaps), hand-rolled CSS token system (no build step), Chart.js visuals, light+dark

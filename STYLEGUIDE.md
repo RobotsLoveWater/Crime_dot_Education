@@ -81,6 +81,10 @@ Dark theme uses **borders, not shadows**, for elevation (shadows are near-invisi
 
 Heatmap shading (crosstab): a single-hue ramp from `--color-accent-subtle` → `--color-accent`.
 The number is **always rendered in the cell** — color is never the only signal.
+Implementation (Phase 3): a discrete 8-step ramp (`.heat-1`–`.heat-8` in `components.css`,
+`color-mix` of the two tokens), scaled linearly 0→max on the active stat; step 0 is unshaded.
+Cell text flips to `--color-on-accent` from step 7; the mix percentages skew away from the
+mid-ramp (and dark's step 6 uses a lighter mix) so both text colors keep AA contrast.
 
 ### Typography
 

@@ -398,11 +398,26 @@ p.error { color: var(--color-danger); }
 .segmented-item + .segmented-item {
   border-left: 1px solid var(--color-border);
 }
-a.segmented-item:hover {
+/* button-flavored segments (form-value state, e.g. the crosstab stat toggle)
+   shed the UA button chrome so both flavors render identically */
+button.segmented-item {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-family: inherit;
+  line-height: 1.45;
+  cursor: pointer;
+}
+button.segmented-item + .segmented-item {
+  border-left: 1px solid var(--color-border);
+}
+a.segmented-item:hover,
+button.segmented-item:hover {
   background: var(--color-accent-subtle);
   color: var(--color-text);
 }
-.segmented-item[aria-current] {
+.segmented-item[aria-current],
+.segmented-item[aria-pressed="true"] {
   background: var(--color-accent-subtle);
   color: var(--color-accent);
 }
@@ -472,6 +487,135 @@ a.segmented-item:hover {
   font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- Form fields (STYLEGUIDE.md "Inputs & selects") ---------- */
+.field {
+  margin-bottom: var(--space-4);
+}
+.field > label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-weight: 500;
+}
+.field-hint {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.field select {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--fs-base);
+}
+
+/* ---------- Searchable picker (STYLEGUIDE.md "Searchable picker") ----------
+   Enhancement over a native select inside [data-picker]; app.js builds the
+   combobox input + listbox and hides the select (.picker-native). */
+.picker {
+  position: relative;
+}
+.picker-native {
+  display: none; /* class is added by JS, so no-JS keeps the native select */
+}
+.picker-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--fs-base);
+}
+.picker-input::placeholder {
+  color: var(--color-text-faint);
+}
+.picker-menu {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-2);
+}
+.picker-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1) 0;
+}
+.picker-group {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.picker-option {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.picker-option:hover,
+.picker-option.active {
+  background: var(--color-accent-subtle);
+}
+.picker-option.active {
+  color: var(--color-accent);
+}
+.picker-option[aria-selected="true"] {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.picker-empty {
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- Heatmap cells (crosstab — STYLEGUIDE.md "Heatmap cells") ----------
+   Discrete 8-step single-hue ramp from --color-accent-subtle to --color-accent,
+   linear on the active stat (0 = unshaded). The number always renders; text
+   flips to --color-on-accent from step 7 (mid-ramp mixes keep default text for
+   contrast in both themes; percentages skew to avoid the unreadable middle). */
+.heat-1 { background: color-mix(in srgb, var(--color-accent) 10%, var(--color-accent-subtle)); }
+.heat-2 { background: color-mix(in srgb, var(--color-accent) 20%, var(--color-accent-subtle)); }
+.heat-3 { background: color-mix(in srgb, var(--color-accent) 30%, var(--color-accent-subtle)); }
+.heat-4 { background: color-mix(in srgb, var(--color-accent) 42%, var(--color-accent-subtle)); }
+.heat-5 { background: color-mix(in srgb, var(--color-accent) 54%, var(--color-accent-subtle)); }
+.heat-6 { background: color-mix(in srgb, var(--color-accent) 64%, var(--color-accent-subtle)); }
+.heat-7 { background: color-mix(in srgb, var(--color-accent) 88%, var(--color-accent-subtle)); }
+.heat-8 { background: var(--color-accent); }
+/* dark accent is lighter, so the step-6 mix needs less of it to keep AA text */
+[data-theme="dark"] .heat-6 { background: color-mix(in srgb, var(--color-accent) 58%, var(--color-accent-subtle)); }
+td.heat-7,
+td.heat-8 {
+  color: var(--color-on-accent);
+}
+
+/* ---------- Crosstab cells (stat toggle, Phase 3) ----------
+   Every stat ships in the markup as a .cell-stat span. Without JS the table has
+   no data-stat and all stats render stacked with their labels; compare.js sets
+   data-stat and these rules show only the active one. */
+.crosstab .cell-stat {
+  display: block;
+  white-space: nowrap;
+}
+.crosstab:not([data-stat]) .cell-stat::before {
+  content: attr(data-label) " ";
+  opacity: 0.7; /* currentColor at reduced weight, so it survives the heat flip */
+  font-size: var(--fs-xs);
+}
+.crosstab[data-stat="n"] .cell-stat:not(.cell-n) { display: none; }
+.crosstab[data-stat="mean"] .cell-stat:not(.cell-mean) { display: none; }
+.crosstab[data-stat="mdn"] .cell-stat:not(.cell-mdn) { display: none; }
+.crosstab[data-stat="std"] .cell-stat:not(.cell-std) { display: none; }
 
 /* ---------- Search inputs (column browser, value table) ---------- */
 input[type="search"].search-input,

@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+{% block title %} — Compare{% endblock %}
+
+{% block head %}
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/compare.js') }}" defer></script>
+{% endblock %}
+
+{% block body %}
+{# htmx swap target: the compare view (builder or results) is replaced here;
+   hx-push-url keeps every state bookmarkable — same pattern as explore.html #}
+<div id="compare-view" class="compare-view">
+    {% if table is defined %}
+        {% include 'partials/compare_results.html' %}
+    {% else %}
+        {% include 'partials/compare_builder.html' %}
+    {% endif %}
+</div>
+{% endblock %}

@@ -6,6 +6,7 @@
    - sidebar drawer at tablet width: toggle, focus trap, Esc to close
    - global progress bar bound to htmx request events
    - form submit feedback: spinner + "Computing statistics…" on [data-loading] forms
+   - searchable pickers over native selects ([data-picker], STYLEGUIDE.md)
    Everything here is an enhancement; all actions work as plain links/forms without it. */
 
 (function () {
@@ -244,4 +245,205 @@
     if (!e.persisted) return;
     document.querySelectorAll('form[data-loading]').forEach(resetLoadingForm);
   });
+
+  /* ---------- Searchable pickers (STYLEGUIDE.md "Searchable picker") ----------
+     Progressive enhancement over a native <select> inside a [data-picker] wrapper:
+     a combobox input filters the option list client-side; arrows + Enter select,
+     Esc closes. The native select stays in the form and keeps carrying the value
+     (and is the no-JS fallback). */
+
+  var pickerSeq = 0;
+
+  function enhancePicker(wrap) {
+    var select = wrap.querySelector('select');
+    if (!select || wrap.dataset.enhanced) return;
+    wrap.dataset.enhanced = '1';
+
+    // flatten the options (placeholder rows with empty values are not results)
+    var options = [];
+    Array.prototype.forEach.call(select.querySelectorAll('option'), function (opt) {
+      if (opt.value === '') return;
+      options.push({
+        value: opt.value,
+        text: opt.textContent,
+        group: opt.parentElement.tagName === 'OPTGROUP' ? opt.parentElement.label : ''
+      });
+    });
+
+    var baseId = select.id || ('picker-' + (++pickerSeq));
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'picker-input';
+    input.id = baseId + '-input';
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-expanded', 'false');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-controls', baseId + '-listbox');
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.placeholder = 'Type to search…';
+
+    var menu = document.createElement('div');
+    menu.className = 'picker-menu';
+    menu.hidden = true;
+    var list = document.createElement('ul');
+    list.className = 'picker-list';
+    list.id = baseId + '-listbox';
+    list.setAttribute('role', 'listbox');
+    menu.appendChild(list);
+
+    // the visible input is now what the label describes
+    var label = wrap.querySelector('label');
+    if (label) label.htmlFor = input.id;
+
+    select.classList.add('picker-native');
+    select.tabIndex = -1;
+    select.setAttribute('aria-hidden', 'true');
+    select.insertAdjacentElement('afterend', input);
+    input.insertAdjacentElement('afterend', menu);
+
+    var items = [];   // rendered .picker-option elements
+    var active = -1;  // index into items
+
+    function selectedText() {
+      var opt = select.options[select.selectedIndex];
+      return opt && opt.value !== '' ? opt.textContent : '';
+    }
+
+    function setActive(index) {
+      if (items[active]) items[active].classList.remove('active');
+      active = index;
+      if (items[active]) {
+        items[active].classList.add('active');
+        input.setAttribute('aria-activedescendant', items[active].id);
+        items[active].scrollIntoView({ block: 'nearest' });
+      } else {
+        input.removeAttribute('aria-activedescendant');
+      }
+    }
+
+    function render(query) {
+      list.innerHTML = '';
+      items = [];
+      var lastGroup = null;
+      var selectedItem = null;
+
+      options.forEach(function (option, index) {
+        if (query && (option.text + ' ' + option.value).toLowerCase().indexOf(query) === -1) return;
+        if (option.group && option.group !== lastGroup) {
+          var heading = document.createElement('li');
+          heading.className = 'picker-group';
+          heading.setAttribute('role', 'presentation');
+          heading.textContent = option.group;
+          list.appendChild(heading);
+          lastGroup = option.group;
+        }
+        var item = document.createElement('li');
+        item.className = 'picker-option';
+        item.id = baseId + '-opt-' + index;
+        item.setAttribute('role', 'option');
+        item.setAttribute('data-index', index);
+        item.textContent = option.text;
+        if (option.value === select.value) {
+          item.setAttribute('aria-selected', 'true');
+          selectedItem = item;
+        }
+        list.appendChild(item);
+        items.push(item);
+      });
+
+      if (!items.length) {
+        var empty = document.createElement('li');
+        empty.className = 'picker-empty';
+        empty.setAttribute('role', 'presentation');
+        empty.textContent = 'No matches.';
+        list.appendChild(empty);
+      }
+
+      // start on the committed choice when browsing, else the first match
+      setActive(selectedItem ? items.indexOf(selectedItem) : (items.length ? 0 : -1));
+    }
+
+    function open(query) {
+      menu.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+      render(query || '');
+    }
+
+    function close() {
+      menu.hidden = true;
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+      input.value = selectedText(); // revert uncommitted typing
+    }
+
+    function choose(item) {
+      var option = options[parseInt(item.getAttribute('data-index'), 10)];
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      close();
+    }
+
+    input.value = selectedText();
+
+    input.addEventListener('focus', function () {
+      if (menu.hidden) {
+        open('');
+        input.select();
+      }
+    });
+    input.addEventListener('click', function () {
+      if (menu.hidden) {
+        open('');
+        input.select();
+      }
+    });
+    input.addEventListener('input', function () {
+      var query = input.value.trim().toLowerCase();
+      if (menu.hidden) open(query);
+      else render(query);
+    });
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (menu.hidden) { open(''); return; }
+        if (!items.length) return;
+        var step = e.key === 'ArrowDown' ? 1 : -1;
+        setActive((active + step + items.length) % items.length);
+      } else if (e.key === 'Enter') {
+        if (!menu.hidden) {
+          e.preventDefault(); // choosing an option must not submit the form
+          if (items[active]) choose(items[active]);
+        }
+      } else if (e.key === 'Escape') {
+        if (!menu.hidden) {
+          e.stopPropagation(); // just close the menu, not a surrounding dialog/drawer
+          close();
+        }
+      } else if (e.key === 'Tab') {
+        if (!menu.hidden) close();
+      }
+    });
+
+    // selecting with the mouse: prevent the blur so the click can land
+    menu.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    menu.addEventListener('click', function (e) {
+      var item = e.target.closest('.picker-option');
+      if (item) choose(item);
+    });
+
+    input.addEventListener('blur', function () {
+      if (!menu.hidden) close();
+    });
+  }
+
+  function initPickers() {
+    document.querySelectorAll('[data-picker]').forEach(enhancePicker);
+  }
+
+  initPickers();
+  document.body.addEventListener('htmx:afterSwap', initPickers);
+  document.body.addEventListener('htmx:historyRestore', initPickers);
 })();

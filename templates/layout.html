@@ -49,15 +49,15 @@
     <a href="{{ url_for('index') }}" class="brand">Minnesota Sentencing Explorer</a>
     {% if user %}
     {% set p = request.path %}
-    {% set section = 'stats' if p.startswith('/info') or p.startswith('/explore') else
-                     'compare' if p.startswith('/table') else
+    {% set section = 'compare' if p.startswith('/table') or p.startswith('/explore/table') else
+                     'stats' if p.startswith('/info') or p.startswith('/explore') else
                      'filter' if p.startswith('/filter') else
                      'lessons' if p.startswith('/lesson') else
                      'authoring' if p.startswith('/admin') else '' %}
     <nav class="topbar-nav" aria-label="Primary">
         <ul>
             <li><a href="{{ url_for('explore') }}" {% if section == 'stats' %}aria-current="page"{% endif %}>Statistics</a></li>
-            <li><a href="{{ url_for('table_menu') }}" {% if section == 'compare' %}aria-current="page"{% endif %}>Compare</a></li>
+            <li><a href="{{ url_for('explore_table') }}" {% if section == 'compare' %}aria-current="page"{% endif %}>Compare</a></li>
             <li><a href="{{ url_for('filter_menu') }}" {% if section == 'filter' %}aria-current="page"{% endif %}>Filter</a></li>
             <li><a href="{{ url_for('lesson_catalog') }}" {% if section == 'lessons' %}aria-current="page"{% endif %}>Lessons</a></li>
             {% if user['is_educator'] %}

@@ -1,0 +1,72 @@
+{# Compare builder (Phase 3): three searchable pickers over native selects —
+   Measure, Rows, Columns — replacing the old 161-row radio table. Served as a
+   fragment on htmx requests (fragment=True adds the <title> htmx uses to
+   retitle the page) and included by compare.html on full loads. #}
+{% if fragment %}<title>Minnesota Sentencing Explorer — Compare</title>{% endif %}
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Compare</h1>
+        <p class="view-subtitle">Compare (cross-tabulation): how two columns break down
+            against each other, computed on your current data state{% if datastate %} —
+            <strong>{{ '{:,}'.format(datastate['entries']) }}</strong> cases right now{% endif %}.</p>
+    </div>
+</header>
+
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    {% for message in error %}<p>{{ message }}</p>{% endfor %}
+</div>
+{% endif %}
+
+<form class="compare-form" method="post" action="{{ url_for('explore_table') }}"
+      data-loading="Computing statistics…">
+
+    {% set picked_measure = form.get('measure') or '#' %}
+    <div class="field picker" data-picker>
+        <label for="measure-select">Measure</label>
+        <select id="measure-select" name="measure">
+            <option value="#" {% if picked_measure == '#' %}selected{% endif %}>Count of cases</option>
+            <optgroup label="Mean of a numeric column">
+                {% for col in numeric_measures %}
+                <option value="{{ col['code'] }}" {% if picked_measure == col['code'] %}selected{% endif %}>{{ col['desc'] }} ({{ col['code'] }})</option>
+                {% endfor %}
+            </optgroup>
+        </select>
+        <p class="field-hint">“Count of cases” counts how many cases land in each cell.
+           A numeric column shows that column's mean per cell — median and standard
+           deviation come along too.</p>
+    </div>
+
+    <div class="field picker" data-picker>
+        <label for="rows-select">Rows</label>
+        <select id="rows-select" name="rows">
+            <option value="" {% if not form.get('rows') %}selected{% endif %}>Choose a column…</option>
+            {% for group in axis_groups %}
+            <optgroup label="{{ group['name'] }}">
+                {% for col in group['columns'] %}
+                <option value="{{ col['code'] }}" {% if form.get('rows') == col['code'] %}selected{% endif %}>{{ col['desc'] }} ({{ col['code'] }})</option>
+                {% endfor %}
+            </optgroup>
+            {% endfor %}
+        </select>
+        <p class="field-hint">Each value of this column becomes a row of the table.</p>
+    </div>
+
+    <div class="field picker" data-picker>
+        <label for="cols-select">Columns</label>
+        <select id="cols-select" name="cols">
+            <option value="" {% if not form.get('cols') %}selected{% endif %}>Choose a column…</option>
+            {% for group in axis_groups %}
+            <optgroup label="{{ group['name'] }}">
+                {% for col in group['columns'] %}
+                <option value="{{ col['code'] }}" {% if form.get('cols') == col['code'] %}selected{% endif %}>{{ col['desc'] }} ({{ col['code'] }})</option>
+                {% endfor %}
+            </optgroup>
+            {% endfor %}
+        </select>
+        <p class="field-hint">Each value of this column becomes a column of the table.</p>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Create table</button>
+</form>

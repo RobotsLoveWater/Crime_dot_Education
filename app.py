@@ -15,6 +15,7 @@ from flask import session
 from flask import request
 from flask import redirect, url_for
 from flask import flash
+from flask import Response
 
 from markupsafe import Markup, escape
 
@@ -22,6 +23,8 @@ import html
 import re
 import json
 import datetime
+import io
+import csv
 
 import util
 import make_history
@@ -388,68 +391,216 @@ def info_specific(column, sorting='occurrence'):
     return redirect(url_for('explore_column', column=column, sorting=sorting))
 
 
-@app.route("/table", methods=['GET', 'POST'])
-def table_menu():
+def build_compare_options(data):
+    # Picker option lists for the crosstab builder: Rows/Columns get every documented,
+    # non-excluded column grouped like the column browser; the Measure picker gets the
+    # numeric columns (each cell then shows that column's mean/median/std).
+    axis_groups = []
+    for group in build_column_browser(data):
+        columns = [c for c in group['columns'] if not c['excluded']]
+        if columns:
+            axis_groups.append({'name': group['name'], 'columns': columns})
+
+    numeric = sorted(
+        ({'code': code, 'desc': CODEBOOK.codebook[code]}
+         for code in data['numeric']
+         if code not in data['excluded'] and CODEBOOK.codebook.get(code)),
+        key=lambda c: c['desc'].lower())
+
+    return axis_groups, numeric
+
+
+def crosstab_error(data, measure, x_axis, y_axis):
+    # Shared validation for crosstab URL args (results view, CSV download).
+    # Returns a user-facing message, or None when the combination is valid.
+    for col in (x_axis, y_axis):
+        if (col not in data['column_list'] or col in data['excluded']
+                or not CODEBOOK.codebook.get(col)):
+            return "That comparison isn't available — pick columns from the lists."
+    if x_axis == y_axis:
+        return 'Rows and columns must be two different columns.'
+    if measure != '#':
+        if measure not in data['numeric'] or measure in data['excluded'] \
+                or not CODEBOOK.codebook.get(measure):
+            return "That measure isn't available — pick one from the list."
+        if measure in (x_axis, y_axis):
+            return 'The measure column must be different from the rows and columns.'
+    return None
+
+
+def _crosstab_key(value):
+    # numeric-aware ordering for row/column headers: 2001.0 before 2010.0, text A→Z
+    try:
+        return (0, float(value), '')
+    except (TypeError, ValueError):
+        return (1, 0.0, str(value).lower())
+
+
+def build_crosstab(sheet, has_measure):
+    # Reshape data.get_table's nested dict into an ordered display table with per-stat
+    # heatmap steps and N totals. sheet[x][y] keys arrive in dataframe order and can
+    # include NaN (cases missing a value in that column) — NaN rows/columns are dropped
+    # from display, so the totals only count cases that appear in the table.
+    rows = sorted((x for x in sheet if x == x), key=_crosstab_key)
+    cols = []
+    if rows:
+        cols = sorted((y for y in sheet[rows[0]] if y == y), key=_crosstab_key)
+
+    stats = ['n', 'mean', 'mdn', 'std'] if has_measure else ['n']
+
+    def parse(text):
+        # get_table emits 'N/A' when a cell has no data for the measure column
+        try:
+            return float(text)
+        except (TypeError, ValueError):
+            return None
+
+    grid = []
+    for x in rows:
+        line = []
+        for y in cols:
+            raw = sheet[x][y]
+            cell = {'n': raw['N'],
+                    'values': {'n': float(raw['N'])},
+                    'display': {'n': '{:,}'.format(raw['N'])},
+                    'heat': {}}
+            if has_measure:
+                for stat in ('mean', 'mdn', 'std'):
+                    value = parse(raw[stat])
+                    cell['values'][stat] = value
+                    cell['display'][stat] = raw[stat] if value is not None else '–'
+            line.append(cell)
+        grid.append(line)
+
+    # heatmap steps: linear 0→max ramp per stat, 8 steps (0 = unshaded); the active
+    # stat's steps become .heat-N classes (server-set for N, swapped client-side)
+    for stat in stats:
+        peak = max((c['values'][stat] or 0 for line in grid for c in line), default=0)
+        for line in grid:
+            for cell in line:
+                value = cell['values'][stat]
+                step = 0
+                if peak > 0 and value and value > 0:
+                    step = max(1, round(8 * value / peak))
+                cell['heat'][stat] = step
+
+    row_totals = [sum(c['n'] for c in line) for line in grid]
+    col_totals = [sum(line[j]['n'] for line in grid) for j in range(len(cols))]
+
+    return {'rows': rows, 'cols': cols, 'grid': grid, 'stats': stats,
+            'row_totals': row_totals, 'col_totals': col_totals,
+            'total': sum(row_totals)}
+
+
+def build_compare_chart(table):
+    # grouped-bar companion, only for small tables (up to ~8×8 the bars stay readable);
+    # stats holds every stat so the client-side toggle re-renders without a refetch
+    if not table['rows'] or len(table['rows']) > 8 or len(table['cols']) > 8:
+        return None
+    return {
+        'labels': [display_value(x) for x in table['rows']],
+        'columns': [display_value(y) for y in table['cols']],
+        'stats': {stat: [[line[j]['values'][stat] for line in table['grid']]
+                         for j in range(len(table['cols']))]
+                  for stat in table['stats']}
+    }
+
+
+def render_compare(dependant=None, x_axis=None, y_axis=None, error=None, form=None):
+    # Shared renderer for the compare workbench (same pattern as render_explore):
+    # builder without args, results with them; fragments on htmx requests.
+    user = account.retrieve(session['userid'])
+    data = get_data(session)
+    context = {'user': user, 'data': data, 'error': error or []}
+
+    if dependant:
+        measure_col = None if dependant == '#' else dependant
+        # crosstabs are computed fresh each time (never disk-cached, matching the old view)
+        sheet = _execute(session).get_table(measure_col, x_axis, y_axis)
+        table = build_crosstab(sheet, measure_col is not None)
+        context.update({
+            'dependant': dependant, 'x_axis': x_axis, 'y_axis': y_axis,
+            'measure': measure_col,
+            'measure_desc': CODEBOOK.codebook[measure_col] if measure_col else None,
+            'row_desc': CODEBOOK.codebook[x_axis],
+            'col_desc': CODEBOOK.codebook[y_axis],
+            'table': table,
+            'chart': build_compare_chart(table),
+            # what the stat toggle starts on: the picked measure's mean, else the count
+            'default_stat': 'mean' if measure_col else 'n'
+        })
+        partial = 'partials/compare_results.html'
+    else:
+        axis_groups, numeric = build_compare_options(data)
+        context.update({'axis_groups': axis_groups, 'numeric_measures': numeric,
+                        'form': form or {}})
+        partial = 'partials/compare_builder.html'
+
+    if wants_fragment():
+        return render_template(partial, fragment=True, **context)
+    return render_template('compare.html', **context)
+
+
+@app.route("/explore/table", methods=['GET', 'POST'])
+def explore_table():
     if is_logged_in():
-        error = []
-        user = account.retrieve(session['userid'])
-
         if request.method == 'POST':
+            form = {'measure': request.form.get('measure', ''),
+                    'rows': request.form.get('rows', ''),
+                    'cols': request.form.get('cols', '')}
 
-            # check that the form was filled out
-            if request.form['dependant'] == '':
-                error.append("Dependant variable not selected.")
-            if request.form['x_axis'] == '':
-                error.append("Y-Axis variable not selected.")  # flipped due to display issues
-            if request.form['y_axis'] == '':
-                error.append("X-Axis variable not selected.")  # flipped due to display issues
+            error = []
+            if not form['measure']:
+                error.append('Choose a measure.')
+            if not form['rows']:
+                error.append('Choose a column for the rows.')
+            if not form['cols']:
+                error.append('Choose a column for the columns.')
+            if not error:
+                message = crosstab_error(get_data(session), form['measure'],
+                                         form['rows'], form['cols'])
+                if message:
+                    error.append(message)
 
-            # check that the form has no duplicates
-            form_result = [request.form['dependant'], request.form['x_axis'], request.form['y_axis']]
-            if len(set(form_result)) != len(form_result):
-                error.append("There are duplicates selected.")
+            if not error:
+                # Orientation note: data.get_table renders x_axis values as the ROW
+                # headers and y_axis values as the COLUMN headers (sheet[x][y] iterates
+                # x as rows). The pre-overhaul UI labeled these "X axis"/"Y axis"
+                # backwards; the flip is contained right here — Rows maps to x_axis,
+                # Columns to y_axis, and users only ever see "Rows"/"Columns".
+                return redirect(url_for('explore_table_view', dependant=form['measure'],
+                                        x_axis=form['rows'], y_axis=form['cols']))
 
-            if len(error) == 0:
-                return redirect(url_for('table', dependant=request.form['dependant'], x_axis=request.form['x_axis'], y_axis=request.form['y_axis']))
+            return render_compare(error=error, form=form)
 
-        data = get_data(session)
-        return render_template('perm_menu.html', data=data, error=error, user=user)
-
+        return render_compare()
     else:
         return not_logged_in()
+
+
+@app.route("/explore/table/<dependant>/<x_axis>/<y_axis>")
+def explore_table_view(dependant, x_axis, y_axis):
+    if is_logged_in():
+        message = crosstab_error(get_data(session), dependant, x_axis, y_axis)
+        if message:
+            flash(message, 'danger')
+            return redirect(url_for('explore_table'))
+        return render_compare(dependant, x_axis, y_axis)
+    else:
+        return not_logged_in()
+
+
+# Legacy crosstab URLs (pre-overhaul). The endpoint names survive on purpose:
+# lesson deep links (build_explore) still emit /table/... until Phase 5.
+@app.route("/table")
+def table_menu():
+    return redirect(url_for('explore_table'))
 
 
 @app.route("/table/<dependant>/<x_axis>/<y_axis>")
 def table(dependant, x_axis, y_axis):
-    if is_logged_in():
-        user = account.retrieve(session['userid'])
-
-        temp_data = _execute(session)
-
-        data = get_data(session)
-
-        columns = temp_data.get_columns_w_codebook()
-        variables = {
-            'x': [x_axis, columns[x_axis]],
-            'y': [y_axis, columns[y_axis]]
-        }
-
-        # deal with the dependant variable possibly being simply the number of times occurring
-        variables['d'] = [dependant, '']
-        if dependant == '#':
-            variables['d'][1] = 'Number of Occurrences.'
-            dependant = None
-        else:
-            variables['d'][1] = columns[dependant]
-
-        sheet = temp_data.get_table(dependant, x_axis, y_axis)
-
-        yh = sheet[list(sheet.keys())[0]]
-
-        return render_template('perm.html', data=data, variables=variables, y_headers=yh, sheet=sheet, user=user)
-
-    else:
-        return not_logged_in()
+    return redirect(url_for('explore_table_view', dependant=dependant,
+                            x_axis=x_axis, y_axis=y_axis))
 
 
 @app.route("/filter/")
@@ -599,10 +750,87 @@ def filter_moc(moc1, moc2, moc3, moc4, moc5, active):
         return not_logged_in()
 
 
+def crosstab_csv(dependant, x_axis, y_axis):
+    # CSV of the crosstab the results view renders — same get_table call, same
+    # build_crosstab reshaping, so the numbers always match the screen.
+    measure_col = None if dependant == '#' else dependant
+    sheet = _execute(session).get_table(measure_col, x_axis, y_axis)
+    table = build_crosstab(sheet, measure_col is not None)
+    entries = get_data(session)['entries']
+
+    row_desc = CODEBOOK.codebook[x_axis]
+    col_desc = CODEBOOK.codebook[y_axis]
+    measure_label = ('Mean of ' + CODEBOOK.codebook[measure_col]) if measure_col \
+        else 'Count of cases'
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(['Minnesota Sentencing Explorer crosstab'])
+    writer.writerow(['Measure', measure_label])
+    writer.writerow(['Rows', row_desc + ' (' + x_axis + ')'])
+    writer.writerow(['Columns', col_desc + ' (' + y_axis + ')'])
+    writer.writerow(['Data state', str(entries) + ' cases'])
+
+    col_headers = [display_value(y) for y in table['cols']]
+
+    sections = [('n', 'Count of cases')]
+    if measure_col:
+        desc = CODEBOOK.codebook[measure_col]
+        sections += [('mean', 'Mean of ' + desc),
+                     ('mdn', 'Median of ' + desc),
+                     ('std', 'Std. deviation of ' + desc)]
+
+    for stat, label in sections:
+        writer.writerow([])
+        writer.writerow([label])
+        header = [row_desc] + col_headers
+        if stat == 'n':
+            header.append('Total')
+        writer.writerow(header)
+        for i, x in enumerate(table['rows']):
+            line = [display_value(x)]
+            for j in range(len(table['cols'])):
+                cell = table['grid'][i][j]
+                if stat == 'n':
+                    line.append(cell['n'])  # raw int — Excel-friendly, no thousands separator
+                else:
+                    value = cell['values'][stat]
+                    # the display string carries the same rounding the screen shows
+                    line.append('' if value is None else cell['display'][stat])
+            if stat == 'n':
+                line.append(table['row_totals'][i])
+            writer.writerow(line)
+        if stat == 'n':
+            writer.writerow(['Total'] + table['col_totals'] + [table['total']])
+
+    filename = ('crosstab-' + (measure_col if measure_col else 'count')
+                + '-' + x_axis + '-by-' + y_axis + '.csv')
+    # BOM so Excel reads the file as UTF-8 (codebook descriptions can carry non-ASCII)
+    response = Response('\ufeff' + buffer.getvalue(), mimetype='text/csv')
+    response.headers['Content-Disposition'] = 'attachment; filename="' + filename + '"'
+    return response
+
+
 @app.route('/download')
 def download():
+    # Crosstab CSV export (Phase 3). Query args mirror the results view: measure
+    # ('#' = count of cases) plus the rows/cols display columns.
     if is_logged_in():
-        return not_implemented()
+        measure = request.args.get('measure', '')
+        rows = request.args.get('rows', '')
+        cols = request.args.get('cols', '')
+
+        if not (measure and rows and cols):
+            flash('Build a comparison first — the CSV download exports the table '
+                  'you are viewing.', 'danger')
+            return redirect(url_for('explore_table'))
+
+        message = crosstab_error(get_data(session), measure, rows, cols)
+        if message:
+            flash(message, 'danger')
+            return redirect(url_for('explore_table'))
+
+        return crosstab_csv(measure, rows, cols)
     else:
         return not_logged_in()
 
