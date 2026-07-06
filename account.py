@@ -134,6 +134,12 @@ def history_revert(userid, entry_number=1):
     user = retrieve(userid)
     user['history'] = user['history'][:entry_number]
 
+    # the reverted-to entry is now the most recent; mark only it active (a display flag,
+    # mirroring history_add) so the history table shows it as 'Current' rather than 'Revert'
+    for entry in user['history']:
+        entry['active'] = False
+    user['history'][-1]['active'] = True
+
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
 

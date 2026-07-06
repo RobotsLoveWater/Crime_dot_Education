@@ -460,6 +460,20 @@ def load():
         return not_logged_in()
 
 
+@app.route('/revert/<int:n>')
+def revert(n):
+    if is_logged_in():
+        # n is the 1-based history position from the table (loop.index); history_revert
+        # truncates to history[:n], so the clicked row's entry and everything before it
+        # survive. The <int> converter rejects negatives; an over-large n is a harmless
+        # no-op, and n < 1 is skipped so we never trip history_revert's assert.
+        if n >= 1:
+            account.history_revert(session['userid'], n)
+        return redirect(url_for('index'))
+    else:
+        return not_logged_in()
+
+
 @app.route('/save', methods=['GET', 'POST'])
 def save():
     if is_logged_in():

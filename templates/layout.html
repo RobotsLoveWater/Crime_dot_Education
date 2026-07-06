@@ -44,7 +44,7 @@
             {% for ih in user['history'] %}
                 <tr>
                     {% if ih['active'] == False %}
-                    <td><a href="/">Revert</a></td>
+                    <td><a href="{{ url_for('revert', n=loop.index) }}">Revert</a></td>
                     {% else %}
                     <td>Current</td>
                     {% endif %}

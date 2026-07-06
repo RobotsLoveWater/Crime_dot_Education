@@ -31,7 +31,9 @@ There is **no live dataframe per session.** Instead:
 Consequences:
 - Applying a filter = **appending a history entry** to the user's pickle, then redirecting home.
   It does not mutate a dataframe.
-- "Revert" (`/load`) just truncates the history list back to a shorter prefix.
+- "Revert" (`/revert/<n>`) truncates the history list back to the clicked entry (keeps
+  `history[:n]`, where `n` is that row's 1-based position); "Clear Data" (`/load`) reverts all
+  the way to the base (full dataset).
 - Cache files inside a history directory: `_data.bin` (dataset-level summary),
   `<column>.bin` (per-column stats), `_moc.bin` (offense-code option counts).
 - The cache is **content-addressed and safe to delete** — it regenerates on demand (slowly).
@@ -118,7 +120,9 @@ CODES['A'] = [ 'Assault',                 # [0] title (comment '# Complete' = fu
 - `/info/`, `/info/<column>/<sorting>` — descriptive stats per column. `sorting` ∈ `Data.VALID_SORTING`.
 - `/table`, `/table/<dependant>/<x_axis>/<y_axis>` — cross-tab (N, mean, median, std). `dependant == '#'` means count only.
 - `/filter/` menu; `/filter/boolean/<column>/<sorting>` — comparison filters (single or OR-multiple); `/filter/moc/...` — offense-code drill-down.
-- `/load` — revert/clear history.
+- `/load` — clear history (revert to the base full-dataset entry). `/revert/<n>` — revert the
+  history to a prior entry (`account.history_revert`, truncating to `history[:n]`; `n` is the
+  1-based row position from the dashboard history table).
 - **Learning modules:** `/lesson` (catalog), `/lesson/<module_id>` (overview), `/lesson/<module_id>/<step>` (render; POST grades a `question`), `/lesson/<module_id>/complete` (mark done). See "Learning Modules" below.
 - **Authoring (educators only):** `/admin` (list your class's modules), `/admin/edit[/<module_id>]` (create/edit → writes validated JSON to `lessons/`). Guarded by `require_educator()`.
 - `/guide` — static guide page (replaced the old buggy `/lesson/get_started` stub). `/download`, `/save`, `/other`, `/settings` — still **stubs** returning "WIP, Feature Not Implemented".
