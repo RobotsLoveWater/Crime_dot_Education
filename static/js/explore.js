@@ -108,7 +108,9 @@
           if (match) visible++;
         });
         group.hidden = visible === 0;
-        if (query && visible) group.open = true;
+        // groups start collapsed; a search opens the ones with matches and an
+        // empty query collapses them all again (back to the resting state)
+        group.open = !!(query && visible);
         if (visible) anyVisible = true;
       });
 
@@ -184,26 +186,44 @@
 
   /* ---------- Wiring ---------- */
 
-  function initView() {
+  // Chart.js measures its container when it's created. During an htmx swap the
+  // layout isn't final until htmx settles (it also runs `show:window:top`), so a
+  // chart built on afterSwap can measure a transient size and paint blank until a
+  // manual refresh. Render it on afterSettle (layout + scroll finalized) and force
+  // one resize on the next frame — this makes the swap path behave like a full load.
+  function renderChartSafe() {
     renderChart();
+    requestAnimationFrame(function () { if (chart) chart.resize(); });
+  }
+
+  function initInteractive() {
     initValueTable();
     syncActiveColumn();
   }
 
   initBrowserSearch();
-  initView();
+  initInteractive();
+  renderChartSafe();
 
   document.body.addEventListener('htmx:afterSwap', function (e) {
     if (e.detail.target && e.detail.target.id === 'explore-view') {
-      initView();
+      initInteractive();
       // picking a column from the tablet drawer should also close the drawer
       var backdrop = document.getElementById('sidebar-backdrop');
       if (backdrop && backdrop.classList.contains('open')) backdrop.click();
     }
   });
 
+  // render the chart once the swap has settled (stable container size)
+  document.body.addEventListener('htmx:afterSettle', function (e) {
+    if (e.detail.target && e.detail.target.id === 'explore-view') renderChartSafe();
+  });
+
   // htmx restored a cached page snapshot (browser Back): canvas state is lost, re-init
-  document.body.addEventListener('htmx:historyRestore', initView);
+  document.body.addEventListener('htmx:historyRestore', function () {
+    initInteractive();
+    renderChartSafe();
+  });
 
   // charts re-read the CSS tokens when the theme flips (theme.js fires this)
   document.addEventListener('themechange', renderChart);

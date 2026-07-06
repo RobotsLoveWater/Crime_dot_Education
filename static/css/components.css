@@ -423,8 +423,8 @@ button.segmented-item:hover {
 }
 
 /* ---------- Data tables (STYLEGUIDE.md "Data tables") ----------
-   .data-table overrides the legacy accent-filled thead from style.css until
-   that file is retired. .table-scroll adds a max height + sticky header. */
+   .data-table is fully self-contained (surface thead, token borders).
+   .table-scroll adds a max height + sticky header. */
 .table-wrapper {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -502,7 +502,24 @@ button.segmented-item:hover {
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
 }
-.field select {
+.field-hint code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 0 3px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+/* "— optional" marker on a non-required field label */
+.field-optional {
+  color: var(--color-text-faint);
+  font-weight: 400;
+  font-size: var(--fs-sm);
+}
+.field select,
+.field input[type="number"],
+.field input[type="text"],
+.field textarea {
   width: 100%;
   padding: var(--space-2) var(--space-3);
   background: var(--color-surface);
@@ -510,6 +527,34 @@ button.segmented-item:hover {
   border-radius: var(--radius-sm);
   color: var(--color-text);
   font-size: var(--fs-base);
+}
+.field textarea { resize: vertical; }
+.field textarea.code-area {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+/* fieldset + legend for radio/checkbox groups (STYLEGUIDE.md "Inputs & selects") */
+fieldset.field {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+fieldset.field > legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-weight: 500;
+}
+.radio-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  font-size: var(--fs-base);
+}
+.radio-row input {
+  flex-shrink: 0;
 }
 
 /* ---------- Searchable picker (STYLEGUIDE.md "Searchable picker") ----------

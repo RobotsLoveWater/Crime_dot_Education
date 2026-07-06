@@ -82,17 +82,17 @@ uv run flask --app app run     # add --debug for reload
 | `codebook.xml` | Maps dataset column names → human descriptions; each entry also carries a `group` attribute placing the column in an explore column-browser category (display order in `Data.GROUP_ORDER`). Loaded by `Data.__init__` (descriptions → `self.codebook`, groups → `self.groups`). Some entry names don't match real dataset columns (see gotchas). |
 | `settings.xml` | seaborn palette/style (`deep` / `darkgrid`). Not heavily used yet. |
 | `test.py` | Ad-hoc scratch script for the history→cache-key encoding. Not a real test suite. |
-| `templates/` | Jinja2. `layout.html` is the base — the Phase 1 **workbench shell**: top bar (nav + theme toggle + identity), data-state **sidebar** (count badge, filter chips, Clear data; `{% block sidebar_extra %}` hosts view-specific modules), toast region, confirm `<dialog>`, htmx progress bar; others extend it via `{% block body %}`. `explore.html` + `templates/partials/` (`column_browser.html`, `explore_landing.html`, `explore_column.html`) are the Phase 2 statistics workbench — partials render standalone on htmx fragment requests (`fragment=True` adds the `<title>` htmx uses to retitle the page) and are `{% include %}`d on full loads. `compare.html` + `partials/compare_builder.html`/`compare_results.html` are the Phase 3 crosstab workbench on the same pattern (replacing the deleted `perm_menu.html`/`perm.html`). `error.html` renders the styled 404/500 handlers. Learning-modules views: `lesson_catalog.html`, `lesson.html`, `lesson_step.html`, `admin.html`, `admin_edit.html`. (`info.html`/`info_menu.html` were deleted in Phase 2.) |
+| `templates/` | Jinja2. `layout.html` is the base — the Phase 1 **workbench shell**: top bar (nav + theme toggle + identity), data-state **sidebar** (count badge, filter chips, Clear data; `{% block sidebar_extra %}` hosts view-specific modules), toast region, confirm `<dialog>`, htmx progress bar; others extend it via `{% block body %}`. `explore.html` + `templates/partials/` (`column_browser.html`, `explore_landing.html`, `explore_column.html`) are the Phase 2 statistics workbench — partials render standalone on htmx fragment requests (`fragment=True` adds the `<title>` htmx uses to retitle the page) and are `{% include %}`d on full loads. `compare.html` + `partials/compare_builder.html`/`compare_results.html` are the Phase 3 crosstab workbench on the same pattern (replacing the deleted `perm_menu.html`/`perm.html`). `filter.html` + `partials/filter_landing.html`/`filter_column.html`/`filter_preview.html`/`filter_zero.html` are the Phase 4 **Filter workbench** (same fragment pattern; the sidebar reuses the now-parametrized `column_browser.html` pointed at the filter routes), and `moc1.html`/`moc.html` are the rebuilt offense-code chooser + 5-slot stepper. The Phase 4 rewrite deleted `filter_boolean.html`/`filter_boolean_menu.html`. `error.html` renders the styled 404/500 handlers. Learning-modules views (Phase 5 restyled + docked): `lesson_catalog.html`, `lesson.html`, `lesson_step.html` (extends `layout.html`, fills the new `{% block dock %}`; the main area `{% include %}`s `partials/lesson_data.html` — the read-only sandbox data view), `admin.html`, `admin_edit.html`. (`info.html`/`info_menu.html` were deleted in Phase 2.) |
 | `lessons/` | Authored learning-module content (`<id>.json`) + `README.md` schema. **Safe to commit** (unlike `user/`). |
 | `LEARNING_MODULES_PROMPTS.md` | Phased build plan for the learning-modules feature. All phases are now implemented; the doc still reads as forward-looking. |
-| `UI_OVERHAUL_PROMPTS.md` | Phased build plan for the UI/UX overhaul (sidebar workbench redesign). **Phases 0 (hygiene/tokens/vendored assets), 1 (workbench shell), 2 (explore workbench), and 3 (compare workbench + CSV export) are done**; Phases 4–7 remain — see "In progress: UI/UX overhaul" below. |
+| `UI_OVERHAUL_PROMPTS.md` | Phased build plan for the UI/UX overhaul (sidebar workbench redesign). **Phases 0 (hygiene/tokens/vendored assets), 1 (workbench shell), 2 (explore workbench), 3 (compare workbench + CSV export), 4 (filter workbench: live previews, searchable values, MOC stepper), 5 (docked lessons + checkpoint wiring), 6 (auth pages/landing/logged-in home), and 7 (responsive/a11y/dark QA + `style.css` removal) are done** — the overhaul is feature-complete; see "In progress: UI/UX overhaul" below. |
 | `STYLEGUIDE.md` | **Design authority** for all UI work: tokens (light+dark), typography, layout, components, htmx conventions, a11y checklist. Read it before touching `templates/` or `static/`. |
 | `static/css/tokens.css`, `static/css/base.css` | Phase 0 token system: all design tokens (both themes, exact `STYLEGUIDE.md` tables — plus `--overlay` for drawer/dialog backdrops) and reset/typography/focus/reduced-motion. Loaded first; theme switches via `data-theme` on `<html>` (FOUC-guard inline script in `layout.html` — which also sets a `js` class gating JS-only CSS — toggle in `static/js/theme.js`, persisted to `localStorage.theme`, fires a `themechange` event). |
-| `static/css/components.css`, `static/css/views.css` | Phase 1 shell styles per the styleguide's file organization: `components.css` = buttons/badges/chips/toasts/dialog/alerts/empty-state/loading; `views.css` = top bar, workbench grid, sidebar + tablet drawer, breakpoints. Loaded **after** `style.css` so new shell rules win ties. |
-| `static/css/style.css` | **Legacy** pre-overhaul component styles, re-pointed at the tokens (old names like `--color-panel`/`--color-muted` are aliases in its `:root`). Phase 1 removed its header/nav/flash/footer rules (shell-owned now); the rest is retired once its last consumer is rebuilt. |
-| `static/js/app.js` | Phase 1 shell behaviors (vanilla, no build step): toast auto-dismiss + `HX-Trigger`/`htmx:responseError` toast paths, `[data-confirm]` dialog interception, sidebar drawer with focus trap, htmx-bound global progress bar, `[data-loading]` submit feedback ("Computing statistics…"). Phase 3 added the **searchable picker**: a `[data-picker]` wrapper around a native `<select>` gets a filtering combobox (arrows/Enter/Esc); the hidden select keeps carrying the form value (and is the no-JS fallback). |
-| `static/js/compare.js` | Phase 3 compare behaviors: stat toggle (sets `data-stat` on the crosstab — pure CSS show/hide, since all four stats ship in the markup — updates `aria-pressed`, and re-shades the `.heat-N` heatmap from each cell's `data-heat-<stat>` attributes) and the grouped-bar companion chart (theme-aware, ≤8×8 tables only, re-rendered on `themechange` and htmx swaps/history restores). Loaded (with `chart.umd.min.js`) only via `compare.html`'s `{% block head %}`. |
-| `static/js/explore.js` | Phase 2 explore behaviors: distribution chart (Chart.js; colors read from CSS tokens at render time, re-rendered on `themechange` and htmx swaps/history restores; horizontal bars when labels run long), column-browser search, value-table search + "show more" pagination, active-column `aria-current` sync, tablet-drawer auto-close on column pick. Loaded (with `chart.umd.min.js`) only via `explore.html`'s `{% block head %}`. |
+| `static/css/components.css`, `static/css/views.css` | Phase 1 shell styles per the styleguide's file organization: `components.css` = buttons/badges/chips/toasts/dialog/alerts/empty-state/loading; `views.css` = top bar, workbench grid, sidebar + tablet drawer, breakpoints, **phone shell (data-state bar, bottom nav, sticky-first-column tables, bottom-sheet dock — Phase 7)**. The retired `style.css` is gone (Phase 7); its still-live base rules (`.container`, bare `h1`/`h2`/`h3`/`p`) moved here + into `base.css`. |
+| `static/js/app.js` | Phase 1 shell behaviors (vanilla, no build step): toast auto-dismiss + `HX-Trigger`/`htmx:responseError` toast paths, `[data-confirm]` dialog interception, sidebar drawer with focus trap (Phase 7: opened by **any** `[aria-controls="sidebar"]` trigger — the tablet ☰ or the phone data-state bar — focus returns to the opener), htmx-bound global progress bar, `[data-loading]` submit feedback ("Computing statistics…"). Phase 3 added the **searchable picker**: a `[data-picker]` wrapper around a native `<select>` gets a filtering combobox (arrows/Enter/Esc); the hidden select keeps carrying the form value (and is the no-JS fallback). |
+| `static/js/compare.js` | Phase 3 compare behaviors: stat toggle (sets `data-stat` on the crosstab — pure CSS show/hide, since all four stats ship in the markup — updates `aria-pressed`, and re-shades the `.heat-N` heatmap from each cell's `data-heat-<stat>` attributes) and the grouped-bar companion chart (theme-aware, ≤8×8 tables only, re-rendered on `themechange` and history restores). **The chart renders on `htmx:afterSettle` (not `afterSwap`) + a next-frame `chart.resize()`** — the swapped DOM/scroll must settle before Chart.js measures the container, or it intermittently paints blank until a manual refresh; don't move it back to `afterSwap`. Loaded (with `chart.umd.min.js`) only via `compare.html`'s `{% block head %}`. |
+| `static/js/explore.js` | Phase 2 explore behaviors: distribution chart (Chart.js; colors read from CSS tokens at render time, re-rendered on `themechange` and history restores; horizontal bars when labels run long), column-browser search, value-table search + "show more" pagination, active-column `aria-current` sync, tablet-drawer auto-close on column pick. **The chart renders on `htmx:afterSettle` (not `afterSwap`) + a next-frame `chart.resize()`** (interactive bits — table/active-column — still run on `afterSwap`): Chart.js must measure the container after the swap/`show:window:top` scroll settles, or it intermittently paints blank until a refresh; don't move it back to `afterSwap`. Loaded (with `chart.umd.min.js`) only via `explore.html`'s `{% block head %}`. |
+| `static/js/filter.js` | Phase 4 filter-workbench behaviors: column-browser search + active-column `aria-current` sync (against `#filter-view`), categorical value-list search + "Select shown"/"Clear" bulk actions, and MOC option/category table search. The live "~N cases match" preview is pure htmx (`hx-get` on the preview element) and needs no JS here — all of this is progressive enhancement over plain forms/links. Loaded via `filter.html`/`moc.html`/`moc1.html`'s `{% block head %}`. |
 | `static/js/vendor/` | Vendored, pinned htmx 2.0.10 + Chart.js 4.5.1 (`VERSIONS.md` is the manifest; never hand-edit). Inter variable font at `static/fonts/InterVariable.woff2`. htmx is loaded by `layout.html`; Chart.js only by `explore.html`. |
 
 ## Key data structures
@@ -123,7 +123,11 @@ CODES['A'] = [ 'Assault',                 # [0] title (comment '# Complete' = fu
 
 ## Routes (in `app.py`)
 
-- `/`, `/landing` — home dashboard (the data state renders in the shell's sidebar on every page).
+- `/` — home. **Logged in:** redirects to `/explore` (the workbench is home), flashing a
+  "Continue <lesson>" resume toast when a lesson is in progress (`in_progress_lesson`).
+  **Logged out:** the marketing landing (`render_landing` → `index.html`). `/landing`
+  (endpoint `landing`) always renders the landing, even when signed in. `revert`/`load`
+  redirect to `/explore` (not `/`) so a data op never re-fires the resume toast. (Phase 6.)
 - `/new`, `/login`, `/logout` — account/session. Session keys: `userid` (`classcode/username`), plus `username`/`classcode`.
 - `/explore` (landing) and `/explore/column/<column>[/<sorting>]` — the Phase 2 statistics
   workbench: sidebar column browser + stat cards, Chart.js distribution (top 20 + "Other"),
@@ -133,8 +137,8 @@ CODES['A'] = [ 'Assault',                 # [0] title (comment '# Complete' = fu
   `HX-Request` is present (`wants_fragment()` — htmx history restores get the full page);
   navigation uses `hx-push-url`. Excluded columns and unknown columns bounce to `/explore`
   with a flash. **Legacy redirects:** `/info/` → `/explore`, `/info/<column>[/<sorting>]` →
-  `/explore/column/...` — endpoint names `info_menu`/`info_specific` survive because
-  `build_explore` still emits `/info/...` deep links (updated in Phase 5).
+  `/explore/column/...` — endpoint names `info_menu`/`info_specific` survive for old bookmarks
+  only (Phase 5 pointed the lesson deep links at `/explore/...`; nothing internal emits `/info/...`).
 - `/explore/table` (builder) and `/explore/table/<dependant>/<x_axis>/<y_axis>` (results) —
   the Phase 3 **Compare (crosstab) workbench**, same shared-renderer pattern
   (`render_compare` + `wants_fragment()`). Builder: three searchable pickers (Measure =
@@ -149,21 +153,43 @@ CODES['A'] = [ 'Assault',                 # [0] title (comment '# Complete' = fu
   grouped-bar Chart.js companion for tables ≤8×8. Crosstabs are computed fresh per request
   (never disk-cached — matches pre-overhaul behavior). `dependant == '#'` means count only.
   **Legacy redirects:** `/table` → `/explore/table`, `/table/<d>/<x>/<y>` → results —
-  endpoint names `table_menu`/`table` survive because `build_explore` still emits
-  `/table/...` deep links (updated in Phase 5).
+  endpoint names `table_menu`/`table` survive for old bookmarks only (Phase 5 pointed the
+  lesson deep links at `/explore/table/...`; nothing internal emits `/table/...`).
 - `/download?measure=<d>&rows=<x>&cols=<y>` — **implemented in Phase 3**: CSV export of
   that crosstab (`crosstab_csv` reuses the exact `get_table` + `build_crosstab` path, so
   numbers match the screen; UTF-8 BOM for Excel; `Content-Disposition` filename
   `crosstab-<measure>-<rows>-by-<cols>.csv`). Count-only exports one N table with totals;
   a measure adds mean/median/std sections.
-- `/filter/` menu; `/filter/boolean/<column>/<sorting>` — comparison filters (single or OR-multiple); `/filter/moc/...` — offense-code drill-down.
+- `/explore/filter` (landing) and `/explore/filter/<column>` (GET builder + POST apply) —
+  the Phase 4 **Filter workbench** (same shared-renderer + `wants_fragment()` pattern as
+  explore/compare; `render_filter`). Sidebar reuses the column browser pointed at the filter
+  routes. **Numeric** columns get a comparison select + value input with a live "~N cases
+  would match" preview served by `/explore/filter/<column>/preview` (htmx GET — computes the
+  count via `get_data(session, history_override=[candidate])`, so it resolves to the SAME
+  cache dir the apply will, and the preview count equals the post-apply chip count; no
+  history mutation). **Categorical** columns get a searchable multi-select with per-value
+  counts, "Select shown"/"Clear", and eq/ne mode; multi-value applies still emit the
+  unchanged `o.col.op.v1~v2` OR token. Apply flashes "Filter applied — N cases remain" and
+  redirects back to the same filter view (chips + counts refresh; 0 cases → empty state with
+  an "Undo last filter" CTA via `revert(len(history)-1)`).
+- `/explore/moc/` (offense-code chooser, replaces the `moc1.html` table) and
+  `/explore/moc/<moc1>/<moc2>/<moc3>/<moc4>/<moc5>/<active>` (GET stepper + POST apply) — the
+  Phase 4 **MOC drill-down**: a 5-slot code stepper (each slot shows its digit + decoded
+  meaning; wildcards read "Any"; INC multi-digit sections render as one merged slot that
+  distributes a multi-char code across its digit positions). The remaining-counts table below
+  lists the active slot's options with the case count each would leave (`get_moc_options`).
+  Apply emits one `f.mocN.eq.X` filter per set digit (cache-compatible), flashes the remaining
+  count, and returns to the chooser.
+- **Legacy filter redirects:** `/filter/` and `/filter/boolean/...` → `/explore/filter[...]`;
+  `/filter/moc/...` → `/explore/moc/...`. Endpoint names (`filter_menu`, `filter_boolean`,
+  `filter_moc1`, `filter_moc`) survive for old bookmarks.
 - `/load` — clear history (revert to the base full-dataset entry); no longer linked from the
   nav (the sidebar's confirmed "Clear data" button hits `/revert/1` instead). `/revert/<n>` —
   revert the history to a prior entry (`account.history_revert`, truncating to `history[:n]`;
   `n` is the 1-based history position — the sidebar chips link here: clicking a chip reverts
   to that step, the last chip's `×` removes just that step). Filter apply, revert, and clear
   all `flash()` a message that `layout.html` renders as a toast.
-- **Learning modules:** `/lesson` (catalog), `/lesson/<module_id>` (overview), `/lesson/<module_id>/<step>` (render; POST grades a `question`), `/lesson/<module_id>/complete` (mark done). See "Learning Modules" below.
+- **Learning modules:** `/lesson` (catalog with per-module status + resume), `/lesson/<module_id>` (overview), `/lesson/<module_id>/<int:step>` (Phase 5 **docked lesson**: workbench shell + lesson dock; the main area shows the step's read-only sandbox data, the sidebar shows the "Lesson data" module; POST grades a `question`, `checkpoint` steps compare state), `/lesson/<module_id>/complete` (mark done). See "Learning Modules" below.
 - **Authoring (educators only):** `/admin` (list your class's modules), `/admin/edit[/<module_id>]` (create/edit → writes validated JSON to `lessons/`). Guarded by `require_educator()`.
 - `/guide` — static guide page (replaced the old buggy `/lesson/get_started` stub). `/save`, `/other`, `/settings` — still **stubs** returning "WIP, Feature Not Implemented" (`/download` was implemented in Phase 3, see above).
 
@@ -218,15 +244,23 @@ view. `hx_toast()` sets the `HX-Trigger` header for htmx-response toasts (used f
   through to `create` and crashed — and `/login` rejected every existing user); and
   `account.create` now returns `retrieve(userid)` (was `retrieve(username)`) on the already-exists
   path. Login still does **not** verify the password (see above).
-- `/new` sets `session['userid']` but not `session['username']`/`session['classcode']`.
+- ~~`/new` sets `session['userid']` but not `session['username']`/`session['classcode']`.~~
+  **Fixed in Phase 6** — `/new` now sets all three (from the created account), matching `/login`.
 - Stubbed/`pass`-only: `Data.filter_and`, `filter_or_diff` (partial), `make_history.filter_or_diff`, `filter_and`, `moc_or`; the `d` and `a` action codes are not handled by `_execute` (raise `ValueError`).
-- **Learning-module `checkpoint` steps are not wired up.** `lessons.py` validates a step's `expect_state`, but `app.lesson_step` builds no context for `checkpoint` and `lesson_step.html` falls through to the generic "Interactive step — coming next phase" placeholder — nothing compares the student's active state to `expect_state`. Both shipped lessons (`intro-explorer-basics`, `intro-descriptive-stats`) *end* on such a step. (Note: `current_year` is now injected globally via a context processor and `index` passes `hero_image_url`, so those earlier template-variable gaps are resolved.)
+- ~~**Learning-module `checkpoint` steps are not wired up.**~~ **Fixed in Phase 5.**
+  `app.build_checkpoint` compares the step's active lesson state (`resolve_lesson_state` — the
+  step's own `state` or the inherited `progress[module_id]['state']`) to `expect_state` as a
+  token **multiset** (`collections.Counter` diff), renders pass ("✓ Your data matches") or a
+  fail diff ("Still needed: …" / "These shouldn't be applied: …" via `describe_token`), and
+  gates Next like `require_answer`. It reads only the sandboxed lesson state — never the
+  student's history. Both shipped lessons now complete. (Note: `current_year` is injected
+  globally via a context processor and `index` passes `hero_image_url`, so those earlier
+  template-variable gaps are resolved.)
 
 ## In progress: UI/UX overhaul (`ui-overhaul` branch)
 
-A full redesign of the presentation layer, planned with the author (2026-07). **Phases 0–3
-are done** (see below); Phases 4–7 are not started. The filter view layouts described
-elsewhere in this file are still the pre-overhaul state; update those sections as phases land.
+A full redesign of the presentation layer, planned with the author (2026-07). **All phases
+(0–7) are done** (see below). The overhaul is feature-complete on the `ui-overhaul` branch.
 
 **Phase 0 (done — foundations, no redesign):** every child template's nested `<body>` (and
 `load.html`/`guide.html`'s nested `<head>`) removed — `layout.html` owns the document shell
@@ -264,8 +298,8 @@ links). One shared renderer serves full pages or `templates/partials/` fragments
 columns disabled with a tooltip — the `!!!WARNING!!!` marker is gone). The statistics view:
 stat cards (N, missing, mean/median/std), theme-aware Chart.js top-20+"Other" distribution
 (`explore.js`), segmented sort control (links + `aria-current`), sticky-header value table
-with search + "show more", and a "Filter this column" CTA into the Phase 4-pending filter
-route. Display headers come from the live codebook parse, never cached pickles. Codebook
+with search + "show more", and a "Filter this column" CTA into the filter route (wired to
+`/explore/filter/<col>` in Phase 4). Display headers come from the live codebook parse, never cached pickles. Codebook
 fixes: duplicate `<preason2>` → `<preason3>`, stray `>` in `pper`. New files: `explore.html`,
 `templates/partials/*`, `explore.js`; deleted `info.html`/`info_menu.html`.
 
@@ -286,6 +320,75 @@ BOM; `Content-Disposition` filename). New files: `compare.html`,
 `partials/compare_builder.html`, `partials/compare_results.html`, `compare.js`; deleted
 `perm.html`/`perm_menu.html`.
 
+**Phase 4 (done — filter workbench):** `/explore/filter[/<col>]` (builder + apply) and
+`/explore/moc/...` (offense-code chooser + stepper) replace the `/filter/...` views (old URLs
+redirect; endpoint names kept). Same shared-renderer/`wants_fragment()` pattern; the sidebar
+reuses the **parametrized** `column_browser.html` (new `browser_endpoint`/`browser_target`/
+`browser_title` vars, default to the explore ones) pointed at the filter routes. **Numeric**
+columns: comparison select + number input + a live "~N cases would match" preview served by
+`/explore/filter/<col>/preview` (htmx GET → `get_data(session, history_override=[candidate])`;
+same cache dir as the eventual apply, so preview == post-apply count; no history mutation).
+**Categorical** columns: searchable multi-select with per-value counts, "Select shown"/"Clear",
+eq/ne mode — multi-value still emits the unchanged `o.` OR token (same cache dir as the old
+UI). The **MOC stepper** collapses INC multi-digit sections into one merged slot that
+distributes a multi-char code across its digit positions; apply emits one `f.mocN.eq.X` filter
+per set digit. Every apply flashes "Filter applied — N cases remain" and lands back on the view
+you came from; a 0-case result shows the empty state with an "Undo last filter" CTA. Also fixed
+`cache.get_moc_options` to encode the history path with `history_item_to_text` (OR-filter `o.`
+entries used to crash the bare `'.'.join`). New files: `filter.html`, `partials/filter_landing.html`,
+`partials/filter_column.html`, `partials/filter_preview.html`, `partials/filter_zero.html`,
+`filter.js`; rebuilt `moc1.html`/`moc.html`; deleted `filter_boolean.html`/`filter_boolean_menu.html`.
+
+**Phase 5 (done — docked lessons + checkpoint wiring):** `/lesson/<id>/<int:step>` renders the
+workbench shell with a **lesson dock** (right column ≥1024px via a new `{% block dock %}` in
+`layout.html`; a stacked full-width panel below the data at ≤1023px). The **main area** shows a
+**read-only** view of the lesson's sandbox data driven by the step's `focus` (`build_lesson_data`
+→ `partials/lesson_data.html`: stat cards + Chart.js distribution + value table for `info`, a
+stacked-stat crosstab for `table` — reusing the explore markup ids so `explore.js` powers the
+chart/search; **no htmx nav and no editing** — the student manipulates their own data in the
+workbench tabs). The **sidebar** swaps its data-state module for a read-only **"Lesson data"**
+badge + chips (`lesson_chips`/`describe_token`) when a `lesson` context is present; the student's
+own history is hidden and **never mutated** (verified byte-identical across a full playthrough).
+`checkpoint` is wired (see Known issues, now struck through) and gates Next/Finish. `build_explore`
+was replaced by `build_lesson_data`; lesson deep links now target `/explore/...` directly (so
+nothing internal emits `/info/...` or `/table/...` — those endpoints stay only for old bookmarks).
+`lesson_catalog.html`/`lesson.html`/`admin.html`/`admin_edit.html` restyled to the component
+system (status badges, resume, `.field` forms — functional parity, no schema/authoring changes).
+New file: `partials/lesson_data.html`; rebuilt `lesson_step.html`. New CSS: lesson dock/progress
+dots/checkpoint/prose in `views.css`, textarea fields in `components.css`.
+
+**Phase 6 (done — auth pages, landing, logged-in home):** `index.html` rebuilt as the
+styleguide **landing** (hero + honest metric cards + feature grid + CTA; zero inline styles,
+no hero image). `/` and `/landing` split: `/` redirects a logged-in user to `/explore` with a
+"Continue <lesson>" resume toast (`in_progress_lesson` — `Markup.format`ed flash) and shows the
+landing when logged out; `landing` (new endpoint) always renders the landing. `render_landing`
+is the shared body. `login.html`/`new.html` are centered `.auth-card`s: visible labels, the
+class-code explained (blank → public group; `edu-` → authoring), inline `.alert-danger`
+validation (routes pass `errors`, **not** `error`, so the shell's top-of-main alert doesn't
+double-render), and the **password field no longer carries a `value`** (was echoed on `login`).
+`/new` now sets all three session keys (`username`/`classcode`/`userid`) from the created
+account. `revert`/`load` redirect to `/explore` (not `/`) to avoid re-firing the resume toast.
+Password verification stays out of scope (a code comment in `login` reaffirms the known issue).
+New CSS: landing + auth in `views.css`; `.field-hint code`/`.field-optional` in `components.css`.
+
+**Phase 7 (done — responsive deep pass, a11y, dark QA, cleanup):** the phone shell (<768px)
+landed: a fixed **bottom nav** (Explore · Compare · Filter · Lessons, + Author for educators;
+decorative inline-SVG icons + text label + `aria-current`) replaces the top-bar section nav,
+and a full-width **data-state bar** under the top bar shows the live count/badge and, on tap,
+opens the same off-canvas sidebar drawer used at tablet width (so the full data state + column
+browser stay reachable — nothing hidden without a path). `app.js`'s drawer now binds **any**
+`[aria-controls="sidebar"]` trigger (the tablet ☰ *and* the phone bar), traps focus, and
+returns focus to the opener. Wide data tables keep a **sticky first column** and scroll
+horizontally inside `.table-wrapper` (never the page); the lesson dock is a **bottom-sheet**
+panel (rounded top + grab handle) below the data; `env(safe-area-inset-bottom)` + a body
+`padding-bottom` keep the fixed nav off the footer. The legacy **`style.css` was deleted**
+(its live base rules — `.container`, bare `h1`/`h2`/`h3`/`p` — moved to `views.css`/`base.css`;
+`load.html` rebuilt on `.field`/`.btn`). Verified against the running app at 375 / 768 / 1280px
+in **both themes**: no console errors, no failed/external requests (all assets local),
+`VERSIONS.md` matches the vendored htmx 2.0.10 / Chart.js 4.5.1 / Inter. New markup:
+`.datastate-bar` + `.bottom-nav` in `layout.html`; new CSS in `views.css` (phone shell) and
+`base.css` (migrated element defaults).
+
 **Locked direction** (author-approved): sidebar **workbench** IA (`/explore` with htmx
 fragment swaps), hand-rolled CSS token system (no build step), Chart.js visuals, light+dark
 themes from day one, **docked lesson panel** (lessons run beside live data), fully responsive
@@ -301,7 +404,7 @@ including phones, all assets vendored (no runtime CDN — school networks filter
   criteria, and don'ts. Old URLs keep working via redirects at every phase boundary; cache
   compatibility (same filters → same cache dirs) is a hard constraint.
 
-Note: Phase 5 fixes the "checkpoint steps not wired up" known issue above; Phase 6 fixes the
+Note: Phase 5 fixed the "checkpoint steps not wired up" known issue above; Phase 6 fixed the
 `/new` session-keys issue. Password verification and the hardcoded `secret_key` stay **out of
 scope** (separate branch — see the prompts doc's Appendix C).
 
@@ -328,16 +431,17 @@ existing `_execute`/`get_data` path, and numeric questions are **graded live**
   `order: 1`) then `intro-descriptive-stats.json` (`order: 2`).
 - `lessons.py` — loader/validator: `list_modules`, `get_module`, `validate`, `save_module`.
 
-**Step types:** `read` (body only), `explore` (sets/deep-links a data `state`; `focus` links
-into `/info/<column>` or `/table/...`), `question` (`numeric` graded live within `tolerance` /
-`choice` graded by index / `free` stored ungraded), `checkpoint` (declared + validated but
-**not yet functional** — see Known issues).
+**Step types:** `read` (body only), `explore` (sets a data `state`; `focus` picks the main-area
+view — `info` a column, `table` a crosstab — which the docked lesson renders read-only), `question`
+(`numeric` graded live within `tolerance` / `choice` graded by index / `free` stored ungraded),
+`checkpoint` (**wired in Phase 5**: `expect_state` is compared to the active lesson state as a
+token multiset; pass/fail diff; gates Next — see `build_checkpoint`).
 
 **Data-state override (the sandbox).** Lesson states are applied through the `history_override`
 parameter on `cache.get_data` / `cache._execute`, appended on top of the base dataset (or the
 student's history) **without ever mutating `user['history']`** — this completes the formerly
 no-op `history_override` hook. `cache.history_text_to_item` decodes a token back into a history
-`action` for this path. `app.build_explore` / `compute_expected` drive it with `session=None`
+`action` for this path. `app.build_lesson_data` / `compute_expected` drive it with `session=None`
 so only the lesson's own tokens apply.
 
 **Progress & state** live on the user pickle under `progress` (backwards-compatible via

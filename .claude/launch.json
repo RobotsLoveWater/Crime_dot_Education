@@ -1,0 +1,56 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "explorer",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5000"],
+      "port": 5000
+    },
+    {
+      "name": "explorer-alt",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5050"],
+      "port": 5050
+    },
+    {
+      "name": "explorer-phase2",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5077"],
+      "port": 5077
+    },
+    {
+      "name": "explorer-phase3",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5088"],
+      "port": 5088
+    },
+    {
+      "name": "explorer-phase4",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5099"],
+      "port": 5099
+    },
+    {
+      "name": "explorer-phase5",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5121"],
+      "port": 5121,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-phase6",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5132"],
+      "port": 5132,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-phase7",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5143"],
+      "port": 5143,
+      "autoPort": false
+    }
+  ]
+}

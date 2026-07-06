@@ -3,36 +3,48 @@
 
 {% block body %}
 
-    <div class="container">
-        <h1>Lesson Authoring</h1>
-        <p>Modules scoped to class <code>{{ classcode }}</code>.</p>
-
-        <div class="btn-bar">
-            <a href="/admin/edit" class="btn">New module</a>
-        </div>
-
-        {% if modules %}
-        <table>
-            <thead>
-                <tr><th>Title</th><th>Id</th><th>Steps</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-                {% for m in modules %}
-                <tr>
-                    <td>{{ m['title'] }}</td>
-                    <td><code>{{ m['id'] }}</code></td>
-                    <td>{{ m['steps']|length }}</td>
-                    <td>
-                        <a href="/admin/edit/{{ m['id'] }}">Edit</a> &middot;
-                        <a href="/lesson/{{ m['id'] }}">View</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p>You haven't authored any modules yet. Use <strong>New module</strong> to create one.</p>
-        {% endif %}
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Lesson authoring</h1>
+        <p class="view-subtitle">Modules scoped to class <code>{{ classcode }}</code>.</p>
     </div>
+    <div class="view-actions">
+        <a class="btn btn-primary" href="{{ url_for('admin_edit') }}">New module</a>
+    </div>
+</header>
+
+{% if modules %}
+<div class="table-wrapper">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th scope="col">Title</th>
+                <th scope="col">Id</th>
+                <th scope="col" class="num">Steps</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in modules %}
+            <tr>
+                <td>{{ m['title'] }}</td>
+                <td><code>{{ m['id'] }}</code></td>
+                <td class="num">{{ m['steps']|length }}</td>
+                <td>
+                    <a href="{{ url_for('admin_edit', module_id=m['id']) }}">Edit</a> ·
+                    <a href="{{ url_for('lesson_overview', module_id=m['id']) }}">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h2>No modules yet</h2>
+    <p>Use <strong>New module</strong> to create your first lesson.</p>
+    <a class="btn btn-primary" href="{{ url_for('admin_edit') }}">New module</a>
+</div>
+{% endif %}
 
 {% endblock %}

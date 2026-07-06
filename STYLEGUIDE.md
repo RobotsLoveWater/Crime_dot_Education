@@ -153,10 +153,23 @@ headings/values. **All numeric table cells and stat values use
 | Range | Sidebar | Lesson dock | Nav |
 |---|---|---|---|
 | ≥ 1024px | Persistent | Right dock | Top bar |
-| 768–1023px | Slide-over drawer (toggle in top bar) | Bottom sheet | Top bar |
-| < 768px | Hidden; data state collapses to a bar under the top bar | Bottom sheet | Bottom nav: Explore · Compare · Filter · Lessons |
+| 768–1023px | Slide-over drawer (toggle in top bar) | Stacked panel below the data | Top bar |
+| < 768px | Off-canvas drawer, opened by the data-state bar under the top bar | Bottom-sheet panel below the data | Bottom nav: Explore · Compare · Filter · Lessons (+ Author for educators) |
 
 Touch targets ≥ 44×44px below 1024px.
+
+**Phone shell (< 768px, Phase 7).** The top-bar section nav and the ☰ toggle give way
+to a fixed **bottom nav** (the same sections, decorative icon + text label,
+`aria-current` on the active one) and a full-width **data-state bar** directly under the
+top bar. The bar is the drawer trigger: it shows the live case count (and filter/lesson
+badge) and, on tap, opens the same off-canvas sidebar drawer used at tablet width — so the
+full data state *and* column browser stay reachable (nothing is hidden without a path to
+it). Both the tablet ☰ and the phone bar carry `aria-controls="sidebar"`; one drawer, one
+focus trap, focus returns to whichever trigger opened it. Wide data tables keep a **sticky
+first column** and scroll horizontally *inside* their `.table-wrapper` (never the page).
+The lesson dock becomes a polished bottom-sheet-style panel (rounded top, grab handle)
+below the read-only data. `env(safe-area-inset-bottom)` pads the bottom nav; the body
+reserves its height so the footer is never covered.
 
 ## Components
 
@@ -201,16 +214,49 @@ Touch targets ≥ 44×44px below 1024px.
 - **Column browser** (explore sidebar, below the data-state module). All documented columns
   grouped by category — groups come from the `group` attribute on `codebook.xml` entries,
   ordered by `Data.GROUP_ORDER`. Each item: friendly description primary, mono column code
-  secondary. Groups are native `<details open>`; a JS-only search box filters items and
-  hides empty groups. Excluded columns render disabled (`aria-disabled`, faint) with a
+  secondary. Groups are native `<details>` and **start collapsed**; a JS-only search box
+  filters items, hides empty groups, and opens the groups with matches (clearing the search
+  collapses them all again). Excluded columns render disabled (`aria-disabled`, faint) with a
   `title` tooltip saying why. The active column carries `aria-current="page"`.
-- **Progress (lessons).** Slim bar + step dots; completed dots accent-filled, current
-  outlined. "Step 3 of 7" text alongside — never the bar alone.
+- **Progress (lessons).** Step dots + "Step 3 of 7" text (Phase 5): completed dots
+  accent-filled, current outlined with an accent-subtle ring; the text always accompanies the
+  dots — never dots alone. (The originally-planned slim bar was dropped: a data-driven fill
+  width needs an inline `style`, which this guide forbids; the discrete dots carry the same
+  signal with tokens only.)
 - **Empty states.** Icon-light: a short muted sentence + one CTA. Zero-case filter result:
   "Your filters match 0 cases" + "Undo last filter" button.
+- **Landing** (logged-out home / `/landing`). Centered single column inside the main area:
+  a hero (accent eyebrow, `--fs-2xl` title — the *only* use of that size — muted lede, one
+  primary + one secondary CTA), a row of **honest metric cards** (reuse `.stat-card`,
+  centered, value-first: fixed dataset facts "294,467 felony cases", "2001–2019", plus the
+  real lesson count), then a **feature-card** grid (surface + border + `--shadow-1`) and a
+  final CTA band. No hero background image, no inline styles. Signed-in visitors to
+  `/landing` get workbench/lessons CTAs instead of sign-up.
+- **Auth cards** (log in / create account). A single centered `.auth-card` (≤420px, surface +
+  border + `--shadow-1`) holding a title, a switch link to the other form, an inline
+  `.alert-danger` for validation, and `.field` inputs. **Password inputs never carry a
+  `value`** — the submitted password is never echoed back into the page source. The class-code
+  field is marked optional and explained in a `.field-hint` (blank → public group; an `edu-`
+  prefix grants authoring). The `<form>` is `.auth-form`, which resets the legacy `style.css`
+  form box so the card is the only frame.
 - **Loading.** Global 2px accent progress bar at the viewport top bound to htmx request
   events; local `.htmx-indicator` spinners on buttons/forms. Full-page navigations that may
   recompute the cache show a submit-spinner + "Computing statistics…" text.
+- **Filter preview** (filter view). A single muted line under the filter controls reading
+  how many cases a candidate filter would keep ("12,431 of 294,467 cases would match"),
+  refreshed live via a debounced htmx `hx-get` as the value/selection changes. The count is
+  computed on the server through the same history-override path the apply uses, so the
+  preview always equals the post-apply count. A 0-case preview turns `--color-danger` and
+  warns that applying would empty the data. No-JS: the line stays a static hint and the form
+  still submits. **Categorical value multi-select:** a bordered, scrollable checkbox list —
+  each row a value with its right-aligned tabular-nums count — above a JS-only search box and
+  "Select shown" / "Clear" actions; eq/ne mode is a `fieldset`/`legend` radio group.
+- **MOC stepper** (offense-code filter). A horizontal row of slots, one per editable code
+  digit; each shows an uppercase muted label and the decoded value (or an italic faint
+  "Any" for a wildcard). The active slot carries the accent border + `aria-current`; INC
+  multi-digit sections render as **one** merged slot. Below it, an options table lists each
+  choice for the active slot with the case count it would leave. The offense category is a
+  leading fixed (dashed) slot.
 
 ## Charts (Chart.js)
 
@@ -278,5 +324,7 @@ static/
   fonts/InterVariable.woff2
 ```
 
-No build step, no Node tooling — files are served as written. `style.css` is retired once
-its last consumer is rebuilt (see `UI_OVERHAUL_PROMPTS.md`).
+No build step, no Node tooling — files are served as written. The legacy `style.css` was
+**removed in Phase 7**; its still-live base rules (`.container`, bare `h1`/`h2`/`h3`/`p`
+sizing + margins) moved into `views.css` / `base.css`, and its last legacy consumer
+(`load.html`) was rebuilt on the component system.

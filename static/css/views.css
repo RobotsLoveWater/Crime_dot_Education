@@ -11,6 +11,14 @@ body {
   min-height: 100vh;
 }
 
+/* Legacy content wrapper (migrated from the retired style.css). The workbench
+   main area caps and fills it below (.main-area > .container). */
+.container {
+  width: 90%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
 /* ---------- Skip link ---------- */
 .skip-link {
   position: absolute;
@@ -122,6 +130,10 @@ body {
 .workbench-single {
   grid-template-columns: minmax(0, 1fr);
 }
+/* lesson mode adds the dock as a third column (STYLEGUIDE.md "Lesson dock") */
+.workbench-lesson {
+  grid-template-columns: 280px minmax(0, 1fr) 380px;
+}
 
 /* ---------- Sidebar / data-state module ---------- */
 .sidebar {
@@ -164,7 +176,7 @@ body {
   min-width: 0;
   padding: var(--space-5) var(--space-5) var(--space-7);
 }
-/* legacy views keep centering via .container (style.css); cap it inside the work area */
+/* cap the content wrapper inside the work area (fills the cell, centered up to 960px) */
 .main-area > .container {
   width: 100%;
   max-width: 960px;
@@ -363,6 +375,548 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
   height: 340px;
 }
 
+/* ---------- Filter workbench (Phase 4) ---------- */
+
+/* landing: two entry cards */
+.filter-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+.filter-entry-card {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+.filter-entry-card h2 {
+  font-size: var(--fs-lg);
+  margin-bottom: var(--space-2);
+}
+.filter-entry-card p {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+}
+.filter-entry-card p:last-child { margin-bottom: 0; }
+
+/* filter form (numeric + categorical) */
+.filter-form {
+  max-width: 560px;
+}
+.filter-compare-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.filter-compare-row select {
+  flex: 1 1 200px;
+}
+.filter-compare-row input[type="number"] {
+  flex: 1 1 140px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--fs-base);
+}
+
+.filter-stat-hint {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  margin-bottom: var(--space-4);
+}
+.filter-stat-hint strong {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* live preview line */
+.filter-preview {
+  min-height: 1.5em;
+  margin-bottom: var(--space-4);
+  font-size: var(--fs-base);
+}
+.filter-preview-hint {
+  color: var(--color-text-muted);
+}
+.filter-preview-count {
+  color: var(--color-text);
+}
+.filter-preview-count strong {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.filter-preview-empty {
+  color: var(--color-danger);
+}
+
+/* categorical value picker */
+.value-picker {
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.value-picker-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+.value-picker-toolbar .table-search {
+  flex: 1 1 180px;
+}
+.value-picker-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+.value-check-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1);
+  max-height: 360px;
+  overflow-y: auto;
+}
+.value-check > label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.value-check > label:hover {
+  background: var(--color-accent-subtle);
+}
+.value-check-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.value-check-count {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- MOC stepper (Phase 4) ---------- */
+.moc-stepper {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+}
+.moc-slot {
+  flex: 1 1 140px;
+  min-width: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.moc-slot-fixed {
+  border-style: dashed;
+  padding: var(--space-2) var(--space-3);
+}
+.moc-slot-link {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--color-text);
+  transition: background 120ms var(--ease);
+}
+.moc-slot-link:hover {
+  background: var(--color-accent-subtle);
+}
+.moc-slot-active {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+.moc-slot-active .moc-slot-link {
+  background: var(--color-accent-subtle);
+}
+.moc-slot-label {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.moc-slot-value {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.moc-slot-digit {
+  display: inline-block;
+  margin-right: var(--space-2);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.moc-slot-wildcard {
+  color: var(--color-text-faint);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.moc-apply {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+.moc-apply .field-hint { margin: 0; }
+
+.moc-code-link,
+.moc-option-code {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+.moc-code-title {
+  color: var(--color-text);
+  text-decoration: none;
+}
+.moc-code-link:hover,
+.moc-code-title:hover,
+.moc-option-code:hover {
+  text-decoration: underline;
+}
+.moc-option-reset td {
+  color: var(--color-text-muted);
+}
+
+/* ---------- Lessons: catalog + overview (Phase 5) ---------- */
+.lesson-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+.lesson-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+.lesson-card h2 {
+  font-size: var(--fs-lg);
+  margin: 0;
+}
+.lesson-card-desc {
+  flex: 1;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+.lesson-card-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.lesson-card-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+}
+.objectives {
+  margin: var(--space-3) 0 var(--space-4);
+  padding-left: var(--space-5);
+}
+.objectives li { margin-bottom: var(--space-1); }
+
+/* prose blocks: lesson step bodies + landing/overview copy */
+.lesson-body {
+  font-size: var(--fs-md);
+  line-height: 1.65;
+}
+.lesson-body p { margin-bottom: var(--space-3); }
+.lesson-body p:last-child { margin-bottom: 0; }
+.lesson-body ul {
+  margin: 0 0 var(--space-3);
+  padding-left: var(--space-5);
+}
+.lesson-body li { margin-bottom: var(--space-1); }
+.lesson-body code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 0 3px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+/* ---------- Lesson dock (Phase 5, STYLEGUIDE.md "Lesson dock") ---------- */
+.lesson-dock {
+  background: var(--color-sidebar);
+  border-left: 1px solid var(--color-border);
+}
+.dock-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.dock-header {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+.dock-back {
+  display: inline-block;
+  margin-bottom: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+.dock-back:hover { color: var(--color-accent); }
+.dock-progress-text {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.progress-dots {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+}
+.progress-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-border-strong);
+  background: transparent;
+}
+.progress-dot.done {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+.progress-dot.current {
+  border-color: var(--color-accent);
+  background: transparent;
+  box-shadow: 0 0 0 2px var(--color-accent-subtle);
+}
+
+.dock-title {
+  font-size: var(--fs-xl);
+  margin: 0 0 var(--space-3);
+}
+
+.dock-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+/* question form + feedback (icon + word + colour, per the a11y checklist) */
+.lesson-question { margin-top: var(--space-4); }
+.lesson-feedback {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-weight: 600;
+}
+.lesson-feedback-correct { color: var(--color-success); }
+.lesson-feedback-wrong { color: var(--color-danger); }
+.lesson-model {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* checkpoint pass/fail block */
+.checkpoint {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+}
+.checkpoint-pass {
+  background: var(--color-success-subtle);
+  border-color: var(--color-success);
+}
+.checkpoint-fail {
+  background: var(--color-warning-subtle);
+  border-color: var(--color-warning);
+}
+.checkpoint-status {
+  margin: 0 0 var(--space-2);
+  font-weight: 600;
+}
+.checkpoint-pass .checkpoint-status { color: var(--color-success); }
+.checkpoint-fail .checkpoint-status { color: var(--color-warning); }
+.checkpoint-diff {
+  margin: var(--space-1) 0 var(--space-2);
+  padding-left: var(--space-5);
+}
+.checkpoint-diff li { margin-bottom: 2px; }
+.checkpoint-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* lesson-mode sidebar: read-only chips + sandbox note */
+.chip-chain-static .chip { cursor: default; }
+.datastate-note {
+  margin-top: var(--space-2);
+  color: var(--color-text-faint);
+  font-size: var(--fs-xs);
+}
+
+/* ---------- Landing (logged-out home / /landing) ---------- */
+.landing-hero {
+  padding: var(--space-6) 0 var(--space-5);
+  text-align: center;
+}
+.landing-eyebrow {
+  margin-bottom: var(--space-2);
+  color: var(--color-accent);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.landing-title {
+  max-width: 22ch;
+  margin: 0 auto var(--space-3);
+  font-size: var(--fs-2xl); /* the one place --fs-2xl is used (STYLEGUIDE.md typography) */
+  line-height: 1.2;
+}
+.landing-lede {
+  max-width: 60ch;
+  margin: 0 auto var(--space-5);
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+  line-height: 1.65;
+}
+.landing-cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+/* honest metric cards — reuse .stat-card, centered, value first (big number leads) */
+.landing-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-6) 0;
+}
+.landing-metrics .stat-card {
+  align-items: center;
+  text-align: center;
+}
+.landing-metrics .stat-value {
+  color: var(--color-accent);
+}
+
+.landing-section-title {
+  margin-bottom: var(--space-4);
+  font-size: var(--fs-lg);
+  text-align: center;
+}
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+.feature-card {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+.feature-card h3 {
+  margin-bottom: var(--space-2);
+  font-size: var(--fs-md);
+}
+.feature-card p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.landing-final {
+  margin-top: var(--space-6);
+  padding: var(--space-6) var(--space-4) var(--space-2);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+}
+.landing-final h2 {
+  margin-bottom: var(--space-4);
+  font-size: var(--fs-xl);
+}
+
+/* ---------- Auth cards (login / create account) ---------- */
+.auth {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-6) 0;
+}
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+.auth-title {
+  margin-bottom: var(--space-1);
+  font-size: var(--fs-xl);
+}
+.auth-sub {
+  margin-bottom: var(--space-5);
+  color: var(--color-text-muted);
+}
+/* the form is the card body; keep it frameless (no box of its own) */
+.auth-form {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.auth-form .btn {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
 /* ---------- Footer ---------- */
 .site-footer {
   padding: var(--space-3);
@@ -373,9 +927,85 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
   text-align: center;
 }
 
-/* ---------- ≥1024px: persistent sidebar, independently scrollable ---------- */
+/* ---------- Phone shell: data-state bar + bottom nav (STYLEGUIDE.md breakpoints) ----------
+   Both are phone-only; display is switched on in the <768px query below. */
+.datastate-bar,
+.bottom-nav {
+  display: none;
+}
+
+.datastate-bar {
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+.datastate-bar-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.datastate-bar-count {
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.datastate-bar-cue {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.bottom-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: var(--space-1);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: var(--fs-xs);
+  transition: color 120ms var(--ease);
+}
+.bottom-nav a[aria-current="page"] {
+  color: var(--color-accent);
+}
+.bottom-nav-icon {
+  width: 22px;
+  height: 22px;
+}
+.bottom-nav-label {
+  font-weight: 500;
+}
+
+/* ---------- ≥1024px: persistent sidebar + lesson dock, independently scrollable ---------- */
 @media (min-width: 1024px) {
-  .sidebar {
+  .sidebar,
+  .lesson-dock {
     position: sticky;
     top: 56px;
     height: calc(100vh - 56px);
@@ -385,8 +1015,15 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
 
 /* ---------- 768–1023px: slide-over drawer (JS only) ---------- */
 @media (max-width: 1023px) {
-  .workbench {
+  .workbench,
+  .workbench-lesson {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* dock drops below the data as a full-width "bottom sheet" panel */
+  .lesson-dock {
+    border-left: 0;
+    border-top: 1px solid var(--color-border);
   }
 
   .js .sidebar-toggle { display: inline-flex; }
@@ -439,13 +1076,57 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
   }
 }
 
-/* ---------- <768px: sidebar hidden with JS (phone treatment lands in Phase 7) ---------- */
+/* ---------- <768px: phone (STYLEGUIDE.md breakpoints) ----------
+   The sidebar stays the drawer from the block above, but it's opened by the
+   full-width data-state bar instead of the top-bar ☰; the top-bar section nav
+   gives way to a fixed bottom nav. Nothing is hidden without a path to it. */
 @media (max-width: 767px) {
-  .js .sidebar,
-  .js .sidebar-toggle,
-  .js .sidebar-backdrop { display: none; }
+  .topbar-nav { display: none; }
+  .js .sidebar-toggle { display: none; }
+
+  .datastate-bar { display: flex; }
+  .bottom-nav { display: grid; }
+
+  /* reserve space so the fixed bottom nav never covers the footer/content */
+  body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+
+  /* no-JS: the drawer can't open, so drop the bar (which would open it) and let
+     the sidebar stay in flow (rule in the ≤1023px block) — data is still shown */
+  html:not(.js) .datastate-bar { display: none; }
 
   .topbar { gap: var(--space-2); }
   .user-identity { display: none; }
   .main-area { padding: var(--space-4) var(--space-3) var(--space-6); }
+
+  /* data tables: pin the first column while the rest scrolls horizontally
+     (the crosstab already pins its row headers via its own rules) */
+  .data-table:not(.crosstab) th:first-child,
+  .data-table:not(.crosstab) td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--color-surface);
+    box-shadow: inset -1px 0 0 var(--color-border);
+  }
+  .data-table:not(.crosstab) thead th:first-child {
+    z-index: 3;
+    box-shadow: inset -1px -1px 0 var(--color-border); /* right + bottom edge */
+  }
+  .data-table:not(.crosstab) tbody th:first-child,
+  .data-table:not(.crosstab) tbody td:first-child { z-index: 1; }
+
+  /* lesson dock: a polished bottom-sheet-style panel below the data */
+  .lesson-dock {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-top: 1px solid var(--color-border-strong);
+    box-shadow: var(--shadow-2);
+  }
+  .lesson-dock::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: var(--space-2) auto 0;
+    border-radius: var(--radius-full);
+    background: var(--color-border-strong);
+  }
 }

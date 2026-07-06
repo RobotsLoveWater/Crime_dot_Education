@@ -3,37 +3,46 @@
 
 {% block body %}
 
-    <div class="container">
-        <p><a href="/lesson">&larr; All Lessons</a></p>
+<p><a class="dock-back" href="{{ url_for('lesson_catalog') }}">&larr; All lessons</a></p>
 
+<header class="view-header">
+    <div class="view-heading">
         <h1>{{ module['title'] }}</h1>
-        <p>{{ module['description'] }}</p>
-
-        {% if module['objectives'] %}
-        <h2>What you'll learn</h2>
-        <ul>
-            {% for objective in module['objectives'] %}
-            <li>{{ objective }}</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-
-        {% if status == 'completed' %}
-        <p style="color: #1a7f37; font-weight: 600;">&check; You've completed this lesson.</p>
-        {% endif %}
-
-        <p><em>{{ module['steps']|length }} steps</em></p>
-
-        <div class="btn-bar">
-            {% if status == 'not_started' %}
-            <a href="/lesson/{{ module['id'] }}/0" class="btn">Start Lesson</a>
+        <p class="view-subtitle">
+            {% if status == 'completed' %}
+            <span class="badge badge-success"><span aria-hidden="true">&check;</span> Completed</span>
             {% elif status == 'in_progress' %}
-            <a href="/lesson/{{ module['id'] }}/{{ resume }}" class="btn">Resume</a>
-            <a href="/lesson/{{ module['id'] }}/0" class="btn">Start over</a>
+            <span class="badge badge-accent">In progress</span>
             {% else %}
-            <a href="/lesson/{{ module['id'] }}/0" class="btn">Review from start</a>
+            <span class="badge badge-muted">Not started</span>
             {% endif %}
-        </div>
+            · {{ module['steps']|length }} steps
+        </p>
     </div>
+</header>
+
+<div class="lesson-body">
+    <p>{{ module['description'] }}</p>
+</div>
+
+{% if module['objectives'] %}
+<h2>What you'll learn</h2>
+<ul class="objectives">
+    {% for objective in module['objectives'] %}
+    <li>{{ objective }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<div class="lesson-card-actions">
+    {% if status == 'not_started' %}
+    <a class="btn btn-primary" href="{{ url_for('lesson_step', module_id=module['id'], step=0) }}">Start lesson</a>
+    {% elif status == 'in_progress' %}
+    <a class="btn btn-primary" href="{{ url_for('lesson_step', module_id=module['id'], step=resume) }}">Resume · step {{ resume + 1 }}</a>
+    <a class="btn btn-secondary" href="{{ url_for('lesson_step', module_id=module['id'], step=0) }}">Start over</a>
+    {% else %}
+    <a class="btn btn-primary" href="{{ url_for('lesson_step', module_id=module['id'], step=0) }}">Review from start</a>
+    {% endif %}
+</div>
 
 {% endblock %}

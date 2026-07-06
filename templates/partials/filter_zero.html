@@ -1,0 +1,9 @@
+{# Zero-case guard (Phase 4): when the current data state matches 0 cases there is
+   nothing left to filter. Offer a one-click way back out. undo_n reverts just the
+   most recent step (account.history_revert truncates to history[:undo_n]). #}
+<div class="empty-state">
+    <h2>Your filters match 0 cases</h2>
+    <p>No case is left after your current filters, so there's nothing more to narrow.
+        Undo the last filter to get some cases back, or clear everything from the sidebar.</p>
+    <a class="btn btn-primary" href="{{ url_for('revert', n=undo_n) }}">Undo last filter</a>
+</div>

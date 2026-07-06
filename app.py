@@ -25,6 +25,7 @@ import json
 import datetime
 import io
 import csv
+import collections
 
 import util
 import make_history
@@ -93,6 +94,14 @@ def lesson_body(text):
 _dataset_total = None
 
 
+def dataset_total():
+    # full-dataset case count, memoized (used by the sidebar badge and the lesson-data module)
+    global _dataset_total
+    if _dataset_total is None:
+        _dataset_total = get_data(None)['entries']
+    return _dataset_total
+
+
 def current_user():
     # best-effort user lookup for layout context (error handlers, context processor);
     # never raises — a missing pickle just renders the logged-out shell
@@ -111,13 +120,10 @@ def inject_globals():
     context = {'current_year': datetime.date.today().year, 'datastate': None}
 
     if is_logged_in():
-        global _dataset_total
         try:
-            if _dataset_total is None:
-                _dataset_total = get_data(None)['entries']
             context['datastate'] = {
                 'entries': get_data(session)['entries'],
-                'total': _dataset_total
+                'total': dataset_total()
             }
         except Exception:
             pass
@@ -163,29 +169,55 @@ def internal_server_error(e):
                                    'safe — try again, or head back home.'), 500
 
 
-# homepage
-@app.route("/")
-@app.route("/landing")
-def index():
-
-    if is_logged_in():
-
-        # set the user based on cookies
-        user = account.retrieve(session['userid'])
-
-    else: user = None
-
-    # real lesson metrics for the homepage cards (replaces the hardcoded 0)
+def render_landing(user):
+    # The marketing landing (logged-out home, and /landing for anyone). Honest metric
+    # cards: the fixed dataset facts plus the real lesson count / completion for this user.
     modules = lessons.list_modules()
-    lesson_count = len(modules)
 
     lessons_completed = 0
     if user:
         progress = user.get('progress', {})
         lessons_completed = sum(1 for m in modules if progress.get(m['id'], {}).get('completed'))
 
-    return render_template('index.html', user=user, lesson_count=lesson_count,
-                           lessons_completed=lessons_completed, hero_image_url='')
+    return render_template('index.html', user=user, lesson_count=len(modules),
+                           lessons_completed=lessons_completed)
+
+
+def in_progress_lesson(user):
+    # The first started-but-unfinished lesson (in catalog order), for the "Continue …"
+    # resume nudge on arrival. Reads only stored progress — no data replay. None if none.
+    progress = user.get('progress', {})
+    for m in lessons.list_modules():
+        entry = progress.get(m['id'])
+        if entry and not entry.get('completed'):
+            return {'id': m['id'], 'title': m['title'],
+                    'step': resume_step(entry, len(m['steps']))}
+    return None
+
+
+# homepage
+@app.route("/")
+def index():
+    # For a logged-in user the workbench IS home: drop them straight into Statistics, with a
+    # one-time "Continue <lesson>" toast when a lesson is still in progress. Logged out: the
+    # landing. (/landing below always renders the landing, even when signed in.)
+    if is_logged_in():
+        user = account.retrieve(session['userid'])
+        resume = in_progress_lesson(user)
+        if resume:
+            # Markup.format escapes the substituted title; the url_for value is already safe
+            flash(Markup('Continue your lesson: <a href="{}">{}</a>.').format(
+                url_for('lesson_step', module_id=resume['id'], step=resume['step']),
+                resume['title']), 'info')
+        return redirect(url_for('explore'))
+
+    return render_landing(None)
+
+
+@app.route("/landing")
+def landing():
+    # Always the landing page (unlike "/"), so a signed-in user can still reach the overview.
+    return render_landing(current_user())
 
 
 @app.route("/guide")
@@ -223,10 +255,13 @@ def new():
             # generate the new user account
             new_user = account.create(sanitized_form['username'], sanitized_form['classcode'],  hashed_password)
 
-            # get derived userid
+            # sign them in — set all three session keys (userid + username/classcode), matching
+            # /login. (Previously only 'userid' was set, so the shell had no username/classcode.)
+            session['username'] = new_user['username']
+            session['classcode'] = new_user['classcode']
             session['userid'] = new_user['userid']
 
-            # send them to the homepage
+            # send them home (which drops into the workbench for a logged-in user)
             return redirect(url_for('index'))
 
         # user already exists, let them know
@@ -235,7 +270,7 @@ def new():
             if sanitized_form['classcode']: errortext += ' in class ' + sanitized_form['classcode']
             error = [errortext]
 
-    return render_template('new.html', error=error)
+    return render_template('new.html', errors=error)
 
 
 # login page
@@ -264,13 +299,16 @@ def login():
 
             else:
 
+                # NOTE: the password is NOT verified — util.check_password is wired to
+                # nothing. This is a known issue tracked for its own branch (see CLAUDE.md);
+                # Phase 6 deliberately does not fix auth, only the account/login UX.
                 session['username'] = sanitized_form['username']
                 session['classcode'] = sanitized_form['classcode']
                 session['userid'] = account.form_userid(session['username'], session['classcode'])
 
                 return redirect(url_for('index'))
 
-    return render_template('login.html', error=error)
+    return render_template('login.html', errors=error)
 
 
 @app.route("/logout")
@@ -378,8 +416,8 @@ def explore_column(column, sorting):
         return not_logged_in()
 
 
-# Legacy statistics URLs (pre-overhaul). The endpoint names survive on purpose:
-# lesson deep links (build_explore) still emit /info/... until Phase 5.
+# Legacy statistics URLs (pre-overhaul) — kept only for old bookmarks. Phase 5 pointed the
+# lesson deep links at /explore/... directly, so nothing internal emits /info/... anymore.
 @app.route("/info/")
 def info_menu():
     return redirect(url_for('explore'))
@@ -590,8 +628,8 @@ def explore_table_view(dependant, x_axis, y_axis):
         return not_logged_in()
 
 
-# Legacy crosstab URLs (pre-overhaul). The endpoint names survive on purpose:
-# lesson deep links (build_explore) still emit /table/... until Phase 5.
+# Legacy crosstab URLs (pre-overhaul) — kept only for old bookmarks. Phase 5 pointed the
+# lesson deep links at /explore/table/... directly, so nothing internal emits /table/... now.
 @app.route("/table")
 def table_menu():
     return redirect(url_for('explore_table'))
@@ -603,151 +641,343 @@ def table(dependant, x_axis, y_axis):
                             x_axis=x_axis, y_axis=y_axis))
 
 
-@app.route("/filter/")
-def filter_menu():
+# ---------------------------------------------------------------------------
+# Filter workbench (Phase 4): live previews, searchable values, MOC stepper.
+# ---------------------------------------------------------------------------
+
+def filter_column_error(data, column):
+    # Shared validation for the filter column view / preview. Returns a user-facing
+    # message, or None when the column can be filtered.
+    if column not in data['column_list'] or not CODEBOOK.codebook.get(column):
+        return "That column doesn't exist — pick one from the column browser."
+    if column in data['excluded']:
+        return ('That column is excluded from filtering — it identifies individual '
+                'people or cases.')
+    return None
+
+
+def undo_target(user):
+    # `revert` n for an "Undo last filter" CTA: drop just the most recent step.
+    # history[0] is the base; len-1 removes the last filter (len==2 -> n=1 = base).
+    return max(1, len(user['history']) - 1)
+
+
+def filter_candidate(column, comparison, values):
+    # The history entry a filter WOULD append, as a token-encodable action — used to
+    # preview a count via history_override without mutating history. Mirrors the apply
+    # path (make_history.filter_single / filter_or_same) exactly, so a preview and the
+    # eventual apply resolve to the SAME cache directory (cache compatibility).
+    if len(values) == 1:
+        return {'desc': 'preview', 'action': ['f', column, comparison, values[0]]}
+    return {'desc': 'preview', 'action': ['o', column, comparison, values]}
+
+
+def numeric_value_error(values):
+    # every candidate value must parse as a float (numeric columns coerce on filter)
+    for value in values:
+        try:
+            float(value)
+        except ValueError:
+            return 'That value isn\'t a number. Enter a number like 14 or 14.5.'
+    return None
+
+
+def render_filter(column=None, error=None):
+    # Shared renderer for the filter workbench (same pattern as render_explore /
+    # render_compare): full page normally, just the view fragment on htmx requests.
+    user = account.retrieve(session['userid'])
+    data = get_data(session)
+
+    context = {'user': user, 'data': data, 'error': error or [], 'column': column,
+               'browser': build_column_browser(data), 'excluded_note': EXCLUDED_NOTE,
+               'undo_n': undo_target(user)}
+
+    if column:
+        message = filter_column_error(data, column)
+        if message:
+            flash(message, 'danger')
+            return redirect(url_for('explore_filter'))
+
+        data = get_data(session, column, 'occurrence')
+        info = data['column_info']
+        missing = info['len'] - sum(e['num'] for e in info['each'])
+        context.update({
+            'data': data, 'info': info,
+            # display header from the live codebook parse, never the cached column_info
+            'header': CODEBOOK.codebook[column],
+            'missing': missing,
+        })
+        partial = 'partials/filter_column.html'
+    else:
+        partial = 'partials/filter_landing.html'
+
+    if wants_fragment():
+        return render_template(partial, fragment=True, **context)
+    return render_template('filter.html', **context)
+
+
+@app.route("/explore/filter")
+def explore_filter():
     if is_logged_in():
-        user = account.retrieve(session['userid'])
-
-        return render_template('filter.html', user=user)
-
+        return render_filter()
     else:
         return not_logged_in()
+
+
+@app.route("/explore/filter/<column>", methods=['GET', 'POST'])
+def explore_filter_column(column):
+    if not is_logged_in():
+        return not_logged_in()
+
+    data = get_data(session)
+    message = filter_column_error(data, column)
+    if message:
+        flash(message, 'danger')
+        return redirect(url_for('explore_filter'))
+
+    if request.method == 'POST':
+        error = []
+        comparison = request.form.get('comparison', '')
+        values = [v for v in request.form.getlist('value') if v != '']
+
+        if comparison not in ('eq', 'ne', 'gt', 'ge', 'lt', 'le'):
+            error.append('Choose how to compare.')
+        elif not values:
+            error.append('Enter or pick at least one value to filter by.')
+        # numeric comparisons — and any comparison on a numeric column (which coerces
+        # values to float) — require numeric input
+        elif comparison in ('gt', 'ge', 'lt', 'le') or column in data['numeric']:
+            message = numeric_value_error(values)
+            if message:
+                error.append(message)
+
+        if error:
+            return render_filter(column, error=error)
+
+        # single value -> 'f'; multiple -> 'o' OR-same-column. Encoding unchanged, so a
+        # multi-value categorical filter lands in the same cache dir as the old UI.
+        if len(values) == 1:
+            entry = make_history.filter_single(column, comparison, values[0])
+        else:
+            entry = make_history.filter_or_same(column, comparison, values)
+        account.history_add(session['userid'], entry)
+
+        remaining = get_data(session)['entries']
+        flash('Filter applied — {:,} cases remain.'.format(remaining), 'success')
+        # land back on the view we came from (not a bare redirect home): the same filter
+        # column view, now showing updated chips, refreshed counts, or the zero-case state
+        return redirect(url_for('explore_filter_column', column=column))
+
+    return render_filter(column)
+
+
+@app.route("/explore/filter/<column>/preview")
+def explore_filter_preview(column):
+    # Small htmx GET: how many cases a candidate filter would keep, computed via
+    # history_override with the candidate token (no history mutation). The candidate
+    # resolves to the same cache dir the apply will, so this preview count equals the
+    # post-apply chip count. JS-off, this endpoint is simply never called.
+    if not is_logged_in():
+        return not_logged_in()
+
+    data = get_data(session)
+    if filter_column_error(data, column):
+        return ''  # nothing to preview for a bad/excluded column
+
+    comparison = request.args.get('comparison', 'eq')
+    values = [v for v in request.args.getlist('value') if v != '']
+
+    context = {'count': None, 'current': data['entries'], 'message': None}
+
+    if comparison not in ('eq', 'ne', 'gt', 'ge', 'lt', 'le'):
+        context['message'] = 'Choose how to compare.'
+    elif not values:
+        context['message'] = 'Enter a value to preview how many cases match.'
+    else:
+        message = None
+        if comparison in ('gt', 'ge', 'lt', 'le') or column in data['numeric']:
+            message = numeric_value_error(values)
+        if message:
+            context['message'] = message
+        else:
+            candidate = filter_candidate(column, comparison, values)
+            try:
+                context['count'] = get_data(session, history_override=[candidate])['entries']
+            except Exception:
+                context['message'] = "Couldn't preview that filter — check the value."
+
+    return render_template('partials/filter_preview.html', **context)
+
+
+# ---- MOC (Minnesota Offense Code) drill-down ----
+
+def moc_slot_positions(code_list):
+    # Editable slot positions (indices into code_list, which line up with cur_moc).
+    # Multi-digit INC sections collapse to their first position (the trailing INC
+    # placeholder dicts are not their own slot) — same rule the old moc_col built.
+    positions = []
+    prev_inc = False
+    for i in range(1, 5):
+        if i >= len(code_list):
+            break
+        has_inc = isinstance(code_list[i], dict) and 'INC' in code_list[i]
+        if has_inc:
+            if not prev_inc:
+                positions.append(i)
+            prev_inc = True
+        else:
+            positions.append(i)
+            prev_inc = False
+    return positions
+
+
+def moc_slot_digits(code_list, i):
+    # cur_moc positions a slot writes: its own, or every digit in its INC group.
+    slot = code_list[i] if i < len(code_list) else None
+    if isinstance(slot, dict) and 'INC' in slot:
+        return list(slot['INC'])
+    return [i]
+
+
+def moc_url(moc_list, active):
+    return url_for('explore_moc_step', moc1=moc_list[0], moc2=moc_list[1],
+                   moc3=moc_list[2], moc4=moc_list[3], moc5=moc_list[4], active=active)
+
+
+def build_moc_slots(code_list, cur_moc, active):
+    # One display slot per editable position: its label, decoded current value (or
+    # wildcard), and a link that makes it the active slot.
+    slots = []
+    for i in moc_slot_positions(code_list):
+        digits = moc_slot_digits(code_list, i)
+        key = ''.join(cur_moc[p] for p in digits)
+        is_wild = all(cur_moc[p] == '*' for p in digits)
+        if is_wild:
+            value = None
+        elif key in code_list[i]:
+            value = code_list[i][key]
+        else:
+            value = key  # partially set / unrecognized — show the raw digits
+        slots.append({
+            'index': i,
+            'label': code_list[i].get('COL', 'Digit ' + str(i)),
+            'value': value,
+            'is_wildcard': is_wild,
+            'is_active': i == active,
+            'href': moc_url(cur_moc, i),
+        })
+    return slots
+
+
+def build_moc_options(code_list, cur_moc, active, counts):
+    # Choices for the active slot with the case count each would leave. An INC option
+    # is a multi-char code distributed across its digit positions (e.g. '01' -> two
+    # digits), so applying it later emits one per-digit `f.mocN.eq.X` filter each.
+    digits = moc_slot_digits(code_list, active)
+
+    reset = cur_moc[:]
+    for p in digits:
+        reset[p] = '*'
+    options = [{'code': '*', 'label': "Any — don't filter this digit",
+                'count': counts.get('*'), 'href': moc_url(reset, active), 'is_reset': True}]
+
+    for key in code_list[active]:
+        if key in ('COL', 'INC'):
+            continue
+        target = cur_moc[:]
+        for offset, p in enumerate(digits):
+            target[p] = key[offset]
+        options.append({'code': key, 'label': code_list[active][key],
+                        'count': counts.get(key), 'href': moc_url(target, active),
+                        'is_reset': False})
+    return options
+
+
+@app.route("/explore/moc/")
+def explore_moc():
+    if not is_logged_in():
+        return not_logged_in()
+
+    user = account.retrieve(session['userid'])
+    data = get_data(session)
+    codes = [{'code': c, 'title': MOC.CODES[c][0]} for c in MOC.CODES]
+
+    return render_template('moc1.html', user=user, data=data, codes=codes,
+                           undo_n=undo_target(user))
+
+
+@app.route("/explore/moc/<moc1>/<moc2>/<moc3>/<moc4>/<moc5>/<active>", methods=['GET', 'POST'])
+def explore_moc_step(moc1, moc2, moc3, moc4, moc5, active):
+    if not is_logged_in():
+        return not_logged_in()
+
+    if moc1 not in MOC.CODES:
+        return redirect(url_for('explore_moc'))
+
+    cur_moc = [moc1, moc2, moc3, moc4, moc5]
+
+    if request.method == 'POST':
+        # each set (non-wildcard) digit becomes its own single-filter history entry,
+        # exactly as before — cache-compatible per-digit `f.mocN.eq.X` tokens
+        applied = 0
+        for k, digit in enumerate(cur_moc):
+            if digit != '*':
+                account.history_add(session['userid'], make_history.moc(k + 1, digit))
+                applied += 1
+
+        remaining = get_data(session)['entries']
+        if applied:
+            flash('Offense code filter applied — {:,} cases remain.'.format(remaining), 'success')
+        else:
+            flash('No offense-code digits were set, so nothing was filtered.', 'info')
+        # back to the offense-code chooser (chips updated) to build another, if wanted
+        return redirect(url_for('explore_moc'))
+
+    user = account.retrieve(session['userid'])
+    code_list = MOC.CODES[moc1]
+
+    positions = moc_slot_positions(code_list)
+    active = int(active)
+    if active not in positions:
+        active = positions[0] if positions else 1
+
+    data = get_data(session)
+    counts = get_moc_options(session, cur_moc[:], active)
+
+    return render_template('moc.html', user=user, data=data, code_list=code_list,
+                           cur_moc=cur_moc, active=active,
+                           slots=build_moc_slots(code_list, cur_moc, active),
+                           options=build_moc_options(code_list, cur_moc, active, counts),
+                           active_label=code_list[active].get('COL', ''),
+                           undo_n=undo_target(user))
+
+
+# ---- Legacy filter URLs (pre-overhaul). Endpoint names survive for any bookmarks. ----
+@app.route("/filter/")
+def filter_menu():
+    return redirect(url_for('explore_filter'))
 
 
 @app.route("/filter/boolean/")
 def filter_boolean_menu():
-    if is_logged_in():
-        user = account.retrieve(session['userid'])
-
-        data = get_data(session)
-
-        return render_template('filter_boolean_menu.html', data=data, user=user)
-
-    else:
-        return not_logged_in()
+    return redirect(url_for('explore_filter'))
 
 
 @app.route("/filter/boolean/<column>/")
-def filter_boolean_redirect(column):
-    return redirect(url_for('filter_boolean', column=column, sorting='occurrence'))
-
-
-@app.route("/filter/boolean/<column>/<sorting>", methods=['GET', 'POST'])
-def filter_boolean(column, sorting):
-    if is_logged_in():
-        error = []
-        user = account.retrieve(session['userid'])
-        values = request.form.getlist('value')
-
-        if request.method == 'POST':
-
-            # trying to compare to nothing
-            if values is None or values == []:
-                error.append("Filter value input cannot be blank.")
-
-            # trying to compare non-numbers numerically
-            elif request.form['comparison'] in ['gt', 'ge', 'lt', 'le']:
-                try:
-                    float(values[0])
-                except ValueError:
-                    error.append("Filter value: " + values[0] + " is not numeric and a numeric comparison was selected.")
-
-            # no comparison selected
-            if request.form['comparison'] not in ['eq', 'ne', 'gt', 'ge', 'lt', 'le']:
-                error.append('No comparison selected.')
-
-            # edit the history log
-            else:
-                if len(values) == 1:
-                    entry = make_history.filter_single(column, request.form['comparison'], values[0])
-                else:
-                    entry = make_history.filter_or_same(column, request.form['comparison'], values)
-                account.history_add(session['userid'], entry)
-                flash(entry['desc'], 'success')
-                return redirect(url_for('index'))
-
-        if sorting not in Data.VALID_SORTING:
-            return redirect(url_for('filter_boolean', column=column, sorting='occurrence'))
-
-        data = get_data(session, column, sorting)
-
-        if column in data['column_list']:
-
-            return render_template('filter_boolean.html', column=column, data=data, error=error, user=user, sorting=sorting)
-
-        else:
-
-            return redirect(url_for('filter_boolean_menu'))
-
-    else:
-        return not_logged_in()
+@app.route("/filter/boolean/<column>/<sorting>")
+def filter_boolean(column, sorting='occurrence'):
+    return redirect(url_for('explore_filter_column', column=column))
 
 
 @app.route("/filter/moc/")
 def filter_moc1():
-    if is_logged_in():
-        user = account.retrieve(session['userid'])
-
-        data = get_data(session)
-
-        return render_template('moc1.html', data=data, code_list=MOC.CODES, user=user)
-
-    else:
-        return not_logged_in()
+    return redirect(url_for('explore_moc'))
 
 
-@app.route("/filter/moc/<moc1>/<moc2>/<moc3>/<moc4>/<moc5>/<active>", methods=['GET', 'POST'])
+@app.route("/filter/moc/<moc1>/<moc2>/<moc3>/<moc4>/<moc5>/<active>")
 def filter_moc(moc1, moc2, moc3, moc4, moc5, active):
-    if is_logged_in():
-
-        if request.method == 'GET':
-            user = account.retrieve(session['userid'])
-
-            code_list = MOC.CODES[moc1]
-            cur_moc = [moc1, moc2, moc3, moc4, moc5]
-
-            moc_col = []
-
-            # this creates a list of relevant code positions, taking into effect
-            # the fact that some codes may span multiple digits
-
-            # did the previous value fell under inc
-            prev_inc = False
-            for ii in range(1,5):
-                try:
-                    MOC.CODES[moc1][ii]['INC']
-                    if prev_inc == False:
-                        moc_col.append(ii)
-                    prev_inc = True
-                except KeyError:
-                    moc_col.append(ii)
-                    prev_inc = False
-
-            data = get_data(session)
-            data['moc_options'] = get_moc_options(session, cur_moc[:], active)
-
-            return render_template('moc.html', code_list=code_list, moc_col=moc_col, cur_moc=cur_moc, active=int(active), data=data, user=user)
-
-        else:
-
-            # create the new history entry based on the moc changes, excluding wildcards
-            cur_moc = [moc1, moc2, moc3, moc4, moc5]
-            applied = []
-            for k, digit in enumerate(cur_moc):
-                if digit != '*':
-                    entry = make_history.moc(k+1, digit)
-                    account.history_add(session['userid'], entry)
-                    applied.append(entry['desc'])
-
-            if len(applied) == 1:
-                flash(applied[0], 'success')
-            elif applied:
-                flash('Offense code filter applied (' + str(len(applied)) + ' steps).', 'success')
-
-            return redirect(url_for('index'))
-
-    else:
-        return not_logged_in()
+    return redirect(url_for('explore_moc_step', moc1=moc1, moc2=moc2, moc3=moc3,
+                            moc4=moc4, moc5=moc5, active=active))
 
 
 def crosstab_csv(dependant, x_axis, y_axis):
@@ -847,7 +1077,8 @@ def load():
             else:
                 account.history_revert(session['userid'])
                 flash('All filters cleared — full dataset restored.')
-                return redirect(url_for('index'))
+                # land in the workbench, not "/" (which would re-fire the resume nudge)
+                return redirect(url_for('explore'))
 
         return render_template('load.html', error=error, user=user)
     else:
@@ -867,7 +1098,8 @@ def revert(n):
                 flash('All filters cleared — full dataset restored.')
             else:
                 flash('Data state reverted — later filter steps removed.')
-        return redirect(url_for('index'))
+        # land in the workbench, not "/" (which would re-fire the resume nudge)
+        return redirect(url_for('explore'))
     else:
         return not_logged_in()
 
@@ -1031,8 +1263,16 @@ def lesson_catalog():
         user = account.retrieve(session['userid'])
 
         progress = user.get('progress', {})
-        catalog = [{'module': m, 'status': module_status(progress.get(m['id']))}
-                   for m in lessons.list_modules()]
+        catalog = []
+        for m in lessons.list_modules():
+            entry = progress.get(m['id'])
+            total = len(m['steps'])
+            catalog.append({
+                'module': m,
+                'status': module_status(entry),
+                'resume': resume_step(entry, total),
+                'total_steps': total,
+            })
 
         return render_template('lesson_catalog.html', catalog=catalog, user=user)
 
@@ -1063,47 +1303,62 @@ def lesson_overview(module_id):
 
 @app.route('/lesson/<module_id>/<int:step>', methods=['GET', 'POST'])
 def lesson_step(module_id, step):
-    if is_logged_in():
-        user = account.retrieve(session['userid'])
-
-        try:
-            module = lessons.get_module(module_id)
-        except lessons.LessonError:
-            return redirect(url_for('lesson_catalog'))
-
-        steps = module['steps']
-
-        # out-of-range step falls back to the module overview
-        if step < 0 or step >= len(steps):
-            return redirect(url_for('lesson_overview', module_id=module_id))
-
-        current = steps[step]
-
-        # POST an answer -> grade it server-side, persist, then redirect back (Post/Redirect/Get)
-        if request.method == 'POST' and current['type'] == 'question':
-            grade_and_store(module_id, step, current)
-            return redirect(url_for('lesson_step', module_id=module_id, step=step))
-
-        # record the resume pointer, but only when it actually moves (avoid redundant writes)
-        if account.get_progress(session['userid'], module_id).get('step') != step:
-            account.set_progress(session['userid'], module_id, step=step)
-
-        # explore steps materialize their data state in a sandbox (never the student's history)
-        explore = None
-        if current['type'] == 'explore':
-            explore = build_explore(module_id, current)
-
-        # question steps render their form + any prior answer/feedback read back from progress
-        question = None
-        if current['type'] == 'question':
-            question = build_question(module_id, step, current)
-
-        return render_template('lesson_step.html', module=module, step=current,
-                               step_index=step, total=len(steps),
-                               explore=explore, question=question, user=user)
-
-    else:
+    if not is_logged_in():
         return not_logged_in()
+
+    user = account.retrieve(session['userid'])
+
+    try:
+        module = lessons.get_module(module_id)
+    except lessons.LessonError:
+        return redirect(url_for('lesson_catalog'))
+
+    steps = module['steps']
+
+    # out-of-range step falls back to the module overview
+    if step < 0 or step >= len(steps):
+        return redirect(url_for('lesson_overview', module_id=module_id))
+
+    current = steps[step]
+
+    # POST an answer -> grade it server-side, persist, then redirect back (Post/Redirect/Get)
+    if request.method == 'POST' and current['type'] == 'question':
+        grade_and_store(module_id, step, current)
+        return redirect(url_for('lesson_step', module_id=module_id, step=step))
+
+    # record the resume pointer, but only when it actually moves (avoid redundant writes)
+    if account.get_progress(session['userid'], module_id).get('step') != step:
+        account.set_progress(session['userid'], module_id, step=step)
+
+    # explore steps set the active lesson state in the sandbox (never the student's history)
+    if current['type'] == 'explore' and 'state' in current:
+        account.set_lesson_state(session['userid'], module_id, current['state'])
+
+    # the main area shows this step's data view (its focus, or the nearest preceding one's)
+    focus = lesson_active_focus(module, step)
+    lesson_data = build_lesson_data(module_id, current, focus)
+
+    # question steps render their form + any prior answer/feedback read back from progress
+    question = build_question(module_id, step, current) if current['type'] == 'question' else None
+    # checkpoint steps compare the active lesson state to expect_state (Phase 5)
+    checkpoint = build_checkpoint(module_id, current) if current['type'] == 'checkpoint' else None
+
+    # Next is a soft (URL-bypassable) gate: locked while a required question is unanswered or
+    # a checkpoint has not matched — same spirit as require_answer.
+    next_locked = bool((question and question['require_answer'] and not question['answered'])
+                       or (checkpoint and not checkpoint['passed']))
+
+    lesson = {
+        'module': module, 'entries': lesson_data['entries'],
+        'total': lesson_data['total'], 'chips': lesson_data['chips'],
+        'step_index': step, 'total_steps': len(steps),
+    }
+
+    return render_template('lesson_step.html', module=module, step=current,
+                           step_index=step, total=len(steps), user=user,
+                           lesson=lesson, lesson_data=lesson_data,
+                           question=question, checkpoint=checkpoint,
+                           next_locked=next_locked)
 
 
 @app.route('/lesson/<module_id>/complete')
@@ -1132,39 +1387,103 @@ def resolve_lesson_state(module_id, step):
     return account.get_progress(session['userid'], module_id).get('state', [])
 
 
-def build_explore(module_id, step):
-    # Reconstruct the step's data state as a sandboxed override and summarize it inline.
-    # A step with its own `state` sets the module's active state; otherwise it inherits the
-    # active state recorded on the student's progress. The student's own history is untouched.
+# op code -> readable phrase, for lesson chips and the checkpoint diff
+_OP_WORDS = {'eq': 'is', 'ne': 'is not', 'gt': 'is greater than',
+             'ge': 'is at least', 'lt': 'is less than', 'le': 'is at most'}
 
-    if 'state' in step:
-        account.set_lesson_state(session['userid'], module_id, step['state'])
 
+def describe_token(token):
+    # A human-readable phrase for one lesson state token (f.col.op.val / o.col.op.v1~v2),
+    # e.g. 'f.moc1.eq.A' -> 'Minnesota Offense Code (first character) is A'. Uses the live
+    # codebook for the column's friendly name and falls back to the raw code if undocumented.
+    action = history_text_to_item(token)['action']
+    label = CODEBOOK.codebook.get(action[1], action[1])
+    op = _OP_WORDS.get(action[2], action[2])
+    value = ' or '.join(action[3]) if action[0] == 'o' else action[3]
+    return label + ' ' + op + ' ' + value
+
+
+def lesson_chips(state):
+    # read-only chips (token + friendly desc) for the sidebar "Lesson data" module
+    return [{'token': token, 'desc': describe_token(token)} for token in state]
+
+
+def lesson_active_focus(module, step_index):
+    # The data view the main area shows for a step: the step's own `focus`, or the nearest
+    # preceding explore step's focus — so a question/checkpoint inherits the view it discusses.
+    for i in range(step_index, -1, -1):
+        focus = module['steps'][i].get('focus')
+        if focus:
+            return focus
+    return None
+
+
+def build_lesson_data(module_id, step, focus):
+    # Read-only data view for the lesson main area, computed on the step's active lesson state
+    # as a sandboxed override on the base dataset (session=None). The student's history is
+    # never read or mutated here — lessons are strictly sandboxed (see CLAUDE.md).
     active_state = resolve_lesson_state(module_id, step)
-
-    # tokens -> history items, applied on top of the base dataset only (session=None)
     override = [history_text_to_item(token) for token in active_state]
+
     summary = get_data(None, history_override=override)
+    view = {'kind': None, 'state': active_state, 'chips': lesson_chips(active_state),
+            'entries': summary['entries'], 'total': dataset_total(),
+            'focus': focus, 'deeplink': None}
 
-    focus = step.get('focus') or {}
-    column_info = None
-    deeplink = None
+    if not focus:
+        return view
 
-    if focus.get('view') == 'info' and focus.get('column') in summary['column_list']:
-        column = focus['column']
-        column_info = get_data(None, column, 'occurrence', override)['column_info']
-        deeplink = url_for('info_specific', column=column, sorting='occurrence')
+    if focus.get('view') == 'info':
+        column = focus.get('column')
+        if column in summary['column_list'] and CODEBOOK.codebook.get(column):
+            info = get_data(None, column, 'occurrence', override)['column_info']
+            missing = info['len'] - sum(e['num'] for e in info['each'])
+            view.update({
+                'kind': 'info', 'column': column,
+                'header': CODEBOOK.codebook[column], 'info': info, 'missing': missing,
+                'missing_percent': (100 * missing / info['len']) if info['len'] else 0,
+                'chart': build_chart(info),
+                'deeplink': url_for('explore_column', column=column, sorting='occurrence'),
+            })
 
     elif focus.get('view') == 'table':
-        deeplink = url_for('table', dependant=focus['dependant'],
-                           x_axis=focus['x_axis'], y_axis=focus['y_axis'])
+        dependant, x_axis, y_axis = focus.get('dependant'), focus.get('x_axis'), focus.get('y_axis')
+        measure_col = None if dependant == '#' else dependant
+        columns_ok = (x_axis in summary['column_list'] and y_axis in summary['column_list']
+                      and (measure_col is None or measure_col in summary['column_list']))
+        if columns_ok:
+            sheet = _execute(None, override).get_table(measure_col, x_axis, y_axis)
+            table = build_crosstab(sheet, measure_col is not None)
+            view.update({
+                'kind': 'table', 'measure': measure_col,
+                'measure_desc': CODEBOOK.codebook.get(measure_col) if measure_col else None,
+                'row_desc': CODEBOOK.codebook.get(x_axis, x_axis),
+                'col_desc': CODEBOOK.codebook.get(y_axis, y_axis),
+                'table': table,
+                'deeplink': url_for('explore_table_view', dependant=dependant,
+                                    x_axis=x_axis, y_axis=y_axis),
+            })
+
+    return view
+
+
+def build_checkpoint(module_id, step):
+    # Wire the checkpoint step type: compare the active lesson state (resolved exactly as the
+    # explore/grading path resolves it — the step's own state or the inherited progress state)
+    # to the step's expect_state as a token MULTISET. This reads only the sandboxed lesson
+    # state, never the student's history. Missing/extra tokens become a helpful diff.
+    active = resolve_lesson_state(module_id, step)
+    expected = step['expect_state']
+
+    missing = list((collections.Counter(expected) - collections.Counter(active)).elements())
+    extra = list((collections.Counter(active) - collections.Counter(expected)).elements())
 
     return {
-        'state': active_state,
-        'entries': summary['entries'],
-        'focus': focus,
-        'column_info': column_info,
-        'deeplink': deeplink
+        'passed': not missing and not extra,
+        'expect_state': expected,
+        'active_state': active,
+        'missing': [describe_token(token) for token in missing],
+        'extra': [describe_token(token) for token in extra],
     }
 
 

@@ -24,7 +24,6 @@
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/views.css') }}">
     <script src="{{ url_for('static', filename='js/vendor/htmx.min.js') }}" defer></script>
@@ -34,6 +33,14 @@
 </head>
 
 <body>
+
+{# active section, computed once so the top-bar nav and the phone bottom nav agree #}
+{% set p = request.path %}
+{% set section = 'compare' if p.startswith('/table') or p.startswith('/explore/table') else
+                 'filter' if p.startswith('/filter') or p.startswith('/explore/filter') or p.startswith('/explore/moc') else
+                 'stats' if p.startswith('/info') or p.startswith('/explore') else
+                 'lessons' if p.startswith('/lesson') else
+                 'authoring' if p.startswith('/admin') else '' %}
 
 <a class="skip-link" href="#main">Skip to content</a>
 
@@ -48,17 +55,11 @@
     {% endif %}
     <a href="{{ url_for('index') }}" class="brand">Minnesota Sentencing Explorer</a>
     {% if user %}
-    {% set p = request.path %}
-    {% set section = 'compare' if p.startswith('/table') or p.startswith('/explore/table') else
-                     'stats' if p.startswith('/info') or p.startswith('/explore') else
-                     'filter' if p.startswith('/filter') else
-                     'lessons' if p.startswith('/lesson') else
-                     'authoring' if p.startswith('/admin') else '' %}
     <nav class="topbar-nav" aria-label="Primary">
         <ul>
             <li><a href="{{ url_for('explore') }}" {% if section == 'stats' %}aria-current="page"{% endif %}>Statistics</a></li>
             <li><a href="{{ url_for('explore_table') }}" {% if section == 'compare' %}aria-current="page"{% endif %}>Compare</a></li>
-            <li><a href="{{ url_for('filter_menu') }}" {% if section == 'filter' %}aria-current="page"{% endif %}>Filter</a></li>
+            <li><a href="{{ url_for('explore_filter') }}" {% if section == 'filter' %}aria-current="page"{% endif %}>Filter</a></li>
             <li><a href="{{ url_for('lesson_catalog') }}" {% if section == 'lessons' %}aria-current="page"{% endif %}>Lessons</a></li>
             {% if user['is_educator'] %}
             <li><a href="{{ url_for('admin') }}" {% if section == 'authoring' %}aria-current="page"{% endif %}>Authoring</a></li>
@@ -79,12 +80,54 @@
     </div>
 </header>
 
-<!-- WORKBENCH: sidebar (data state) + main area -->
-<div class="workbench{% if not user %} workbench-single{% endif %}">
+{% if user %}
+{# Phone-only data-state bar: a collapsed summary under the top bar that opens the
+   sidebar drawer (full data state + column browser). Hidden ≥768px, where the
+   sidebar is a drawer/persistent panel. #}
+<button type="button" class="datastate-bar" id="datastate-bar"
+        aria-controls="sidebar" aria-expanded="false" aria-label="Open data panel">
+    <span class="datastate-bar-main">
+        {% if lesson %}
+        <span class="badge badge-accent">Lesson data</span>
+        <span class="datastate-bar-count"><strong>{{ '{:,}'.format(lesson['entries']) }}</strong>&nbsp;of {{ '{:,}'.format(lesson['total']) }} cases</span>
+        {% elif datastate %}
+        <span class="datastate-bar-count"><strong>{{ '{:,}'.format(datastate['entries']) }}</strong>&nbsp;of {{ '{:,}'.format(datastate['total']) }} cases</span>
+        {% set filter_count = user['history']|length - 1 %}
+        {% if filter_count > 0 %}
+        <span class="badge badge-muted">{{ filter_count }} filter{{ '' if filter_count == 1 else 's' }}</span>
+        {% endif %}
+        {% endif %}
+    </span>
+    <span class="datastate-bar-cue" aria-hidden="true">Data &amp; columns ▾</span>
+</button>
+{% endif %}
+
+<!-- WORKBENCH: sidebar (data state) + main area (+ lesson dock in lesson mode) -->
+<div class="workbench{% if not user %} workbench-single{% elif lesson %} workbench-lesson{% endif %}">
 
     {% if user %}
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar" aria-label="Data state" tabindex="-1">
+        {% if lesson %}
+        {# Lesson mode: a read-only "Lesson data" module — the lesson's sandbox state, never
+           the student's editable history (which is untouched and hidden here). #}
+        <section class="datastate">
+            <h2 class="sidebar-title">Lesson data</h2>
+            <p class="count-badge badge badge-accent">
+                <strong>{{ '{:,}'.format(lesson['entries']) }}</strong>&nbsp;of {{ '{:,}'.format(lesson['total']) }} cases
+            </p>
+            {% if lesson['chips'] %}
+            <ol class="chip-chain chip-chain-static" aria-label="Lesson filters, in order">
+                {% for chip in lesson['chips'] %}
+                <li class="chip-item"><span class="chip" title="{{ chip['token'] }}">{{ chip['desc'] }}</span></li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="datastate-empty">This step uses the full dataset — no filters applied.</p>
+            {% endif %}
+            <p class="datastate-note">This is the lesson's sandbox. Your own data state isn't changed.</p>
+        </section>
+        {% else %}
         <section class="datastate">
             <div class="datastate-header">
                 <h2 class="sidebar-title">Data state</h2>
@@ -129,9 +172,10 @@
             </ol>
             {% else %}
             <p class="datastate-empty">No filters applied — you're exploring the full dataset.
-               Use <a href="{{ url_for('filter_menu') }}">Filter</a> to narrow it.</p>
+               Use <a href="{{ url_for('explore_filter') }}">Filter</a> to narrow it.</p>
             {% endif %}
         </section>
+        {% endif %}
 
         {# view-specific sidebar modules (e.g. the explore column browser) #}
         {% block sidebar_extra %}{% endblock %}
@@ -149,12 +193,48 @@
         </div>
     </main>
 
+    {% if lesson %}
+    {# Lesson dock: right column ≥1024px, stacked panel below the data at narrower widths. #}
+    <aside class="lesson-dock" aria-label="Lesson">
+        {% block dock %}{% endblock %}
+    </aside>
+    {% endif %}
+
 </div>
 
 <!-- FOOTER -->
 <footer class="site-footer">
     &copy; {{ current_year }} Sidney Allen
 </footer>
+
+{% if user %}
+{# Phone-only bottom nav (hidden ≥768px, where the top-bar nav is shown). Mirrors
+   the top-bar sections; icons are decorative (aria-hidden) beside a text label. #}
+<nav class="bottom-nav" aria-label="Sections">
+    <a href="{{ url_for('explore') }}" {% if section == 'stats' %}aria-current="page"{% endif %}>
+        <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="18" y1="20" x2="18" y2="14"/></svg>
+        <span class="bottom-nav-label">Explore</span>
+    </a>
+    <a href="{{ url_for('explore_table') }}" {% if section == 'compare' %}aria-current="page"{% endif %}>
+        <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>
+        <span class="bottom-nav-label">Compare</span>
+    </a>
+    <a href="{{ url_for('explore_filter') }}" {% if section == 'filter' %}aria-current="page"{% endif %}>
+        <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>
+        <span class="bottom-nav-label">Filter</span>
+    </a>
+    <a href="{{ url_for('lesson_catalog') }}" {% if section == 'lessons' %}aria-current="page"{% endif %}>
+        <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4 2 9l10 5 10-5z"/><path d="M6 11.5V16c0 1 2.7 2 6 2s6-1 6-2v-4.5"/></svg>
+        <span class="bottom-nav-label">Lessons</span>
+    </a>
+    {% if user['is_educator'] %}
+    <a href="{{ url_for('admin') }}" {% if section == 'authoring' %}aria-current="page"{% endif %}>
+        <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 20h4L18 10l-4-4L4 16z"/><line x1="13.5" y1="6.5" x2="17.5" y2="10.5"/></svg>
+        <span class="bottom-nav-label">Author</span>
+    </a>
+    {% endif %}
+</nav>
+{% endif %}
 
 <!-- TOASTS: Flask flashes render here; app.js adds auto-dismiss and htmx-triggered toasts -->
 <div class="toast-region" id="toast-region">

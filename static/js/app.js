@@ -116,13 +116,24 @@
     });
   }
 
-  /* ---------- Sidebar drawer (768–1023px) ---------- */
+  /* ---------- Sidebar drawer (<1024px) ----------
+     Opened by any [aria-controls="sidebar"] trigger: the top-bar ☰ at tablet
+     width and the full-width data-state bar on phones. Focus is trapped and
+     returned to whichever trigger opened it. */
 
   var sidebar = document.getElementById('sidebar');
-  var sidebarToggle = document.getElementById('sidebar-toggle');
   var sidebarBackdrop = document.getElementById('sidebar-backdrop');
+  var sidebarToggles = [].slice.call(document.querySelectorAll('[aria-controls="sidebar"]'));
 
-  if (sidebar && sidebarToggle && sidebarBackdrop) {
+  if (sidebar && sidebarBackdrop && sidebarToggles.length) {
+    var lastOpener = null;
+
+    var setExpanded = function (open) {
+      sidebarToggles.forEach(function (t) {
+        t.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    };
+
     var trapKeydown = function (e) {
       if (e.key === 'Escape') {
         closeDrawer();
@@ -145,10 +156,11 @@
       }
     };
 
-    var openDrawer = function () {
+    var openDrawer = function (opener) {
+      lastOpener = opener || sidebarToggles[0];
       sidebar.classList.add('open');
       sidebarBackdrop.classList.add('open');
-      sidebarToggle.setAttribute('aria-expanded', 'true');
+      setExpanded(true);
       var first = sidebar.querySelector(FOCUSABLE);
       (first || sidebar).focus();
       document.addEventListener('keydown', trapKeydown);
@@ -157,14 +169,16 @@
     var closeDrawer = function () {
       sidebar.classList.remove('open');
       sidebarBackdrop.classList.remove('open');
-      sidebarToggle.setAttribute('aria-expanded', 'false');
+      setExpanded(false);
       document.removeEventListener('keydown', trapKeydown);
-      sidebarToggle.focus();
+      if (lastOpener) lastOpener.focus();
     };
 
-    sidebarToggle.addEventListener('click', function () {
-      if (sidebar.classList.contains('open')) closeDrawer();
-      else openDrawer();
+    sidebarToggles.forEach(function (toggle) {
+      toggle.addEventListener('click', function () {
+        if (sidebar.classList.contains('open')) closeDrawer();
+        else openDrawer(toggle);
+      });
     });
     sidebarBackdrop.addEventListener('click', closeDrawer);
   }

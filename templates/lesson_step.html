@@ -1,120 +1,131 @@
 {% extends "layout.html" %}
 {% block title %} — {{ module['title'] }}{% endblock %}
 
+{% block head %}
+{# reuse the explore chart + value-table behaviours for the read-only lesson data view #}
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/explore.js') }}" defer></script>
+{% endblock %}
+
 {% block body %}
+{% include 'partials/lesson_data.html' %}
+{% endblock %}
 
-    <div class="container">
-        <p><a href="/lesson/{{ module['id'] }}">&larr; {{ module['title'] }}</a></p>
+{% block dock %}
+{% set lock_reason = 'Match the target data state to continue' if step['type'] == 'checkpoint'
+                     else 'Answer this question to continue' %}
+<div class="dock-inner">
 
-        <!-- progress indicator -->
-        <p><strong>Step {{ step_index + 1 }} of {{ total }}</strong></p>
-        <div style="background: var(--color-border); border-radius: 4px; height: 8px; margin-bottom: 2rem;">
-            <div style="background: var(--color-accent); border-radius: 4px; height: 8px; width: {{ ((step_index + 1) / total * 100)|round(0, 'floor') }}%;"></div>
-        </div>
-
-        <h1>{{ step['title'] }}</h1>
-
-        <div class="lesson-body">
-            {{ step['body']|lesson_body }}
-        </div>
-
-        {% if step['type'] == 'explore' and explore %}
-        <!-- Sandboxed lesson dataset: reconstructed from the step's state, not the student's history. -->
-        <div class="card" style="text-align: left; margin: 2rem 0;">
-            <h3>Lesson data</h3>
-            <p><strong>{{ explore['entries'] }}</strong> matching records.</p>
-            {% if explore['state'] %}
-            <p style="color: var(--color-muted);">Filter:
-                {% for token in explore['state'] %}<code>{{ token }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
-            </p>
-            {% endif %}
-
-            {% if explore['column_info'] %}
-            <p><strong>{{ explore['column_info']['header'] }}</strong> &mdash; {{ explore['column_info']['nan'] }}</p>
-            {% if explore['column_info']['numeric'] == True %}
-            <p>Mean {{ explore['column_info']['mean'] }} &middot;
-               Median {{ explore['column_info']['mdn'] }} &middot;
-               Std {{ explore['column_info']['std'] }}</p>
-            {% endif %}
-            {% endif %}
-
-            {% if explore['deeplink'] %}
-            <div class="btn-bar">
-                <a href="{{ explore['deeplink'] }}" class="btn">Open in analysis view &rarr;</a>
-            </div>
-            {% endif %}
-        </div>
-        {% elif step['type'] == 'question' and question %}
-        <!-- Answers are graded server-side; the client never submits a correctness flag. -->
-        <div class="card" style="text-align: left; margin: 2rem 0;">
-            <form method="post">
-                {% if question['type'] == 'numeric' %}
-                    <label>Your answer:
-                        <input type="number" step="any" name="answer" required
-                               value="{% if question['prior'] %}{{ question['prior']['value'] }}{% endif %}">
-                    </label>
-                {% elif question['type'] == 'choice' %}
-                    {% for option in question['options'] %}
-                    <label style="display: block; margin: 0.4rem 0;">
-                        <input type="radio" name="answer" value="{{ loop.index0 }}" required
-                               {% if question['prior'] and question['prior']['value'] == loop.index0 %}checked{% endif %}>
-                        {{ option }}
-                    </label>
-                    {% endfor %}
-                {% elif question['type'] == 'free' %}
-                    <label>Your response:<br>
-                        <textarea name="answer" rows="4" style="width: 100%;">{% if question['prior'] %}{{ question['prior']['value'] }}{% endif %}</textarea>
-                    </label>
-                {% endif %}
-                <p><button type="submit">Submit answer</button></p>
-            </form>
-
-            {% if question['answered'] %}
-                {% if question['prior']['correct'] == True %}
-                    <p style="color: #1a7f37; font-weight: 600;">&check; Correct!</p>
-                {% elif question['prior']['correct'] == False %}
-                    <p style="color: #c0392b; font-weight: 600;">&times; Not quite &mdash; try again.</p>
-                {% else %}
-                    <p style="font-weight: 600;">Answer submitted.</p>
-                    {% if question['model_answer'] %}
-                    <p style="color: var(--color-muted);"><em>Model answer:</em> {{ question['model_answer'] }}</p>
-                    {% endif %}
-                {% endif %}
-            {% endif %}
-        </div>
-        {% elif step['type'] != 'read' %}
-        <!-- checkpoint steps assert the student's state; that arrives in a later phase. -->
-        <div class="card" style="text-align: left; margin: 2rem 0;">
-            <h3>Interactive step &mdash; coming next phase</h3>
-            <p>This is a <strong>{{ step['type'] }}</strong> step. It is not wired up yet;
-               for now you can read the description above and continue.</p>
-        </div>
-        {% endif %}
-
-        {% set next_locked = question and question['require_answer'] and not question['answered'] %}
-
-        <!-- Prev / Next navigation -->
-        <div class="btn-bar">
-            {% if step_index > 0 %}
-                <a href="/lesson/{{ module['id'] }}/{{ step_index - 1 }}" class="btn">&larr; Previous</a>
-            {% else %}
-                <a href="/lesson/{{ module['id'] }}" class="btn">&larr; Overview</a>
-            {% endif %}
-
-            {% if step_index + 1 < total %}
-                {% if next_locked %}
-                    <span class="btn disabled" aria-disabled="true" title="Answer this question to continue">Next &rarr;</span>
-                {% else %}
-                    <a href="/lesson/{{ module['id'] }}/{{ step_index + 1 }}" class="btn">Next &rarr;</a>
-                {% endif %}
-            {% else %}
-                {% if next_locked %}
-                    <span class="btn disabled" aria-disabled="true" title="Answer this question to continue">Finish &check;</span>
-                {% else %}
-                    <a href="/lesson/{{ module['id'] }}/complete" class="btn">Finish &check;</a>
-                {% endif %}
-            {% endif %}
-        </div>
+    <div class="dock-header">
+        <a class="dock-back" href="{{ url_for('lesson_overview', module_id=module['id']) }}">&larr; {{ module['title'] }}</a>
+        <p class="dock-progress-text">Step {{ step_index + 1 }} of {{ total }}</p>
+        <ol class="progress-dots" aria-label="Lesson progress">
+            {% for i in range(total) %}
+            <li class="progress-dot{% if i < step_index %} done{% elif i == step_index %} current{% endif %}">
+                <span class="visually-hidden">Step {{ i + 1 }}{% if i < step_index %} (done){% elif i == step_index %} (current){% endif %}</span>
+            </li>
+            {% endfor %}
+        </ol>
     </div>
 
+    <div class="dock-body">
+        <h1 class="dock-title">{{ step['title'] }}</h1>
+
+        <div class="lesson-body">{{ step['body']|lesson_body }}</div>
+
+        {% if step['type'] == 'question' and question %}
+        {# Answers are graded server-side; the client never submits a correctness flag. #}
+        <form class="lesson-question" method="post">
+            {% if question['type'] == 'numeric' %}
+            <div class="field">
+                <label for="answer-input">Your answer</label>
+                <input type="number" step="any" id="answer-input" name="answer" required
+                       value="{% if question['prior'] %}{{ question['prior']['value'] }}{% endif %}">
+            </div>
+            {% elif question['type'] == 'choice' %}
+            <fieldset class="field">
+                <legend>Choose one</legend>
+                {% for option in question['options'] %}
+                <label class="radio-row">
+                    <input type="radio" name="answer" value="{{ loop.index0 }}" required
+                           {% if question['prior'] and question['prior']['value'] == loop.index0 %}checked{% endif %}>
+                    <span>{{ option }}</span>
+                </label>
+                {% endfor %}
+            </fieldset>
+            {% elif question['type'] == 'free' %}
+            <div class="field">
+                <label for="answer-input">Your response</label>
+                <textarea id="answer-input" name="answer" rows="4">{% if question['prior'] %}{{ question['prior']['value'] }}{% endif %}</textarea>
+            </div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">{% if question['answered'] %}Resubmit{% else %}Submit answer{% endif %}</button>
+        </form>
+
+        {% if question['answered'] %}
+            {% if question['prior']['correct'] == True %}
+            <p class="lesson-feedback lesson-feedback-correct" role="status"><span aria-hidden="true">&check;</span> Correct!</p>
+            {% elif question['prior']['correct'] == False %}
+            <p class="lesson-feedback lesson-feedback-wrong" role="status"><span aria-hidden="true">&times;</span> Not quite — try again.</p>
+            {% else %}
+            <p class="lesson-feedback" role="status">Answer submitted.</p>
+            {% if question['model_answer'] %}
+            <p class="lesson-model"><em>Model answer:</em> {{ question['model_answer'] }}</p>
+            {% endif %}
+            {% endif %}
+        {% endif %}
+
+        {% elif step['type'] == 'checkpoint' and checkpoint %}
+        {# Checkpoint: compares this lesson's active data state to the step's expected state.
+           It reads only the sandboxed lesson state — the student's own history is untouched. #}
+        {% if checkpoint['passed'] %}
+        <div class="checkpoint checkpoint-pass" role="status">
+            <p class="checkpoint-status"><span aria-hidden="true">&check;</span> Your data matches</p>
+            <p>The lesson data is filtered to the target view. You can finish the lesson.</p>
+        </div>
+        {% else %}
+        <div class="checkpoint checkpoint-fail" role="status">
+            <p class="checkpoint-status"><span aria-hidden="true">&times;</span> Not there yet</p>
+            {% if checkpoint['missing'] %}
+            <p>Still needed:</p>
+            <ul class="checkpoint-diff">
+                {% for item in checkpoint['missing'] %}<li>{{ item }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            {% if checkpoint['extra'] %}
+            <p>These shouldn't be applied:</p>
+            <ul class="checkpoint-diff">
+                {% for item in checkpoint['extra'] %}<li>{{ item }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            <p class="checkpoint-hint">Step back through the earlier lesson steps so the lesson
+               data builds up to this state, then return here.</p>
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="dock-nav">
+        {% if step_index > 0 %}
+        <a class="btn btn-secondary" href="{{ url_for('lesson_step', module_id=module['id'], step=step_index - 1) }}">&larr; Back</a>
+        {% else %}
+        <a class="btn btn-secondary" href="{{ url_for('lesson_overview', module_id=module['id']) }}">&larr; Overview</a>
+        {% endif %}
+
+        {% if step_index + 1 < total %}
+            {% if next_locked %}
+            <span class="btn btn-primary" aria-disabled="true" title="{{ lock_reason }}">Next &rarr;</span>
+            {% else %}
+            <a class="btn btn-primary" href="{{ url_for('lesson_step', module_id=module['id'], step=step_index + 1) }}">Next &rarr;</a>
+            {% endif %}
+        {% else %}
+            {% if next_locked %}
+            <span class="btn btn-primary" aria-disabled="true" title="{{ lock_reason }}">Finish &check;</span>
+            {% else %}
+            <a class="btn btn-primary" href="{{ url_for('lesson_complete', module_id=module['id']) }}">Finish &check;</a>
+            {% endif %}
+        {% endif %}
+    </div>
+
+</div>
 {% endblock %}

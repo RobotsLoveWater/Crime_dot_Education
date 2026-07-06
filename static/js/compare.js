@@ -120,6 +120,17 @@
     if (e.detail.target && e.detail.target.id === 'compare-view') initView();
   });
 
+  // Chart.js measures its container on creation; during an htmx swap the layout
+  // isn't final until htmx settles (it also runs `show:window:top`), so a chart
+  // built on afterSwap can paint blank until a manual refresh. Re-render it once
+  // the swap has settled (stable size) + resize next frame — like a full load.
+  document.body.addEventListener('htmx:afterSettle', function (e) {
+    if (e.detail.target && e.detail.target.id === 'compare-view') {
+      renderChart(currentStat());
+      requestAnimationFrame(function () { if (chart) chart.resize(); });
+    }
+  });
+
   // htmx restored a cached page snapshot (browser Back): canvas state is lost, re-init
   document.body.addEventListener('htmx:historyRestore', initView);
 

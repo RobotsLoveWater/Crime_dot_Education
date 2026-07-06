@@ -3,15 +3,22 @@
 
 {% block body %}
 
-    <h1>Load a Dataset</h1>
-    <p>The standard dataset is all felonies sentences in the state of Minnesota from 2001-2019.</p>
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Load a dataset</h1>
+        <p class="view-subtitle">The standard dataset is every felony sentence in
+            Minnesota, 2001–2019.</p>
+    </div>
+</header>
+{# validation errors render via layout.html's main-area alert (the route passes
+   `error`); no inline copy here to avoid a double alert #}
 
-    <form method=post>
-        <dl>
-          <dt>Code:
-          <dd><input type=text name=code value="{{ request.form.code }}">
-        </dl>
-        <p><input type=submit value=Load>
-    </form>
+<form method="post" class="filter-form">
+    <div class="field">
+        <label for="code">Dataset code</label>
+        <input type="text" id="code" name="code" value="{{ request.form.code }}" autocomplete="off">
+    </div>
+    <button type="submit" class="btn btn-primary">Load</button>
+</form>
 
 {% endblock %}

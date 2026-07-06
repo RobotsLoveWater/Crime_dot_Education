@@ -3,69 +3,69 @@
 
 {% block body %}
 
-    {% if user %}
-    <h2>Hello, {{ user['username'] }}</h2>
-    {% endif %}
-
-    <!-- Hero Section -->
-    <section class="hero" style="background-image: url('{{ hero_image_url }}'); background-size: cover; background-position: center; padding: 5rem 1rem; color: #fff; text-align: center; position: relative;">
-    <!-- Overlay for readability -->
-    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);"></div>
-    <div class="container" style="position: relative; z-index: 1;">
-        <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">Explore Criminal Sentencing Data</h1>
-        <p style="font-size: 1.25rem; margin-bottom: 2rem;">Interactive, guided data exploration tailored for educators and students.</p>
-        <a href="/new" style="background: var(--color-accent); color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; text-decoration: none; font-weight: 500;">Get Started</a>
+<section class="landing-hero">
+    <p class="landing-eyebrow">
+        {% if user %}Welcome back, {{ user['username'] }}{% else %}Minnesota Sentencing Explorer{% endif %}
+    </p>
+    <h1 class="landing-title">Explore two decades of Minnesota sentencing data</h1>
+    <p class="landing-lede">An interactive, guided way for educators and students to filter felony
+        sentencing cases, compare groups, and read the statistics behind the numbers — no
+        spreadsheets required.</p>
+    <div class="landing-cta">
+        {% if user %}
+        <a href="{{ url_for('explore') }}" class="btn btn-primary">Open the workbench</a>
+        <a href="{{ url_for('lesson_catalog') }}" class="btn btn-secondary">Browse lessons</a>
+        {% else %}
+        <a href="{{ url_for('new') }}" class="btn btn-primary">Create an account</a>
+        <a href="{{ url_for('login') }}" class="btn btn-secondary">Log in</a>
+        {% endif %}
     </div>
-    </section>
+</section>
 
-    <!-- Overview Text -->
-    <section class="overview container" style="padding: 3rem 0; text-align: center;">
-        <h2 style="font-size: 2rem; margin-bottom: 1rem;">Why Crime[dot]Education?</h2>
-        <p style="max-width: 700px; margin: 0 auto 2rem; color: var(--color-muted);">Minnesota Sentencing Explorer empowers educators with a dynamic toolkit to dive deep into real-world sentencing trends. Create interactive lessons, visualize key metrics, and let students ask their own questions of the data — all within a clean, intuitive interface.</p>
-    </section>
+<section class="landing-metrics" aria-label="About the data">
+    <div class="stat-card">
+        <span class="stat-value">294,467</span>
+        <span class="stat-label">Felony cases</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-value">2001&ndash;2019</span>
+        <span class="stat-label">Years of sentencing data</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-value">{{ lesson_count }}</span>
+        <span class="stat-label">Guided lesson{{ 's' if lesson_count != 1 else '' }}{% if user and lessons_completed %} &middot; {{ lessons_completed }} completed{% endif %}</span>
+    </div>
+</section>
 
-    <!-- Feature Cards -->
-    <section class="features container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; padding-bottom: 3rem;">
-        <div class="card">
-            <h3>Guided Lessons</h3>
-            <p>Step-by-step activities designed to build analytical skills.</p>
-        </div>
-        <div class="card">
-            <h3>Custom Filters</h3>
-            <p>Drill down by offense, county, sentence length, and more.</p>
-        </div>
-        <div class="card">
-            <h3>Interactive Tables</h3>
-            <p>Bring data to life with visualizations students can manipulate.</p>
-        </div>
-    </section>
+<h2 class="landing-section-title">What you can do</h2>
+<div class="feature-grid">
+    <article class="feature-card">
+        <h3>Filter the data</h3>
+        <p>Narrow the cases by offense, sentence length, county, and more. Every filter becomes a
+            plain-language chip you can peel back.</p>
+    </article>
+    <article class="feature-card">
+        <h3>Compare groups</h3>
+        <p>Build cross-tabulations (crosstabs) to see how sentences differ across groups, with a
+            heatmap and CSV export.</p>
+    </article>
+    <article class="feature-card">
+        <h3>Read the statistics</h3>
+        <p>See counts, means, medians, and distributions for any column, charted beside the numbers
+            that back them.</p>
+    </article>
+    <article class="feature-card">
+        <h3>Follow guided lessons</h3>
+        <p>Step-by-step activities run beside a live, read-only view of the data they describe —
+            answers are graded from the data itself.</p>
+    </article>
+</div>
 
-    <!-- Key Metrics -->
-    <section class="metrics container" style="padding-bottom: 3rem;">
-        <div class="metrics">
-            <div class="card">
-                <p class="value">294,467</p>
-                <h3>Total Cases</h3>
-            </div>
-            <div class="card">
-                <p class="value">18 yrs</p>
-                <h3>Years of Data</h3>
-            </div>
-            <div class="card">
-                <p class="value">{{ lesson_count }}</p>
-                <h3>Interactive Lessons</h3>
-                {% if user %}<p style="color: var(--color-muted);">{{ lessons_completed }} completed</p>{% endif %}
-            </div>
-        </div>
-    </section>
-
-    <!-- Call to Action -->
-    {% if not user %}
-        <section class="container" style="text-align: center; padding-bottom: 3rem;">
-            <h2 style="font-size: 1.75rem; margin-bottom: 1rem;">Ready to dive in?</h2>
-            <a href="/new" style="background: var(--color-accent); color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; text-decoration: none; font-weight: 500;">Create an Account</a>
-        </section>
-    {% endif %}
+{% if not user %}
+<section class="landing-final">
+    <h2>Ready to dive in?</h2>
+    <a href="{{ url_for('new') }}" class="btn btn-primary">Create an account</a>
+</section>
+{% endif %}
 
 {% endblock %}
-

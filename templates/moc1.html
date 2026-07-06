@@ -1,30 +1,57 @@
 {% extends "layout.html" %}
-{% block title %} — Offense code filter{% endblock %}
+{% block title %} — Filter by offense code{% endblock %}
+
+{% block head %}
+<script src="{{ url_for('static', filename='js/filter.js') }}" defer></script>
+{% endblock %}
 
 {% block body %}
+<article class="moc-view">
 
-    <h1>Choose Top Level Code</h1>
+    <header class="view-header">
+        <div class="view-heading">
+            <h1>Filter by offense code</h1>
+            <p class="view-subtitle">The Minnesota Offense Code (MOC) classifies each case's
+                offense. Choose an offense category to start, then narrow it digit by digit{% if datastate %} —
+                you're at <strong>{{ '{:,}'.format(datastate['entries']) }}</strong> cases now{% endif %}.</p>
+        </div>
+    </header>
 
-    <div class="card">
-        <h3>Total Entries</h3>
-        <p>{{ data['entries'] }}</p>
-    </div>
+    {% if data['entries'] == 0 %}
+    {% include 'partials/filter_zero.html' %}
+    {% else %}
 
-    <table>
-        <thead>
-            <tr>
-                <th>MOC Code</th>
-                <th>Description</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for moc1 in code_list %}
-            <tr>
-                <td><a href="/filter/moc/{{ moc1 }}/*/*/*/*/1">{{ moc1 }}</a></td>
-                <td>{{ code_list[moc1][0] }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <section aria-label="Offense categories">
+        <div class="view-toolbar">
+            <h2 id="moc-code-heading">Offense category</h2>
+            <div class="table-search js-only">
+                <label class="visually-hidden" for="moc-code-search">Search offenses</label>
+                <input type="search" id="moc-code-search" placeholder="Search offenses…"
+                       autocomplete="off" spellcheck="false">
+            </div>
+        </div>
 
+        <div class="table-wrapper table-scroll">
+            <table class="data-table" id="moc-code-table" aria-labelledby="moc-code-heading">
+                <caption class="visually-hidden">Top-level Minnesota Offense Code categories</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Code</th>
+                        <th scope="col">Offense category</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in codes %}
+                    <tr data-search="{{ (item['code'] ~ ' ' ~ item['title'])|lower }}">
+                        <td><a class="moc-code-link" href="{{ url_for('explore_moc_step', moc1=item['code'], moc2='*', moc3='*', moc4='*', moc5='*', active=1) }}">{{ item['code'] }}</a></td>
+                        <td><a class="moc-code-title" href="{{ url_for('explore_moc_step', moc1=item['code'], moc2='*', moc3='*', moc4='*', moc5='*', active=1) }}">{{ item['title'] }}</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+</article>
 {% endblock %}

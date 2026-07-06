@@ -37,6 +37,14 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.45;
 }
 
+/* Element defaults migrated from the retired style.css so bare headings and
+   paragraphs keep their vertical rhythm; components that need different spacing
+   set it themselves. Sizes come from the token scale. */
+h1 { font-size: var(--fs-xl); margin-bottom: var(--space-2); }
+h2 { font-size: var(--fs-lg); margin: var(--space-4) 0 var(--space-2); }
+h3 { font-size: var(--fs-md); }
+p  { margin-bottom: var(--space-4); }
+
 code, pre, kbd, samp {
   font-family: var(--font-mono);
 }

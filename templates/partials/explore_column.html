@@ -12,7 +12,7 @@
             <p class="view-subtitle">Column <code>{{ column }}</code> · statistics for your current data state</p>
         </div>
         <div class="view-actions">
-            <a class="btn btn-primary" href="{{ url_for('filter_boolean', column=column, sorting=sorting) }}">Filter this column</a>
+            <a class="btn btn-primary" href="{{ url_for('explore_filter_column', column=column) }}">Filter this column</a>
         </div>
     </header>
 

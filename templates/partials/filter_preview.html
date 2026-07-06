@@ -1,0 +1,14 @@
+{# Live filter preview fragment (Phase 4): returned by /explore/filter/<col>/preview.
+   Shows how many cases the candidate filter would keep — count computed via
+   history_override, so it equals the post-apply chip count. #}
+{% if message %}
+<span class="filter-preview-hint">{{ message }}</span>
+{% elif count == 0 %}
+<span class="filter-preview-count filter-preview-empty">
+    <strong>0</strong> of {{ '{:,}'.format(current) }} cases match — applying this would empty your data.
+</span>
+{% else %}
+<span class="filter-preview-count">
+    <strong>{{ '{:,}'.format(count) }}</strong> of {{ '{:,}'.format(current) }} cases would match.
+</span>
+{% endif %}

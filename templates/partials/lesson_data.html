@@ -1,0 +1,186 @@
+{# Lesson main area (Phase 5): a READ-ONLY view of the lesson's sandbox data state,
+   driven by the current step's focus. No htmx nav and no editing — the student
+   manipulates their own data in the workbench (Statistics / Compare / Filter), while
+   this panel shows the live data the docked lesson step is talking about. The info
+   view reuses the explore markup ids so explore.js draws the distribution chart and
+   powers the value-table search/"show more". #}
+
+{% if lesson_data['kind'] == 'info' %}
+{% set info = lesson_data['info'] %}
+<article class="lesson-data" data-column="{{ lesson_data['column'] }}">
+
+    <header class="view-header">
+        <div class="view-heading">
+            <h1>{{ lesson_data['header'] }}</h1>
+            <p class="view-subtitle">Column <code>{{ lesson_data['column'] }}</code> · statistics for this lesson's data</p>
+        </div>
+    </header>
+
+    <section class="stat-grid" aria-label="Summary statistics">
+        <div class="stat-card">
+            <span class="stat-label">Cases (N)</span>
+            <span class="stat-value">{{ '{:,}'.format(info['entries']) }}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Missing</span>
+            <span class="stat-value">{{ '{:,}'.format(lesson_data['missing']) }}</span>
+            <span class="stat-note">{{ '%.1f'|format(lesson_data['missing_percent']) }}% of cases</span>
+        </div>
+        {% if info['numeric'] %}
+        <div class="stat-card">
+            <span class="stat-label">Mean</span>
+            <span class="stat-value">{{ info['mean'] }}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Median</span>
+            <span class="stat-value">{{ info['mdn'] }}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Std. deviation</span>
+            <span class="stat-value">{{ info['std'] }}</span>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if info['each'] %}
+    <section class="chart-card" aria-label="Distribution chart">
+        <h2>Distribution</h2>
+        <p class="chart-note">
+            {% if lesson_data['chart']['other'] > 0 %}
+            The {{ lesson_data['chart']['labels']|length }} most common values; the remaining
+            {{ '{:,}'.format(lesson_data['chart']['otherValues']) }} values are grouped as “Other”.
+            {% else %}
+            All {{ lesson_data['chart']['labels']|length }} values by case count.
+            {% endif %}
+            The table below carries every value.
+        </p>
+        <div class="chart-box"><canvas id="explore-chart" role="img"
+            aria-label="Bar chart of the value distribution; the values table repeats these numbers"></canvas></div>
+        <script type="application/json" id="explore-chart-data">{{ lesson_data['chart']|tojson }}</script>
+    </section>
+
+    <section aria-label="Values">
+        <div class="view-toolbar">
+            <h2 id="values-heading">Values</h2>
+            <div class="table-search js-only">
+                <label class="visually-hidden" for="value-search">Search values</label>
+                <input type="search" id="value-search" placeholder="Search values…"
+                       autocomplete="off" spellcheck="false">
+            </div>
+        </div>
+
+        <div class="table-wrapper table-scroll">
+            <table class="data-table" id="value-table" aria-labelledby="values-heading">
+                <caption class="visually-hidden">Value distribution for {{ lesson_data['header'] }}</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Value</th>
+                        <th scope="col" class="num">Cases</th>
+                        <th scope="col" class="num">Percent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in info['each'] %}
+                    <tr data-value="{{ row['value']|display_value|lower }}">
+                        <td>{{ row['value']|display_value }}</td>
+                        <td class="num">{{ '{:,}'.format(row['num']) }}</td>
+                        <td class="num">{{ '%.2f'|format(row['percent']) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="table-footer">
+            <p class="table-count" id="value-count" role="status"></p>
+            <button type="button" class="btn btn-secondary btn-sm js-only" id="value-show-more" hidden>Show more</button>
+        </div>
+    </section>
+    {% else %}
+    <div class="empty-state">
+        <h2>No values to show</h2>
+        <p>Every case in this lesson's data is missing a value for this column.</p>
+    </div>
+    {% endif %}
+
+</article>
+
+{% elif lesson_data['kind'] == 'table' %}
+{% set table = lesson_data['table'] %}
+<article class="lesson-data compare-view">
+
+    <header class="view-header">
+        <div class="view-heading">
+            <h1>{{ lesson_data['row_desc'] }} by {{ lesson_data['col_desc'] }}</h1>
+            <p class="view-subtitle">
+                {% if lesson_data['measure'] %}Statistics of <strong>{{ lesson_data['measure_desc'] }}</strong>
+                {% else %}Count of cases{% endif %}
+                per cell, computed on this lesson's data —
+                <strong>{{ '{:,}'.format(lesson_data['entries']) }}</strong> cases.</p>
+        </div>
+    </header>
+
+    {% if table['rows'] and table['cols'] %}
+    <div class="table-wrapper table-scroll crosstab-wrapper">
+        {# no data-stat: every stat renders stacked with its label (read-only, no toggle) #}
+        <table class="data-table crosstab">
+            <caption class="visually-hidden">Crosstab of {{ lesson_data['row_desc'] }} by {{ lesson_data['col_desc'] }}</caption>
+            <thead>
+                <tr>
+                    <th scope="col" class="crosstab-corner">{{ lesson_data['row_desc'] }}</th>
+                    {% for y in table['cols'] %}
+                    <th scope="col" class="num">{{ y|display_value }}</th>
+                    {% endfor %}
+                    <th scope="col" class="num crosstab-total">Total cases</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for x in table['rows'] %}
+                {% set i = loop.index0 %}
+                <tr>
+                    <th scope="row">{{ x|display_value }}</th>
+                    {% for cell in table['grid'][i] %}
+                    <td class="num cell{% if cell['heat']['n'] %} heat-{{ cell['heat']['n'] }}{% endif %}">
+                        <span class="cell-stat cell-n" {% if lesson_data['measure'] %}data-label="N"{% endif %}>{{ cell['display']['n'] }}</span>
+                        {%- if lesson_data['measure'] %}
+                        <span class="cell-stat cell-mean" data-label="Mean">{{ cell['display']['mean'] }}</span>
+                        <span class="cell-stat cell-mdn" data-label="Median">{{ cell['display']['mdn'] }}</span>
+                        <span class="cell-stat cell-std" data-label="Std">{{ cell['display']['std'] }}</span>
+                        {%- endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="num crosstab-total">{{ '{:,}'.format(table['row_totals'][i]) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th scope="row">Total cases</th>
+                    {% for t in table['col_totals'] %}
+                    <td class="num crosstab-total">{{ '{:,}'.format(t) }}</td>
+                    {% endfor %}
+                    <td class="num crosstab-total">{{ '{:,}'.format(table['total']) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    <p class="table-note">Cases missing a value in either column aren't shown — the totals
+        count the {{ '{:,}'.format(table['total']) }} cases that appear in the table.</p>
+    {% else %}
+    <div class="empty-state">
+        <h2>Nothing to cross-tabulate</h2>
+        <p>No case in this lesson's data has a value for both of these columns.</p>
+    </div>
+    {% endif %}
+
+</article>
+
+{% else %}
+{# No focus (or a focus whose columns aren't available): show the sandbox size + a nudge. #}
+<article class="lesson-data">
+    <div class="empty-state">
+        <h2>{{ '{:,}'.format(lesson_data['entries']) }} cases in view</h2>
+        <p>This step doesn't pin a specific table or column. Read the lesson on the right, and
+           use the Statistics, Compare, and Filter tools in your own tab to explore.</p>
+    </div>
+</article>
+{% endif %}
