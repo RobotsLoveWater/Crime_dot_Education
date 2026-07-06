@@ -5,6 +5,9 @@
 cache/
 user/
 
+# Educator portal: classes (rosters tie to real students, like user/)
+classes/
+
 # uv migration Phase 0 reference freeze (throwaway snapshot, not a source of truth)
 requirements.lock.txt
 

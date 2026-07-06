@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block title %} — Join a class{% endblock %}
+
+{% block body %}
+
+<div class="auth">
+    <div class="auth-card">
+        <h1 class="auth-title">Join a class</h1>
+        <p class="auth-sub">Enter the join code your teacher gave you.</p>
+
+        {% if errors %}
+        <div class="alert alert-danger" role="alert">
+            {% for e in errors %}<p>{{ e }}</p>{% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" class="auth-form">
+            <div class="field">
+                <label for="classcode">Join code</label>
+                <input type="text" id="classcode" name="classcode" value="{{ request.form.classcode }}"
+                       autocomplete="off" autocapitalize="characters" spellcheck="false" required autofocus>
+                <p class="field-hint">A short code like <code>K7F2QP</code>. Not case-sensitive.</p>
+            </div>
+            <button type="submit" class="btn btn-primary">Join class</button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

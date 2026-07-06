@@ -16,7 +16,8 @@ NO_CLASS_CODE = 'unmanaged'
 
 # classcode convention: signing up with a classcode like 'edu-smith' grants educator
 # (authoring) rights, scoped to that classcode. This is a convenience convention, NOT a
-# security boundary -- the app has no real authentication (see CLAUDE.md known issues).
+# security boundary -- anyone can self-select an 'edu-' classcode at signup (the planned
+# class-code system in EDUCATOR_PORTAL.md replaces this).
 EDUCATOR_CLASSCODE_PREFIX = 'edu-'
 
 
@@ -77,7 +78,7 @@ def retrieve(userid) -> dict:
         raise FileNotFoundError
 
 
-def create(username, classcode, password, overwrite=False) -> dict:
+def create(username, classcode, password, overwrite=False, classes=None) -> dict:
 
     # set as unmanaged if no classcode was used
     classcode = clean_classcode(classcode)
@@ -97,10 +98,33 @@ def create(username, classcode, password, overwrite=False) -> dict:
         'history': [{'desc': 'Loaded complete Minnesota felony sentencing data for 2001 to 2019', 'action': None}],
         'saved': [],
         'progress': {},
+        # class memberships for the educator portal (feature 3): the class_id(s) a student has
+        # joined. Empty for public/'edu-' accounts. Read defensively elsewhere (user.get('classes', []))
+        # so pre-portal pickles without this key stay valid.
+        'classes': list(classes) if classes else [],
         'is_educator': is_educator_classcode(classcode)
     }
 
     if not os.path.exists('user/' + classcode): os.mkdir('user/' + classcode)  # create directory if needed
+
+    with open(get_user_directory(userid), 'wb') as handle:
+        pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    return user
+
+
+def add_class(userid, class_id) -> dict:
+
+    # record a class membership on an existing account (the logged-in "Join a class" flow).
+    # Unlike signup enrollment, this does NOT re-namespace the account -- the pickle stays under
+    # its original classcode; only the 'classes' list grows. The class roster is updated
+    # separately by classroom.enroll (the route keeps the two in sync). Idempotent.
+    user = retrieve(userid)
+
+    classes = user.get('classes', [])  # defensive: pre-portal accounts have no 'classes' key
+    if class_id not in classes:
+        classes.append(class_id)
+    user['classes'] = classes
 
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)

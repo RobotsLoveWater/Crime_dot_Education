@@ -19,6 +19,7 @@ from flask import Response
 
 from markupsafe import Markup, escape
 
+import os
 import html
 import re
 import json
@@ -31,6 +32,7 @@ import util
 import make_history
 import moc
 import account
+import classroom
 import lessons
 
 from data import Data
@@ -40,8 +42,19 @@ from cache import get_data, get_moc_options, _execute, history_text_to_item
 # create the app
 app = Flask(__name__)
 
-# DEVELOPMENT ONLY - this is the secret key
-app.secret_key = b'YVjOnAn6NmJ7eHEOPH9RMGAizZRoZsMrbvyHkZaIVMMX71NdS8wRdvJPFe7GEzNwQ6oCELKLmeQUDLeUZk92ooUKKtyNcVBzsnbK'
+# session signing key. In production set the SECRET_KEY environment variable; the
+# fallback below is a clearly-marked development-only key. Because the fallback is
+# committed to a public repo it provides no security, and any deployment without a
+# stable SECRET_KEY will not keep sessions valid across machines (or across restarts
+# if you swap the fallback for a random value).
+app.secret_key = os.environ.get('SECRET_KEY')
+if not app.secret_key:
+    app.secret_key = 'INSECURE-dev-only-secret-key--set-the-SECRET_KEY-environment-variable'
+    app.logger.warning(
+        'SECRET_KEY environment variable is not set - falling back to the INSECURE '
+        'development-only key. Do not run this way in production: sessions are forgeable, '
+        'and they will not be portable across machines without a stable SECRET_KEY.'
+    )
 
 # codes starts empty
 codes = ['']
@@ -233,44 +246,115 @@ def guide():
 
     return render_template('guide.html', user=user)
 
+# ---------------------------------------------------------------------------
+# Signup / login "code" box resolution (educator portal, Phase 2)
+# ---------------------------------------------------------------------------
+
+def resolve_class_code(raw_code):
+    # The single "class code" field on /new and /login is overloaded; resolve it once, the same
+    # way for both routes, so they can never disagree on what a code means. Returns a dict:
+    #   'kind'      -- 'public' | 'educator' | 'class' | 'unknown'
+    #   'classcode' -- the namespace an account lives under (unmanaged / edu-* / class_id / typed)
+    #   'class_obj' -- the resolved class dict when kind == 'class', else None
+    #
+    #   blank      -> public / 'unmanaged'  (unchanged historical behavior)
+    #   edu-*      -> educator account       (unchanged; is_educator=True at create)
+    #   join code  -> student enrollment; the namespace is the immutable class_id
+    #   else       -> 'unknown': /new rejects it ("no class found"); /login treats it as the
+    #                 typed classcode, so pre-portal bare-directory accounts still authenticate.
+    code = (raw_code or '').strip()
+
+    if code == '':
+        return {'kind': 'public', 'classcode': account.NO_CLASS_CODE, 'class_obj': None}
+
+    # keep the historical html.escape on any stored classcode (edu-/legacy). Valid edu- and join
+    # codes carry no HTML-special characters, so this never alters a real code.
+    escaped = html.escape(code)
+
+    if account.is_educator_classcode(escaped):
+        return {'kind': 'educator', 'classcode': escaped, 'class_obj': None}
+
+    # case-insensitive, skips archived classes, returns None on no match
+    class_obj = classroom.find_by_join_code(code)
+    if class_obj is not None:
+        return {'kind': 'class', 'classcode': class_obj['class_id'], 'class_obj': class_obj}
+
+    return {'kind': 'unknown', 'classcode': escaped, 'class_obj': None}
+
+
+def email_policy_message(class_obj):
+    # user-facing rejection copy when a class requires an allowed-domain email username (feature 3)
+    policy = class_obj.get('email_policy', {})
+    domains = [d.strip().lstrip('@') for d in policy.get('domains', [])
+               if isinstance(d, str) and d.strip()]
+    if domains:
+        pretty = ' or '.join('@' + d for d in domains)
+        return ('This class requires your username to be a school email address ending in '
+                + pretty + '.')
+    return 'This class requires your username to be a valid email address.'
+
+
 # account creation page
 @app.route("/new", methods=['GET', 'POST'])
 def new():
-    error = None
+    errors = None
 
     if request.method == 'POST':
 
-        sanitized_form = {
-            'password': html.escape(request.form['password']),
-            'username': html.escape(request.form['username']),
-            'classcode': html.escape(request.form['classcode'])
-        }
+        # the password MUST go through util.normalize_password — the same helper /login verifies
+        # with — so create and verify can never drift (see util.py)
+        password = util.normalize_password(request.form['password'])
+        username = html.escape(request.form['username'])
 
-        # if this user does not exist, create
-        if sanitized_form['username'] not in account.get_user_list(sanitized_form['classcode']):
+        # resolve the overloaded "code" box: public / educator / class enrollment / error
+        resolution = resolve_class_code(request.form['classcode'])
 
-            # deal with the password
-            hashed_password = util.get_hashed_password(sanitized_form['password'])
+        # a non-blank, non-edu code matching no live class creates nothing (the old behavior
+        # silently spun up a stray user/<code>/ directory — that is what this replaces)
+        if resolution['kind'] == 'unknown':
+            errors = ['No class found with that code. Leave the code blank to join the public '
+                      'group, or check the join code with your teacher.']
+            return render_template('new.html', errors=errors)
 
-            # generate the new user account
-            new_user = account.create(sanitized_form['username'], sanitized_form['classcode'],  hashed_password)
+        # email-domain policy (feature 3) is a join-time check — enforce before creating anything
+        if resolution['kind'] == 'class' and not classroom.email_allowed(
+                resolution['class_obj'].get('email_policy', {}), username):
+            return render_template('new.html', errors=[email_policy_message(resolution['class_obj'])])
 
-            # sign them in — set all three session keys (userid + username/classcode), matching
-            # /login. (Previously only 'userid' was set, so the shell had no username/classcode.)
-            session['username'] = new_user['username']
-            session['classcode'] = new_user['classcode']
-            session['userid'] = new_user['userid']
+        classcode = resolution['classcode']
 
-            # send them home (which drops into the workbench for a logged-in user)
-            return redirect(url_for('index'))
+        # the already-exists check runs against the RESOLVED namespace (the class_id for a class)
+        if username in account.get_user_list(classcode):
+            errortext = 'A user by the name ' + username + ' already exists'
+            if resolution['kind'] == 'class':
+                errortext += ' in ' + resolution['class_obj']['name']
+            elif classcode != account.NO_CLASS_CODE:
+                errortext += ' in class ' + classcode
+            return render_template('new.html', errors=[errortext])
 
-        # user already exists, let them know
+        hashed_password = util.get_hashed_password(password)
+
+        if resolution['kind'] == 'class':
+            # student enrollment: the account is namespaced under the immutable class_id, its
+            # membership is recorded on the pickle, and it is added to the class roster. Role
+            # stays student (is_educator=False — a class_id never carries the edu- prefix). The
+            # roster write and the 'classes' key are set together here so they cannot drift.
+            class_id = resolution['class_obj']['class_id']
+            new_user = account.create(username, class_id, hashed_password, classes=[class_id])
+            classroom.enroll(class_id, new_user['userid'])
         else:
-            errortext = 'A user by the name ' + sanitized_form['username'] + ' already exists'
-            if sanitized_form['classcode']: errortext += ' in class ' + sanitized_form['classcode']
-            error = [errortext]
+            # public ('unmanaged') or educator ('edu-*') — unchanged
+            new_user = account.create(username, classcode, hashed_password)
 
-    return render_template('new.html', errors=error)
+        # sign them in — set all three session keys (userid + username/classcode), matching /login
+        session['username'] = new_user['username']
+        session['classcode'] = new_user['classcode']
+        session['userid'] = new_user['userid']
+
+        # send them home (which drops into the workbench for a logged-in user)
+        return redirect(url_for('index'))
+
+    return render_template('new.html', errors=errors)
 
 
 # login page
@@ -280,35 +364,79 @@ def login():
 
     if request.method == 'POST':
 
-        sanitized_form = {
-            'password': html.escape(request.form['password']),
-            'username': html.escape(request.form['username']),
-            'classcode': html.escape(request.form['classcode'])
-        }
+        # the password MUST go through util.normalize_password — the same helper /new hashes
+        # with — or every stored hash would mismatch (see util.py)
+        password = util.normalize_password(request.form['password'])
+        username = html.escape(request.form['username'])
 
-
-        if sanitized_form['username'] == '':
+        if username == '':
             error = ['No username entered']
 
         else:
 
-            if sanitized_form['username'] not in account.get_user_list(sanitized_form['classcode']):
-                errortext = 'A user by the name ' + sanitized_form['username'] + ' does not exist'
-                if sanitized_form['classcode']: errortext += ' in class ' + sanitized_form['classcode']
-                error = [errortext]
+            # one generic message for BOTH unknown-username and wrong-password, so the
+            # login form can't be used to enumerate which usernames exist in a class
+            bad_credentials = ['Username or password is incorrect.']
+
+            # resolve the code box the SAME way /new does, so a student who enrolled with a join
+            # code signs in with that same code (it maps back to their class_id namespace). Legacy
+            # accounts under a bare classcode still resolve via the 'unknown' branch (classcode =
+            # the typed code), so Phase 0 login behavior is unchanged for them.
+            classcode = resolve_class_code(request.form['classcode'])['classcode']
+
+            if username not in account.get_user_list(classcode):
+                error = bad_credentials
 
             else:
 
-                # NOTE: the password is NOT verified — util.check_password is wired to
-                # nothing. This is a known issue tracked for its own branch (see CLAUDE.md);
-                # Phase 6 deliberately does not fix auth, only the account/login UX.
-                session['username'] = sanitized_form['username']
-                session['classcode'] = sanitized_form['classcode']
-                session['userid'] = account.form_userid(session['username'], session['classcode'])
+                user = account.retrieve(account.form_userid(username, classcode))
 
-                return redirect(url_for('index'))
+                if util.check_password(password, user['password']):
+
+                    # sign them in from the stored account (classcode already cleaned to
+                    # 'unmanaged' when blank), matching what /new stores in the session
+                    session['username'] = user['username']
+                    session['classcode'] = user['classcode']
+                    session['userid'] = user['userid']
+
+                    return redirect(url_for('index'))
+
+                else:
+                    error = bad_credentials
 
     return render_template('login.html', errors=error)
+
+
+@app.route("/join", methods=['GET', 'POST'])
+def join():
+    # Optional logged-in "Join a class" flow: an existing account enrolls in a class by its join
+    # code. Unlike signup enrollment, this does NOT re-namespace the account — the pickle stays
+    # under its original classcode; only the class roster and the account's 'classes' list grow
+    # (updated together so they cannot drift). The email-domain policy still applies at join time.
+    if not is_logged_in():
+        return not_logged_in()
+
+    user = account.retrieve(session['userid'])
+    errors = None
+
+    if request.method == 'POST':
+        class_obj = classroom.find_by_join_code(request.form.get('classcode', ''))
+
+        if class_obj is None:
+            errors = ['No class found with that code. Check the join code with your teacher.']
+        elif not classroom.email_allowed(class_obj.get('email_policy', {}), user['username']):
+            errors = [email_policy_message(class_obj)]
+        elif class_obj['class_id'] in user.get('classes', []):
+            flash("You're already in " + class_obj['name'] + '.', 'info')
+            return redirect(url_for('explore'))
+        else:
+            class_id = class_obj['class_id']
+            classroom.enroll(class_id, user['userid'])
+            account.add_class(user['userid'], class_id)
+            flash('You joined ' + class_obj['name'] + '.', 'success')
+            return redirect(url_for('explore'))
+
+    return render_template('join.html', user=user, errors=errors)
 
 
 @app.route("/logout")

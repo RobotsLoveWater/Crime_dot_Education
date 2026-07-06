@@ -78,7 +78,7 @@ uv run flask --app app run     # add --debug for reload
 | `lessons.py` | Learning-modules loader/validator: `list_modules`, `get_module`, `validate`, `save_module` over `lessons/*.json`. Pure stdlib module (no Flask), mirrors `account.py`. |
 | `make_history.py` | Builds history entry dicts (`action` list + human-readable `desc`). |
 | `moc.py` | `MnOffenseCodes.CODES` — a huge (~1800-line) nested dict decoding the Minnesota Offense Code. Pure data + structure. |
-| `util.py` | `ordinal()` and bcrypt `get_hashed_password` / `check_password`. (Header comment is wrong — says `make_history.py`.) |
+| `util.py` | `ordinal()`, bcrypt `get_hashed_password` / `check_password`, and `normalize_password` — the single pre-hash/pre-verify normalization (`html.escape`, kept for hash compatibility; **don't change it without a migration**). |
 | `codebook.xml` | Maps dataset column names → human descriptions; each entry also carries a `group` attribute placing the column in an explore column-browser category (display order in `Data.GROUP_ORDER`). Loaded by `Data.__init__` (descriptions → `self.codebook`, groups → `self.groups`). Some entry names don't match real dataset columns (see gotchas). |
 | `settings.xml` | seaborn palette/style (`deep` / `darkgrid`). Not heavily used yet. |
 | `test.py` | Ad-hoc scratch script for the history→cache-key encoding. Not a real test suite. |
@@ -220,7 +220,7 @@ view. `hx_toast()` sets the `HX-Trigger` header for htmx-response toasts (used f
 - `float64` columns coerce filter values to float so `16 == 16.0`. Numeric-only comparisons (`gt/ge/lt/le`) are validated against `float()` in the boolean-filter route.
 - Rounding idiom throughout `data.py`: `round(x * 10**precision) / 10**precision`.
 - Cache-path bug guard: trailing `/` is stripped in `get_data` before appending `_data.bin`.
-- Header comments in `cache.py` and `util.py` are copy-paste-wrong (say `precache.py` / `make_history.py`). Filenames in the table above are authoritative.
+- The header comment in `cache.py` is copy-paste-wrong (says `precache.py`; `util.py`'s was fixed in educator-portal Phase 0). Filenames in the table above are authoritative.
 - **Codebook/dataset name mismatches:** `codebook.xml` documents `saytlnth`, `FindRestOnly`,
   `subscspred` but the dataset columns are `staylnth`, `FineRestOnly`, `subcscpred` (and
   `ethnic`, `sentord`, `fine`, `mocwpn`, `weapon`, `post802`, `Raceorig`, `prescon`, `dconv`,
@@ -237,18 +237,23 @@ view. `hx_toast()` sets the `HX-Trigger` header for htmx-response toasts (used f
 
 ## Known issues / incomplete (don't assume these work)
 
-- **Login does not verify the password.** `util.check_password` exists but is never called;
-  `/login` only checks that the username exists, then creates a session. Treat auth as insecure.
-  **Scheduled to be fixed** in `EDUCATOR_PORTAL_PROMPTS.md` Phase 0 (mind the `html.escape`
-  normalization — `/new` hashes `html.escape(password)`, so verify must match it).
-- **Hardcoded Flask `secret_key`** in `app.py` (marked "DEVELOPMENT ONLY"). The repo is a
-  **public** GitHub repo — do not treat this key as secret; rotate + move to env var if productionizing.
-  **Scheduled** in `EDUCATOR_PORTAL_PROMPTS.md` Phase 0 (`secret_key` → environment config).
+- ~~**Login does not verify the password.**~~ **Fixed in educator-portal Phase 0.** `/login`
+  now verifies with `util.check_password`; both `/new` and `/login` run the password through
+  the single `util.normalize_password` helper, which preserves the historical `html.escape`
+  normalization — **changing it invalidates every stored hash** (needs a migration; see the
+  loud comment in `util.py`). Unknown username and wrong password produce the same generic
+  "Username or password is incorrect." message, so `/login` can't be used to enumerate users
+  (the existence check on `/new` still discloses, by design). On success, all three session
+  keys are set from the stored account (classcode already cleaned to `unmanaged` when blank).
+- ~~**Hardcoded Flask `secret_key`**~~ **Fixed in educator-portal Phase 0.** `app.py` now reads
+  `SECRET_KEY` from the environment; when unset it falls back to a clearly-marked insecure dev
+  key and logs a startup warning (on the fallback, sessions are forgeable and not portable
+  across machines). The old literal key shipped in this **public** repo — never reuse it.
 - **Account create/login existence checks — fixed.** `get_user_list` now returns bare usernames
   (it used to return `.pickle`-suffixed filenames, so `/new` never detected duplicates — it fell
   through to `create` and crashed — and `/login` rejected every existing user); and
   `account.create` now returns `retrieve(userid)` (was `retrieve(username)`) on the already-exists
-  path. Login still does **not** verify the password (see above).
+  path.
 - ~~`/new` sets `session['userid']` but not `session['username']`/`session['classcode']`.~~
   **Fixed in Phase 6** — `/new` now sets all three (from the created account), matching `/login`.
 - Stubbed/`pass`-only: `Data.filter_and`, `filter_or_diff` (partial), `make_history.filter_or_diff`, `filter_and`, `moc_or`; the `d` and `a` action codes are not handled by `_execute` (raise `ValueError`).
@@ -415,7 +420,8 @@ scope** (separate branch — see the prompts doc's Appendix C).
 
 ## Planned: Educator portal + class-code system (`educator-portal` branch)
 
-Planned next initiative (scoped with the author, 2026-07) — **not yet built**. Turns the thin
+Planned next initiative (scoped with the author, 2026-07) — **Phase 0 (auth hardening) is
+done; the portal itself is not yet built**. Turns the thin
 `edu-` classcode convention into a real portal and class-code system, and hardens auth (the
 portal exposes cross-account student data).
 
@@ -434,9 +440,10 @@ portal exposes cross-account student data).
   item-level analytics (a new append-only attempt log per student), gradebook CSV export,
   shareable data-state links, computed answer keys, retake/feedback policy, per-module teaching
   notes.
-- **Auth hardening** (Phase 0, prerequisite): wire `util.check_password` into `/login` (minding
-  the `html.escape` normalization so existing hashes still match) and move `secret_key` to
-  environment config — fixing the two auth items in "Known issues" above.
+- **Auth hardening** (Phase 0, prerequisite — **done**): `util.check_password` is wired into
+  `/login` via the shared `util.normalize_password` helper (preserving the `html.escape`
+  normalization so existing hashes still match) and `secret_key` reads from the `SECRET_KEY`
+  environment variable — the two auth items in "Known issues" above are struck through.
 
 **Scope:** auth + P0 (features 1–6) + P1 (features 7–12) from `EDUCATOR_PORTAL.md`; P2 deferred.
 

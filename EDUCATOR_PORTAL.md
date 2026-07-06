@@ -59,6 +59,13 @@ get *validated*:
 
 A logged-in student may also join from a "Join a class" action (same lookup).
 
+**Login resolves the same code box.** `/login` runs the typed code through the identical
+resolver so a student who enrolled with a join code signs in with that same code (it maps back
+to their immutable `class_id` namespace). Legacy/bare-directory and `edu-`/blank accounts are
+untouched — a code matching no live class falls through to being treated as the typed classcode,
+exactly as before. (Because join codes are rotatable, a returning student uses the class's
+*current* code; a rotated code invalidates the old one for fresh logins, not the enrollment.)
+
 **Authorization.** A `require_class_owner(class_id)` guard beside `require_educator()` — an
 educator may only view or edit classes they own (load-bearing once auth is real; see Privacy).
 
