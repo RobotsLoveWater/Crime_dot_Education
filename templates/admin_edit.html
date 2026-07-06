@@ -1,10 +1,7 @@
 {% extends "layout.html" %}
-{% block head %}
-<title>Minnesota Sentencing Explorer - {% if editing %}Edit{% else %}New{% endif %} module</title>
-{% endblock %}
+{% block title %} — {% if editing %}Edit{% else %}New{% endif %} module{% endblock %}
 
 {% block body %}
-<body>
 
     <div class="container">
         <p><a href="/admin">&larr; Authoring</a></p>
@@ -32,5 +29,4 @@
         </form>
     </div>
 
-</body>
 {% endblock %}

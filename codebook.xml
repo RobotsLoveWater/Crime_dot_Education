@@ -1,162 +1,171 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<codes>
-  <sentyear>Year Sentenced</sentyear>
-  <county>County Sentenced</county>
-  <dcnum>District Court Case Number</dcnum>
-  <count>Count Number</count>
-  <sentord>Sentencing Order</sentord>
-  <sex>Offender Sex</sex>
-  <race>Offender Race</race>
-  <ethnic>Offender Ethnicity</ethnic>
-  <statute>MN Statute</statute>
-  <offtype>General Offense Type</offtype>
-  <Offense>Offense Title - Coded</Offense>
-  <doff>Date of Offense</doff>
-  <severity>Severity Level</severity>
-  <statmax>Statutory Maximum</statmax>
-  <attempt>Attempt?</attempt>
-  <conspir>Conspiracy?</conspir>
-  <dngwpn>Dangerous Weapon</dngwpn>
-  <subwpn>Subsequent Weapon Offense?</subwpn>
-  <subsex>Subsequent Sex Offense?</subsex>
-  <subdrug>Subsequent Drug Offense?</subdrug>
-  <subdwi>Subsequent DWI?</subdwi>
-  <subfailr>Subsequent Fail to Register as Predatory Offender?</subfailr>
-  <Subburg>First Degree Burglary of Occupied Dwelling With Prior Burglary?</Subburg>
-  <soljuv>Solicit Juvenile?</soljuv>
-  <solmimp>Solicit Mentally Impaired?</solmimp>
-  <gangrel>Gang Related?</gangrel>
-  <gangrel18>Gang Related - Victim Under 18?</gangrel18>
-  <typecust>Type of Custody</typecust>
-  <cust>Custody Points</cust>
-  <tajud>Juvenile Points</tajud>
-  <tgross>Misdemeanor / Gross Misdemeanor Points</tgross>
-  <tweight>Total Felony Weight</tweight>
-  <histall>Total History</histall>
-  <history>Total History (6 though high=6)</history>
-  <countajd>Number of Juvenile Priors on WS</countajd>
-  <countmis>Number of Misdemeanor / Gross Misdemeanor priors on WS</countmis>
-  <countfel>Number of Felony Priors on WS</countfel>
-  <tfelony>Felony Points</tfelony>
-  <presumpt>Recommended Disposition</presumpt>
-  <time>Presumptive Sentence - Months</time>
-  <Mintime>Time Lower Range</Mintime>
-  <Maxtime>Time Upper Range</Maxtime>
-  <prescon>Presumptive Consecutive</prescon>
-  <dconv>Date of Conviction</dconv>
-  <countoff>Number of Current Offenses on WS</countoff>
-  <recodeh>Recorded History</recodeh>
-  <dsent>Date of Sentence</dsent>
-  <plea>Plea Entered?</plea>
-  <schap>Statute Chapter</schap>
-  <ssection>Statute Section</ssection>
-  <ssubd>Statute Subdivision</ssubd>
-  <moc>MN Offense Code</moc>
-  <prison>Executed Prison Sentence?</prison>
-  <confine>Pronounced Confinement - Months</confine>
-  <stayexec>Stay of Execution?</stayexec>
-  <impose>Stay of Imposition?</impose>
-  <saytlnth>Length of Stay - Months</saytlnth>
-  <lifer>Received Life Sentence?</lifer>
-  <jail>Jail as a Condition of Probation?</jail>
-  <totinc>Total Incarceration</totinc>
-  <inctype>Incarceration Type</inctype>
-  <condconf>Pronounced Conditional Confinement - Days</condconf>
-  <typeprob>Type of Probation</typeprob>
-  <cnscurnt>Consecutive to Other Offense Same Case Number</cnscurnt>
-  <cnsprior>Consecutive Offense Other Case Number</cnsprior>
-  <consec>Consecutive Sentence?</consec>
-  <aggsentc>Aggregated Sentence - Months</aggsentc>
-  <fine>Fine Amount</fine>
-  <dispdep>Dispositional Departure?</dispdep>
-  <durdep>Durational Departure?</durdep>
-  <cnsdep>Departure From Consecutive Policy</cnsdep>
-  <reason1>Departure Reason 1</reason1>
-  <preason1>Plea Reason 1</preason1>
-  <pper>Number Person Priors (No Criminal Sex>)</pper>
-  <tpper>Number True Person Priors (No Criminal Sex)</tpper>
-  <pprp>Number Property Priors</pprp>
-  <tpprp>Number True Property Priors</tpprp>
-  <pdrg>Number Drug Priors</pdrg>
-  <tpdrg>Number True Drug Priors</tpdrg>
-  <poth>Number Other Priors</poth>
-  <tpoth>Number True Other Priors</tpoth>
-  <psex>Number Criminal Sex Priors</psex>
-  <tpsex>Number True Criminal Sex Priors</tpsex>
-  <moc1>MN Offense Code 1st Column</moc1>
-  <moc2>MN Offense Code 2nd Column</moc2>
-  <moc3>MN Offense Code 3rd Column</moc3>
-  <moc4>MN Offense Code 4th Column</moc4>
-  <moc5>MN Offense Code 5th Column</moc5>
-  <totprior>Total Number of Priors</totprior>
-  <truprior>Total Number of True Priors</truprior>
-  <ageoff>Age at Offense</ageoff>
-  <agesent>Age at Sentence</agesent>
-  <AgeStatus>Adult or Juvenile?</AgeStatus>
-  <Agecat>Age Category (At Time of Offense)</Agecat>
-  <Agecat2>Age Category 2 (At Time of Offense)</Agecat2>
-  <race2>Race - Three Categories</race2>
-  <Raceorig>Race as on Worksheet, No Hispanic</Raceorig>
-  <dateoff>Date of Offense - Coded Month</dateoff>
-  <datecon>Date of Conviction - Coded Month</datecon>
-  <datesent>Date Sentenced - Coded Month</datesent>
-  <doffense>Offense Date - Lillian Date</doffense>
-  <dconvict>Conviction Date - Lillian Date</dconvict>
-  <dsentenc>Sentence Date - Lillian Date</dsentenc>
-  <region>Region Within MN</region>
-  <district>MN Judicial District</district>
-  <patsex>Patterned Sex Offender?</patsex>
-  <career>Career Offender?</career>
-  <danger>Dangerous Offender?</danger>
-  <sexoff>Type of Criminal Sexual Conduct Offense</sexoff>
-  <mocwpn>MN Offense Code Weapon</mocwpn>
-  <weapon>Dangerous Weapon Variable or MN Offense Code</weapon>
-  <deptype>Departure Type</deptype>
-  <dep>Departure?</dep>
-  <reas>Departure Reasons Received?</reas>
-  <pagree>Prosecutor Agreement?</pagree>
-  <request>Request Prison Sentence?</request>
-  <ejjrev>Extended Jurisdiction Juvenile Revocation?</ejjrev>
-  <condrel>Conditional Release Mandated?</condrel>
-  <condrelperiod>Conditional Release Period</condrelperiod>
-  <presumptlife>Presumptive Life?</presumptlife>
-  <presumptlifeid>Presumptive Life Category</presumptlifeid>
-  <lifeminmonths>Life Minimum Months</lifeminmonths>
-  <post802>After August 2002?</post802>
-  <aidoff>Aiding Offender - Modifier</aidoff>
-  <terrorism>For Furtherance of Terrorism - Modifier</terrorism>
-  <cscpred>Criminal Sexual Conduct Predatory - Modifier</cscpred>
-  <subscspred>Subsequent Criminal Sexual Conduct Predatory - Modifier</subscspred>
-  <sextrafficking>Aggravating Factors Under MN Statute 609.322 sub. 1(b)</sextrafficking>
-  <PermConsec>Eligible for Permissive Consecutive Sentencing?</PermConsec>
-  <Sexgrid>Offense on Sex Offender Grid</Sexgrid>
-  <EligSexg>Eligible for Sentencing on Sex Offender Grid?</EligSexg>
-  <EligGrid05>Eligible for Expanded Ranges Effective 8-1-05?</EligGrid05>
-  <druggrid>Offense on Drug Offender Grid</druggrid>
-  <Eligdruggrid>Eligible for Sentencing on Drug Offender Grid?</Eligdruggrid>
-  <Grid>Applicable Sentencing Grid</Grid>
-  <FindRestOnly>Fine or Restitution Only?</FindRestOnly>
-  <offtype2>Offense Type 2</offtype2>
-  <offtype3>Offense Type 3</offtype3>
-  <penaltystat>Penalty Statute</penaltystat>
-  <convstat>Conviction Statute</convstat>
-  <Offense_Title>Offense Title</Offense_Title>
-  <cell>Cell on Grid - Coded ID</cell>
-  <abovblow>Above or Below Disposition Line on Grid?</abovblow>
-  <celltime>Time on Grid - Months</celltime>
-  <sexgridcell>Cell on Sex Grid - Coded ID</sexgridcell>
-  <sexgridabove>Above or Below Disposition Line - Sex Grid?</sexgridabove>
-  <sexgridcelltime>Time on Sex Grid - Months</sexgridcelltime>
-  <druggridcell>Cell on Drug Grid</druggridcell>
-  <druggridabove>Above or Below Disposition Line - Drug Grid?</druggridabove>
-  <druggridcelltime>Time on Drug Grid - Months</druggridcelltime>
+<!--
+  Column descriptions for the sentencing dataset, parsed by Data.__init__ (data.py).
+  Each entry: <column_code group="...">Human-readable description</column_code>
 
-  <lname>Offender Last Name</lname>
-  <fname>Offender First Name</fname>
-  <mname>Offender Middle Name</mname>
-  <reason2>Departure Reason 2</reason2>
-  <reason3>Departure Reason 3</reason3>
-  <reason4>Departure Reason 4</reason4>
-  <preason2>Plea Reason 2</preason2>
-  <preason2>Plea Reason 3</preason2>
+  The group attribute assigns the column to a category in the explore workbench's
+  column browser. Group names are display text; their order comes from
+  Data.GROUP_ORDER in data.py. Entries without a group fall into "Other".
+  Draft taxonomy pending author review - see UI_OVERHAUL_PROMPTS.md Appendix C.
+-->
+<codes>
+  <sentyear group="Dates">Year Sentenced</sentyear>
+  <county group="Court &amp; process">County Sentenced</county>
+  <dcnum group="Identifiers">District Court Case Number</dcnum>
+  <count group="Court &amp; process">Count Number</count>
+  <sentord group="Court &amp; process">Sentencing Order</sentord>
+  <sex group="Demographics">Offender Sex</sex>
+  <race group="Demographics">Offender Race</race>
+  <ethnic group="Demographics">Offender Ethnicity</ethnic>
+  <statute group="Offense">MN Statute</statute>
+  <offtype group="Offense">General Offense Type</offtype>
+  <Offense group="Offense">Offense Title - Coded</Offense>
+  <doff group="Dates">Date of Offense</doff>
+  <severity group="Offense">Severity Level</severity>
+  <statmax group="Offense">Statutory Maximum</statmax>
+  <attempt group="Offense">Attempt?</attempt>
+  <conspir group="Offense">Conspiracy?</conspir>
+  <dngwpn group="Offense">Dangerous Weapon</dngwpn>
+  <subwpn group="Offense">Subsequent Weapon Offense?</subwpn>
+  <subsex group="Offense">Subsequent Sex Offense?</subsex>
+  <subdrug group="Offense">Subsequent Drug Offense?</subdrug>
+  <subdwi group="Offense">Subsequent DWI?</subdwi>
+  <subfailr group="Offense">Subsequent Fail to Register as Predatory Offender?</subfailr>
+  <Subburg group="Offense">First Degree Burglary of Occupied Dwelling With Prior Burglary?</Subburg>
+  <soljuv group="Offense">Solicit Juvenile?</soljuv>
+  <solmimp group="Offense">Solicit Mentally Impaired?</solmimp>
+  <gangrel group="Offense">Gang Related?</gangrel>
+  <gangrel18 group="Offense">Gang Related - Victim Under 18?</gangrel18>
+  <typecust group="Criminal history">Type of Custody</typecust>
+  <cust group="Criminal history">Custody Points</cust>
+  <tajud group="Criminal history">Juvenile Points</tajud>
+  <tgross group="Criminal history">Misdemeanor / Gross Misdemeanor Points</tgross>
+  <tweight group="Criminal history">Total Felony Weight</tweight>
+  <histall group="Criminal history">Total History</histall>
+  <history group="Criminal history">Total History (6 though high=6)</history>
+  <countajd group="Criminal history">Number of Juvenile Priors on WS</countajd>
+  <countmis group="Criminal history">Number of Misdemeanor / Gross Misdemeanor priors on WS</countmis>
+  <countfel group="Criminal history">Number of Felony Priors on WS</countfel>
+  <tfelony group="Criminal history">Felony Points</tfelony>
+  <presumpt group="Sentence">Recommended Disposition</presumpt>
+  <time group="Sentence">Presumptive Sentence - Months</time>
+  <Mintime group="Sentence">Time Lower Range</Mintime>
+  <Maxtime group="Sentence">Time Upper Range</Maxtime>
+  <prescon group="Sentence">Presumptive Consecutive</prescon>
+  <dconv group="Dates">Date of Conviction</dconv>
+  <countoff group="Offense">Number of Current Offenses on WS</countoff>
+  <recodeh group="Criminal history">Recorded History</recodeh>
+  <dsent group="Dates">Date of Sentence</dsent>
+  <plea group="Court &amp; process">Plea Entered?</plea>
+  <schap group="Offense">Statute Chapter</schap>
+  <ssection group="Offense">Statute Section</ssection>
+  <ssubd group="Offense">Statute Subdivision</ssubd>
+  <moc group="Offense">MN Offense Code</moc>
+  <prison group="Sentence">Executed Prison Sentence?</prison>
+  <confine group="Sentence">Pronounced Confinement - Months</confine>
+  <stayexec group="Sentence">Stay of Execution?</stayexec>
+  <impose group="Sentence">Stay of Imposition?</impose>
+  <saytlnth group="Sentence">Length of Stay - Months</saytlnth>
+  <lifer group="Sentence">Received Life Sentence?</lifer>
+  <jail group="Sentence">Jail as a Condition of Probation?</jail>
+  <totinc group="Sentence">Total Incarceration</totinc>
+  <inctype group="Sentence">Incarceration Type</inctype>
+  <condconf group="Sentence">Pronounced Conditional Confinement - Days</condconf>
+  <typeprob group="Sentence">Type of Probation</typeprob>
+  <cnscurnt group="Sentence">Consecutive to Other Offense Same Case Number</cnscurnt>
+  <cnsprior group="Sentence">Consecutive Offense Other Case Number</cnsprior>
+  <consec group="Sentence">Consecutive Sentence?</consec>
+  <aggsentc group="Sentence">Aggregated Sentence - Months</aggsentc>
+  <fine group="Sentence">Fine Amount</fine>
+  <dispdep group="Departures &amp; reasons">Dispositional Departure?</dispdep>
+  <durdep group="Departures &amp; reasons">Durational Departure?</durdep>
+  <cnsdep group="Departures &amp; reasons">Departure From Consecutive Policy</cnsdep>
+  <reason1 group="Departures &amp; reasons">Departure Reason 1</reason1>
+  <preason1 group="Departures &amp; reasons">Plea Reason 1</preason1>
+  <pper group="Criminal history">Number Person Priors (No Criminal Sex)</pper>
+  <tpper group="Criminal history">Number True Person Priors (No Criminal Sex)</tpper>
+  <pprp group="Criminal history">Number Property Priors</pprp>
+  <tpprp group="Criminal history">Number True Property Priors</tpprp>
+  <pdrg group="Criminal history">Number Drug Priors</pdrg>
+  <tpdrg group="Criminal history">Number True Drug Priors</tpdrg>
+  <poth group="Criminal history">Number Other Priors</poth>
+  <tpoth group="Criminal history">Number True Other Priors</tpoth>
+  <psex group="Criminal history">Number Criminal Sex Priors</psex>
+  <tpsex group="Criminal history">Number True Criminal Sex Priors</tpsex>
+  <moc1 group="Offense">MN Offense Code 1st Column</moc1>
+  <moc2 group="Offense">MN Offense Code 2nd Column</moc2>
+  <moc3 group="Offense">MN Offense Code 3rd Column</moc3>
+  <moc4 group="Offense">MN Offense Code 4th Column</moc4>
+  <moc5 group="Offense">MN Offense Code 5th Column</moc5>
+  <totprior group="Criminal history">Total Number of Priors</totprior>
+  <truprior group="Criminal history">Total Number of True Priors</truprior>
+  <ageoff group="Demographics">Age at Offense</ageoff>
+  <agesent group="Demographics">Age at Sentence</agesent>
+  <AgeStatus group="Demographics">Adult or Juvenile?</AgeStatus>
+  <Agecat group="Demographics">Age Category (At Time of Offense)</Agecat>
+  <Agecat2 group="Demographics">Age Category 2 (At Time of Offense)</Agecat2>
+  <race2 group="Demographics">Race - Three Categories</race2>
+  <Raceorig group="Demographics">Race as on Worksheet, No Hispanic</Raceorig>
+  <dateoff group="Dates">Date of Offense - Coded Month</dateoff>
+  <datecon group="Dates">Date of Conviction - Coded Month</datecon>
+  <datesent group="Dates">Date Sentenced - Coded Month</datesent>
+  <doffense group="Dates">Offense Date - Lillian Date</doffense>
+  <dconvict group="Dates">Conviction Date - Lillian Date</dconvict>
+  <dsentenc group="Dates">Sentence Date - Lillian Date</dsentenc>
+  <region group="Court &amp; process">Region Within MN</region>
+  <district group="Court &amp; process">MN Judicial District</district>
+  <patsex group="Offense">Patterned Sex Offender?</patsex>
+  <career group="Offense">Career Offender?</career>
+  <danger group="Offense">Dangerous Offender?</danger>
+  <sexoff group="Offense">Type of Criminal Sexual Conduct Offense</sexoff>
+  <mocwpn group="Offense">MN Offense Code Weapon</mocwpn>
+  <weapon group="Offense">Dangerous Weapon Variable or MN Offense Code</weapon>
+  <deptype group="Departures &amp; reasons">Departure Type</deptype>
+  <dep group="Departures &amp; reasons">Departure?</dep>
+  <reas group="Departures &amp; reasons">Departure Reasons Received?</reas>
+  <pagree group="Departures &amp; reasons">Prosecutor Agreement?</pagree>
+  <request group="Sentence">Request Prison Sentence?</request>
+  <ejjrev group="Court &amp; process">Extended Jurisdiction Juvenile Revocation?</ejjrev>
+  <condrel group="Sentence">Conditional Release Mandated?</condrel>
+  <condrelperiod group="Sentence">Conditional Release Period</condrelperiod>
+  <presumptlife group="Sentence">Presumptive Life?</presumptlife>
+  <presumptlifeid group="Sentence">Presumptive Life Category</presumptlifeid>
+  <lifeminmonths group="Sentence">Life Minimum Months</lifeminmonths>
+  <post802 group="Dates">After August 2002?</post802>
+  <aidoff group="Offense">Aiding Offender - Modifier</aidoff>
+  <terrorism group="Offense">For Furtherance of Terrorism - Modifier</terrorism>
+  <cscpred group="Offense">Criminal Sexual Conduct Predatory - Modifier</cscpred>
+  <subscspred group="Offense">Subsequent Criminal Sexual Conduct Predatory - Modifier</subscspred>
+  <sextrafficking group="Offense">Aggravating Factors Under MN Statute 609.322 sub. 1(b)</sextrafficking>
+  <PermConsec group="Sentence">Eligible for Permissive Consecutive Sentencing?</PermConsec>
+  <Sexgrid group="Sentencing grid">Offense on Sex Offender Grid</Sexgrid>
+  <EligSexg group="Sentencing grid">Eligible for Sentencing on Sex Offender Grid?</EligSexg>
+  <EligGrid05 group="Sentencing grid">Eligible for Expanded Ranges Effective 8-1-05?</EligGrid05>
+  <druggrid group="Sentencing grid">Offense on Drug Offender Grid</druggrid>
+  <Eligdruggrid group="Sentencing grid">Eligible for Sentencing on Drug Offender Grid?</Eligdruggrid>
+  <Grid group="Sentencing grid">Applicable Sentencing Grid</Grid>
+  <FindRestOnly group="Sentence">Fine or Restitution Only?</FindRestOnly>
+  <offtype2 group="Offense">Offense Type 2</offtype2>
+  <offtype3 group="Offense">Offense Type 3</offtype3>
+  <penaltystat group="Offense">Penalty Statute</penaltystat>
+  <convstat group="Offense">Conviction Statute</convstat>
+  <Offense_Title group="Offense">Offense Title</Offense_Title>
+  <cell group="Sentencing grid">Cell on Grid - Coded ID</cell>
+  <abovblow group="Sentencing grid">Above or Below Disposition Line on Grid?</abovblow>
+  <celltime group="Sentencing grid">Time on Grid - Months</celltime>
+  <sexgridcell group="Sentencing grid">Cell on Sex Grid - Coded ID</sexgridcell>
+  <sexgridabove group="Sentencing grid">Above or Below Disposition Line - Sex Grid?</sexgridabove>
+  <sexgridcelltime group="Sentencing grid">Time on Sex Grid - Months</sexgridcelltime>
+  <druggridcell group="Sentencing grid">Cell on Drug Grid</druggridcell>
+  <druggridabove group="Sentencing grid">Above or Below Disposition Line - Drug Grid?</druggridabove>
+  <druggridcelltime group="Sentencing grid">Time on Drug Grid - Months</druggridcelltime>
+
+  <lname group="Identifiers">Offender Last Name</lname>
+  <fname group="Identifiers">Offender First Name</fname>
+  <mname group="Identifiers">Offender Middle Name</mname>
+  <reason2 group="Departures &amp; reasons">Departure Reason 2</reason2>
+  <reason3 group="Departures &amp; reasons">Departure Reason 3</reason3>
+  <reason4 group="Departures &amp; reasons">Departure Reason 4</reason4>
+  <preason2 group="Departures &amp; reasons">Plea Reason 2</preason2>
+  <preason3 group="Departures &amp; reasons">Plea Reason 3</preason3>
 </codes>

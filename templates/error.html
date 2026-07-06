@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+{% block title %} — {{ heading }}{% endblock %}
+
+{% block body %}
+
+    <div class="empty-state">
+        <p class="empty-state-code">{{ code }}</p>
+        <h1>{{ heading }}</h1>
+        <p>{{ message }}</p>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">Back to home</a>
+    </div>
+
+{% endblock %}

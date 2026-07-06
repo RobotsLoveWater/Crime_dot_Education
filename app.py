@@ -14,6 +14,7 @@ from flask import render_template
 from flask import session
 from flask import request
 from flask import redirect, url_for
+from flask import flash
 
 from markupsafe import Markup, escape
 
@@ -44,6 +45,21 @@ codes = ['']
 # MOC data is an object imported from another python file
 MOC = moc.MnOffenseCodes
 
+# codebook metadata only (descriptions + column-browser groups) — no dataframe is
+# loaded; Data() without a preload just parses codebook.xml
+CODEBOOK = Data()
+
+# sort orders for the statistics value table: internal key -> student-facing label
+SORT_OPTIONS = [
+    ('occurrence', 'Most common'),
+    ('reverse_occurrence', 'Least common'),
+    ('alphanumeric', 'A to Z'),
+    ('reverse_alphanumeric', 'Z to A')
+]
+
+# tooltip for the excluded columns in the column browser (replaces !!!WARNING!!!)
+EXCLUDED_NOTE = 'Excluded from analysis — identifies individual people or cases.'
+
 
 @app.template_filter('lesson_body')
 def lesson_body(text):
@@ -69,10 +85,79 @@ def lesson_body(text):
     return Markup(''.join(blocks))
 
 
+# full-dataset case count for the sidebar badge ("N of 294,467 cases"); constant for a
+# given cache/raw.csv, so compute it once per process from the base cache entry
+_dataset_total = None
+
+
+def current_user():
+    # best-effort user lookup for layout context (error handlers, context processor);
+    # never raises — a missing pickle just renders the logged-out shell
+    if not is_logged_in():
+        return None
+    try:
+        return account.retrieve(session['userid'])
+    except FileNotFoundError:
+        return None
+
+
 @app.context_processor
 def inject_globals():
-    # layout.html footer references current_year on every page; inject it once here
-    return {'current_year': datetime.date.today().year}
+    # layout.html needs these on every page: the footer year and the sidebar's
+    # data-state counts. Failures degrade to no badge rather than a broken page.
+    context = {'current_year': datetime.date.today().year, 'datastate': None}
+
+    if is_logged_in():
+        global _dataset_total
+        try:
+            if _dataset_total is None:
+                _dataset_total = get_data(None)['entries']
+            context['datastate'] = {
+                'entries': get_data(session)['entries'],
+                'total': _dataset_total
+            }
+        except Exception:
+            pass
+
+    return context
+
+
+def hx_toast(response, message, category='info'):
+    # htmx-response toast path (wired in Phase 1, used from Phase 2 on): the HX-Trigger
+    # header fires a client-side "toast" event that app.js renders into the toast region
+    response.headers['HX-Trigger'] = json.dumps({'toast': {'message': message, 'category': category}})
+    return response
+
+
+def wants_fragment():
+    # htmx view swaps get just the partial; everything else — including htmx history
+    # restores, which expect a complete document — gets the full workbench page
+    return (request.headers.get('HX-Request') == 'true'
+            and request.headers.get('HX-History-Restore-Request') != 'true')
+
+
+@app.template_filter('display_value')
+def display_value(value):
+    # float64 columns hold integral values like 2015.0; show them as "2015"
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('error.html', user=current_user(), code=404,
+                           heading='Page not found',
+                           message="That page doesn't exist or may have moved. "
+                                   "Head back home to keep exploring."), 404
+
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template('error.html', user=current_user(), code=500,
+                           heading='Something went wrong',
+                           message='The server hit an unexpected error. Your data state is '
+                                   'safe — try again, or head back home.'), 500
 
 
 # homepage
@@ -190,46 +275,117 @@ def logout():
     session.pop('username', None)
     session.pop('classcode', None)
     session.pop('userid', None)
+    flash('You have been logged out.')
     return not_logged_in()
 
 
-@app.route("/info/")
-def info_menu():
+def build_column_browser(data):
+    # Sidebar column browser: every documented column in the current dataframe,
+    # grouped per codebook.xml's `group` attributes and ordered by Data.GROUP_ORDER.
+    # Descriptions come straight from the codebook parse (CODEBOOK), not the cached
+    # `data['columns']` dict, so codebook edits show up without clearing the cache.
+    groups = {}
+    for code in data['column_list']:
+        desc = CODEBOOK.codebook.get(code)
+        if not desc:
+            continue  # undocumented columns (e.g. dcnum2) stay out of the browser
+        name = CODEBOOK.groups.get(code, 'Other')
+        groups.setdefault(name, []).append({
+            'code': code,
+            'desc': desc,
+            'excluded': code in data['excluded']
+        })
+
+    rank = {name: k for k, name in enumerate(Data.GROUP_ORDER)}
+    return [{'name': name, 'columns': sorted(groups[name], key=lambda c: c['desc'].lower())}
+            for name in sorted(groups, key=lambda n: (rank.get(n, len(rank)), n))]
+
+
+def build_chart(column_info, top=20):
+    # distribution chart payload: top-N values by case count plus an "Other" bucket;
+    # the value table below the chart carries every value
+    by_count = sorted(column_info['each'], key=lambda e: e['num'], reverse=True)
+    return {
+        'labels': [display_value(e['value']) for e in by_count[:top]],
+        'counts': [e['num'] for e in by_count[:top]],
+        'other': sum(e['num'] for e in by_count[top:]),
+        'otherValues': len(by_count) - min(len(by_count), top)
+    }
+
+
+def render_explore(column=None, sorting='occurrence'):
+    # Shared renderer for the explore workbench (STYLEGUIDE.md "htmx conventions"):
+    # normal requests get the full page, htmx requests just the view fragment.
+    user = account.retrieve(session['userid'])
+    data = get_data(session)
+
+    context = {'user': user, 'column': column, 'sorting': sorting,
+               'sort_options': SORT_OPTIONS, 'excluded_note': EXCLUDED_NOTE,
+               'browser': build_column_browser(data), 'data': data}
+
+    if column:
+        if column not in data['column_list'] or not CODEBOOK.codebook.get(column):
+            flash("That column doesn't exist — pick one from the column browser.", 'danger')
+            return redirect(url_for('explore'))
+
+        if column in data['excluded']:
+            flash('That column is excluded from analysis — it identifies individual '
+                  'people or cases.', 'danger')
+            return redirect(url_for('explore'))
+
+        data = get_data(session, column, sorting)
+        info = data['column_info']
+
+        # info['each'] excludes missing rows, so missing = total - sum(value counts)
+        missing = info['len'] - sum(e['num'] for e in info['each'])
+        context.update({
+            'data': data,
+            'info': info,
+            # display header from the live codebook parse, not the cached column_info —
+            # cached pickles keep whatever description codebook.xml had when they were built
+            'header': CODEBOOK.codebook[column],
+            'missing': missing,
+            'missing_percent': (100 * missing / info['len']) if info['len'] else 0,
+            'chart': build_chart(info)
+        })
+
+    if wants_fragment():
+        template = 'partials/explore_column.html' if column else 'partials/explore_landing.html'
+        return render_template(template, fragment=True, **context)
+
+    return render_template('explore.html', **context)
+
+
+@app.route("/explore")
+def explore():
     if is_logged_in():
-
-        user = account.retrieve(session['userid'])
-        data = get_data(session)
-
-        return render_template('info_menu.html', data=data, user=user)
-
+        return render_explore()
     else:
         return not_logged_in()
+
+
+@app.route("/explore/column/<column>", defaults={'sorting': 'occurrence'})
+@app.route("/explore/column/<column>/<sorting>")
+def explore_column(column, sorting):
+    if is_logged_in():
+        if sorting not in Data.VALID_SORTING:
+            return redirect(url_for('explore_column', column=column))
+        return render_explore(column, sorting)
+    else:
+        return not_logged_in()
+
+
+# Legacy statistics URLs (pre-overhaul). The endpoint names survive on purpose:
+# lesson deep links (build_explore) still emit /info/... until Phase 5.
+@app.route("/info/")
+def info_menu():
+    return redirect(url_for('explore'))
 
 
 @app.route("/info/<column>/")
-def info_specific_redirect(column):
-    return redirect(url_for('info_specific', column=column, sorting='occurrence'))
-
-
 @app.route("/info/<column>/<sorting>")
-def info_specific(column, sorting):
-    if is_logged_in():
-        user = account.retrieve(session['userid'])
-
-        if sorting not in Data.VALID_SORTING:
-            return redirect(url_for('info_specific', column=column, sorting='occurrence'))
-
-        data = get_data(session, column, sorting)
-
-        if column in data['column_list']:
-
-            return render_template('info.html', column=column, data=data, user=user, sorting=sorting)
-
-        else:
-            return redirect(url_for('index'))
-
-    else:
-        return not_logged_in()
+def info_specific(column, sorting='occurrence'):
+    return redirect(url_for('explore_column', column=column, sorting=sorting))
 
 
 @app.route("/table", methods=['GET', 'POST'])
@@ -352,11 +508,12 @@ def filter_boolean(column, sorting):
             # edit the history log
             else:
                 if len(values) == 1:
-                    account.history_add(session['userid'], make_history.filter_single(column, request.form['comparison'], values[0]))
-                    return redirect(url_for('index'))
+                    entry = make_history.filter_single(column, request.form['comparison'], values[0])
                 else:
-                    account.history_add(session['userid'], make_history.filter_or_same(column, request.form['comparison'], values))
-                    return redirect(url_for('index'))
+                    entry = make_history.filter_or_same(column, request.form['comparison'], values)
+                account.history_add(session['userid'], entry)
+                flash(entry['desc'], 'success')
+                return redirect(url_for('index'))
 
         if sorting not in Data.VALID_SORTING:
             return redirect(url_for('filter_boolean', column=column, sorting='occurrence'))
@@ -424,9 +581,17 @@ def filter_moc(moc1, moc2, moc3, moc4, moc5, active):
 
             # create the new history entry based on the moc changes, excluding wildcards
             cur_moc = [moc1, moc2, moc3, moc4, moc5]
-            for k,moc in enumerate(cur_moc):
-                if moc != '*':
-                    account.history_add(session['userid'], make_history.moc(k+1, moc))
+            applied = []
+            for k, digit in enumerate(cur_moc):
+                if digit != '*':
+                    entry = make_history.moc(k+1, digit)
+                    account.history_add(session['userid'], entry)
+                    applied.append(entry['desc'])
+
+            if len(applied) == 1:
+                flash(applied[0], 'success')
+            elif applied:
+                flash('Offense code filter applied (' + str(len(applied)) + ' steps).', 'success')
 
             return redirect(url_for('index'))
 
@@ -450,9 +615,10 @@ def load():
 
         if request.method == 'POST':
             if request.form['code'] not in codes:
-                error = 'Invalid code'
+                error = ['Invalid code']
             else:
                 account.history_revert(session['userid'])
+                flash('All filters cleared — full dataset restored.')
                 return redirect(url_for('index'))
 
         return render_template('load.html', error=error, user=user)
@@ -469,6 +635,10 @@ def revert(n):
         # no-op, and n < 1 is skipped so we never trip history_revert's assert.
         if n >= 1:
             account.history_revert(session['userid'], n)
+            if n == 1:
+                flash('All filters cleared — full dataset restored.')
+            else:
+                flash('Data state reverted — later filter steps removed.')
         return redirect(url_for('index'))
     else:
         return not_logged_in()
@@ -847,5 +1017,16 @@ def build_question(module_id, step_index, step):
 
 def is_logged_in(): return 'userid' in session
 def not_loaded(): return redirect(url_for('load'))
-def not_logged_in(): return redirect(url_for('login'))
+
+
+def not_logged_in():
+    # a 302 inside an htmx swap would inline the login page into the view fragment;
+    # HX-Redirect makes the client do a full-page redirect instead
+    if request.headers.get('HX-Request') == 'true':
+        response = app.make_response('')
+        response.headers['HX-Redirect'] = url_for('login')
+        return response
+    return redirect(url_for('login'))
+
+
 def not_implemented(): return "WIP, Feature Not Implemented"

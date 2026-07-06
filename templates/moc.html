@@ -1,10 +1,7 @@
 {% extends "layout.html" %}
-{% block head %}
-<title>Minnesota Analysis of Sentencing Trends</title>
-{% endblock %}
+{% block title %} — Offense code filter{% endblock %}
 
 {% block body %}
-<body>
 
     <h1>{{ code_list[0] }}</h1>
 
@@ -28,14 +25,14 @@
     <div class="btn-bar">
         {% for imc in moc_col %}
         {% if active == imc %}
-        <a href="{{ imc }}" class="btn disabled">{{ code_list[imc]['COL'] }}</a>
+        <span class="btn disabled" aria-disabled="true">{{ code_list[imc]['COL'] }}</span>
         {% else %}
         <a href="{{ imc }}" class="btn">{{ code_list[imc]['COL'] }}</a>
         {% endif %}
         {% endfor %}
     </div>
 
-    <form method="post">
+    <form method="post" data-loading="Computing statistics…">
         <p><input type="submit" value="Run Filters"/>
     </form>
 
@@ -93,5 +90,4 @@
         </tbody>
     </table>
 
-</body>
 {% endblock %}

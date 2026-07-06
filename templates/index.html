@@ -1,10 +1,7 @@
 {% extends "layout.html" %}
-{% block head %}
-<title>Minnesota Sentencing Explorer - Homepage</title>
-{% endblock %}
+{% block title %} — Home{% endblock %}
 
 {% block body %}
-<body>
 
     {% if user %}
     <h2>Hello, {{ user['username'] }}</h2>
@@ -70,6 +67,5 @@
         </section>
     {% endif %}
 
-</body>
 {% endblock %}
 

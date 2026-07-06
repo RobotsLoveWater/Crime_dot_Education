@@ -1,0 +1,117 @@
+{# Statistics view for one column (Phase 2): stat cards, distribution chart,
+   sort control, searchable value table. Served as a fragment on htmx requests
+   (fragment=True adds the <title> htmx uses to update the document title) and
+   included by explore.html on full loads. #}
+{% if fragment %}<title>Minnesota Sentencing Explorer — {{ header }}</title>{% endif %}
+
+<article class="explore-column" data-column="{{ column }}">
+
+    <header class="view-header">
+        <div class="view-heading">
+            <h1>{{ header }}</h1>
+            <p class="view-subtitle">Column <code>{{ column }}</code> · statistics for your current data state</p>
+        </div>
+        <div class="view-actions">
+            <a class="btn btn-primary" href="{{ url_for('filter_boolean', column=column, sorting=sorting) }}">Filter this column</a>
+        </div>
+    </header>
+
+    <section class="stat-grid" aria-label="Summary statistics">
+        <div class="stat-card">
+            <span class="stat-label">Cases (N)</span>
+            <span class="stat-value">{{ '{:,}'.format(info['entries']) }}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Missing</span>
+            <span class="stat-value">{{ '{:,}'.format(missing) }}</span>
+            <span class="stat-note">{{ '%.1f'|format(missing_percent) }}% of cases</span>
+        </div>
+        {% if info['numeric'] %}
+        <div class="stat-card">
+            <span class="stat-label">Mean</span>
+            <span class="stat-value">{{ info['mean'] }}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Median</span>
+            <span class="stat-value">{{ info['mdn'] }}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Std. deviation</span>
+            <span class="stat-value">{{ info['std'] }}</span>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if info['each'] %}
+    <section class="chart-card" aria-label="Distribution chart">
+        <h2>Distribution</h2>
+        <p class="chart-note">
+            {% if chart['other'] > 0 %}
+            The {{ chart['labels']|length }} most common values; the remaining
+            {{ '{:,}'.format(chart['otherValues']) }} values are grouped as “Other”.
+            {% else %}
+            All {{ chart['labels']|length }} values by case count.
+            {% endif %}
+            The table below carries every value.
+        </p>
+        <div class="chart-box"><canvas id="explore-chart" aria-label="Bar chart of the value distribution; the values table repeats these numbers" role="img"></canvas></div>
+        <script type="application/json" id="explore-chart-data">{{ chart|tojson }}</script>
+    </section>
+
+    <section aria-label="Values">
+        <div class="view-toolbar">
+            <h2 id="values-heading">Values</h2>
+            <nav class="segmented" aria-label="Sort values"
+                 hx-target="#explore-view" hx-push-url="true">
+                {% for key, name in sort_options %}
+                    {% if sorting == key %}
+                    <span class="segmented-item" aria-current="true">{{ name }}</span>
+                    {% else %}
+                    <a class="segmented-item"
+                       href="{{ url_for('explore_column', column=column, sorting=key) }}"
+                       hx-get="{{ url_for('explore_column', column=column, sorting=key) }}">{{ name }}</a>
+                    {% endif %}
+                {% endfor %}
+            </nav>
+            <div class="table-search js-only">
+                <label class="visually-hidden" for="value-search">Search values</label>
+                <input type="search" id="value-search" placeholder="Search values…"
+                       autocomplete="off" spellcheck="false">
+            </div>
+        </div>
+
+        <div class="table-wrapper table-scroll">
+            <table class="data-table" id="value-table" aria-labelledby="values-heading">
+                <caption class="visually-hidden">Value distribution for {{ header }}</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Value</th>
+                        <th scope="col" class="num">Cases</th>
+                        <th scope="col" class="num">Percent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in info['each'] %}
+                    <tr data-value="{{ row['value']|display_value|lower }}">
+                        <td>{{ row['value']|display_value }}</td>
+                        <td class="num">{{ '{:,}'.format(row['num']) }}</td>
+                        <td class="num">{{ '%.2f'|format(row['percent']) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="table-footer">
+            <p class="table-count" id="value-count" role="status"></p>
+            <button type="button" class="btn btn-secondary btn-sm js-only" id="value-show-more" hidden>Show more</button>
+        </div>
+    </section>
+    {% else %}
+    <div class="empty-state">
+        <h2>No values to show</h2>
+        <p>Every case in your current data state is missing a value for this column.
+           Try removing a filter, or pick another column.</p>
+    </div>
+    {% endif %}
+
+</article>

@@ -1,0 +1,43 @@
+{# Sidebar column browser (Phase 2): every documented column, grouped per
+   codebook.xml `group` attributes. Server-rendered; the search box (JS-only)
+   filters it client-side in explore.js. Plain hrefs are the no-JS fallback;
+   htmx attributes on the <section> are inherited by every link inside. #}
+<section class="column-browser" aria-label="Column browser"
+         hx-target="#explore-view" hx-swap="innerHTML show:window:top" hx-push-url="true">
+    <h2 class="sidebar-title">Columns</h2>
+
+    <div class="browser-search js-only">
+        <label class="visually-hidden" for="column-search">Search columns</label>
+        <input type="search" id="column-search" placeholder="Search columns…"
+               autocomplete="off" spellcheck="false">
+    </div>
+
+    <p class="browser-empty" id="browser-empty" hidden>No columns match your search.</p>
+
+    {% for group in browser %}
+    <details class="browser-group" open>
+        <summary>{{ group['name'] }} <span class="browser-count">{{ group['columns']|length }}</span></summary>
+        <ul class="browser-list">
+            {% for col in group['columns'] %}
+            <li data-search="{{ (col['desc'] ~ ' ' ~ col['code'])|lower }}">
+                {% if col['excluded'] %}
+                <span class="browser-item browser-item-disabled" aria-disabled="true"
+                      title="{{ excluded_note }}">
+                    <span class="browser-desc">{{ col['desc'] }}</span>
+                    <span class="browser-code">{{ col['code'] }} · excluded</span>
+                </span>
+                {% else %}
+                <a class="browser-item" data-code="{{ col['code'] }}"
+                   href="{{ url_for('explore_column', column=col['code']) }}"
+                   hx-get="{{ url_for('explore_column', column=col['code']) }}"
+                   {% if col['code'] == column %}aria-current="page"{% endif %}>
+                    <span class="browser-desc">{{ col['desc'] }}</span>
+                    <span class="browser-code">{{ col['code'] }}</span>
+                </a>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </details>
+    {% endfor %}
+</section>

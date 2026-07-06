@@ -1,0 +1,390 @@
+/* static/css/views.css
+   Workbench shell layout per STYLEGUIDE.md "Layout — the workbench shell":
+   top bar, data-state sidebar (persistent ≥1024px, slide-over drawer 768–1023px,
+   hidden <768px until Phase 7), main area, footer.
+   The drawer needs JS, so it is gated on html.js — without JS the sidebar stays
+   in the page flow at every width (progressive enhancement). */
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ---------- Skip link ---------- */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  border-radius: var(--radius-sm);
+}
+.skip-link:focus {
+  left: var(--space-2);
+  top: var(--space-2);
+}
+
+/* ---------- Top bar ---------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.brand {
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.brand:hover { color: var(--color-accent); }
+
+.topbar-nav {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+.topbar-nav ul {
+  list-style: none;
+  display: flex;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+}
+.topbar-nav a {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 120ms var(--ease), color 120ms var(--ease);
+}
+.topbar-nav a:hover {
+  background: var(--color-accent-subtle);
+  color: var(--color-text);
+}
+.topbar-nav a[aria-current="page"] {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.user-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.theme-toggle,
+.sidebar-toggle {
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  transition: background 120ms var(--ease), color 120ms var(--ease);
+}
+.theme-toggle:hover,
+.sidebar-toggle:hover {
+  background: var(--color-accent-subtle);
+  color: var(--color-text);
+}
+.sidebar-toggle { display: none; }
+
+/* ---------- Workbench grid ---------- */
+.workbench {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+.workbench-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ---------- Sidebar / data-state module ---------- */
+.sidebar {
+  background: var(--color-sidebar);
+  border-right: 1px solid var(--color-border);
+  padding: var(--space-4);
+}
+
+/* backdrop only exists at drawer widths; display:none keeps it out of the
+   workbench grid everywhere else */
+.sidebar-backdrop { display: none; }
+
+.sidebar-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.datastate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.count-badge {
+  margin-bottom: var(--space-3);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.datastate-empty {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- Main area ---------- */
+.main-area {
+  min-width: 0;
+  padding: var(--space-5) var(--space-5) var(--space-7);
+}
+/* legacy views keep centering via .container (style.css); cap it inside the work area */
+.main-area > .container {
+  width: 100%;
+  max-width: 960px;
+}
+
+/* ---------- Column browser (explore sidebar module, Phase 2) ---------- */
+.column-browser {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.browser-search {
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.browser-empty {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.browser-group summary {
+  padding: var(--space-2) 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  list-style-position: outside;
+}
+.browser-group summary:hover { color: var(--color-accent); }
+
+.browser-count {
+  color: var(--color-text-faint);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.browser-list {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+}
+
+.browser-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: background 120ms var(--ease);
+}
+a.browser-item:hover { background: var(--color-accent-subtle); }
+.browser-item[aria-current] {
+  background: var(--color-accent-subtle);
+}
+.browser-item[aria-current] .browser-desc { color: var(--color-accent); }
+
+.browser-desc {
+  color: var(--color-text);
+  font-size: var(--fs-sm);
+}
+
+.browser-code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--color-text-faint);
+}
+
+.browser-item-disabled {
+  cursor: not-allowed;
+}
+.browser-item-disabled .browser-desc {
+  color: var(--color-text-faint);
+}
+
+/* ---------- Explore view (Phase 2) ---------- */
+.view-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+
+.view-subtitle {
+  color: var(--color-text-muted);
+  margin-bottom: 0;
+}
+
+.view-actions {
+  flex-shrink: 0;
+}
+
+.chart-card {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  margin-bottom: var(--space-5);
+}
+
+.chart-note {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.chart-box {
+  position: relative; /* Chart.js responsive sizing needs a positioned box */
+}
+
+.view-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.view-toolbar h2 { margin: 0; }
+.view-toolbar .table-search {
+  margin-left: auto;
+  min-width: 200px;
+}
+
+.quick-links { margin-top: var(--space-5); }
+
+.quick-link-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+}
+
+/* ---------- Footer ---------- */
+.site-footer {
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+
+/* ---------- ≥1024px: persistent sidebar, independently scrollable ---------- */
+@media (min-width: 1024px) {
+  .sidebar {
+    position: sticky;
+    top: 56px;
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+  }
+}
+
+/* ---------- 768–1023px: slide-over drawer (JS only) ---------- */
+@media (max-width: 1023px) {
+  .workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .js .sidebar-toggle { display: inline-flex; }
+
+  .js .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 70;
+    width: 280px;
+    overflow-y: auto;
+    border-right: 1px solid var(--color-border);
+    box-shadow: var(--shadow-2);
+    transform: translateX(-100%);
+    transition: transform 200ms var(--ease);
+  }
+  .js .sidebar.open { transform: none; }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: var(--overlay);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms var(--ease);
+  }
+  .js .sidebar-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* no-JS fallback: sidebar stays in the flow above the main area */
+  html:not(.js) .sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* touch targets ≥ 44px below 1024px (STYLEGUIDE.md breakpoints) */
+  .topbar-nav a,
+  .theme-toggle,
+  .sidebar-toggle,
+  .btn {
+    min-height: 44px;
+  }
+  .js .sidebar .chip {
+    min-height: 44px;
+  }
+}
+
+/* ---------- <768px: sidebar hidden with JS (phone treatment lands in Phase 7) ---------- */
+@media (max-width: 767px) {
+  .js .sidebar,
+  .js .sidebar-toggle,
+  .js .sidebar-backdrop { display: none; }
+
+  .topbar { gap: var(--space-2); }
+  .user-identity { display: none; }
+  .main-area { padding: var(--space-4) var(--space-3) var(--space-6); }
+}

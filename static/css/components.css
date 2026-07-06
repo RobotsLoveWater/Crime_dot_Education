@@ -1,0 +1,491 @@
+/* static/css/components.css
+   Shared components per STYLEGUIDE.md "Components": buttons, badges, chips,
+   toasts, dialogs, alerts, empty states, loading indicators.
+   Tokens only — never raw color values (backdrops use --overlay). */
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-base);
+  font-weight: 500;
+  line-height: 1.45;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 120ms var(--ease), color 120ms var(--ease),
+              border-color 120ms var(--ease), opacity 120ms var(--ease);
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+.btn-secondary:hover {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.btn-ghost:hover {
+  background: var(--color-accent-subtle);
+  color: var(--color-text);
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: var(--color-on-accent);
+}
+.btn-danger:hover {
+  opacity: 0.9;
+}
+
+.btn-sm {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--fs-sm);
+}
+
+.btn[disabled],
+.btn[aria-disabled="true"] {
+  background: var(--color-border);
+  border-color: transparent;
+  color: var(--color-text-faint);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ---------- Badges ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1.2;
+}
+.badge-accent {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+.badge-educator {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+.badge-success {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+.badge-muted {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+/* ---------- Filter chips (data-state module) ---------- */
+.chip-chain {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: fit-content;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  text-decoration: none;
+  text-align: left;
+}
+a.chip:hover {
+  border-color: var(--color-accent);
+}
+
+.chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  margin-left: var(--space-1);
+  border-radius: var(--radius-full);
+  color: var(--color-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.chip-remove:hover {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+/* ---------- Toasts ---------- */
+.toast-region {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(360px, calc(100vw - 2 * var(--space-4)));
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+  animation: toast-in 200ms var(--ease);
+}
+[data-theme="dark"] .toast {
+  border-color: var(--color-border-strong);
+  border-left-width: 3px;
+}
+.toast-success { border-left-color: var(--color-success); }
+.toast-danger  { border-left-color: var(--color-danger); }
+
+.toast-message {
+  flex: 1;
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.toast-close {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 var(--space-1);
+}
+.toast-close:hover { color: var(--color-text); }
+
+.toast-leaving {
+  opacity: 0;
+  transition: opacity 200ms var(--ease);
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+@media (max-width: 767px) {
+  /* top-center on phones (STYLEGUIDE.md "Toasts") */
+  .toast-region {
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    top: var(--space-3);
+  }
+}
+
+/* ---------- Confirm dialog ---------- */
+.dialog {
+  /* the base.css reset zeroes all margins, which kills the UA's margin:auto
+     centering for modal dialogs — restore it */
+  margin: auto;
+  width: min(420px, calc(100vw - 2 * var(--space-4)));
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-2);
+}
+[data-theme="dark"] .dialog {
+  border-color: var(--color-border-strong);
+}
+.dialog::backdrop {
+  background: var(--overlay);
+}
+.dialog-body {
+  padding: var(--space-5);
+}
+.dialog-title {
+  font-size: var(--fs-lg);
+  margin-bottom: var(--space-2);
+}
+.dialog-message {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-5);
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* ---------- Inline alerts (form/validation errors stay inline, not toasts) ---------- */
+.alert {
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+}
+.alert p { margin-bottom: var(--space-1); }
+.alert p:last-child { margin-bottom: 0; }
+.alert-danger {
+  background: var(--color-danger-subtle);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+/* legacy inline error paragraphs in pre-overhaul views (login, crosstab menu) */
+p.error { color: var(--color-danger); }
+
+/* ---------- Empty state ---------- */
+.empty-state {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+}
+.empty-state-code {
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.empty-state h1,
+.empty-state h2 {
+  font-size: var(--fs-xl);
+  margin-bottom: var(--space-2);
+}
+.empty-state p {
+  color: var(--color-text-muted);
+}
+.empty-state .btn {
+  margin-top: var(--space-4);
+}
+
+/* ---------- Loading: global progress bar, spinners, submit feedback ---------- */
+.progress-track {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms var(--ease);
+}
+.progress-track.active { opacity: 1; }
+.progress-thumb {
+  height: 100%;
+  width: 0;
+  background: var(--color-accent);
+  transition: width 300ms var(--ease);
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: spin 700ms linear infinite;
+  vertical-align: -2px;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* htmx local indicators (used from Phase 2 on) */
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { display: inline-block; }
+
+/* "Computing statistics…" note injected next to a submitting button (app.js) */
+.form-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- Stat cards (STYLEGUIDE.md "Stat cards") ---------- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1); /* --shadow-1 is none in dark; the border carries elevation */
+}
+
+.stat-label {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.stat-value {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-note {
+  font-size: var(--fs-xs);
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Segmented control ----------
+   Connected button row. Radio-styled where the state is a form value; for
+   URL-backed states (sort orders) the segments are links and the active one is
+   a non-interactive element with aria-current (STYLEGUIDE.md "Segmented control"). */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.segmented-item {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 120ms var(--ease), color 120ms var(--ease);
+}
+.segmented-item + .segmented-item {
+  border-left: 1px solid var(--color-border);
+}
+a.segmented-item:hover {
+  background: var(--color-accent-subtle);
+  color: var(--color-text);
+}
+.segmented-item[aria-current] {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+/* ---------- Data tables (STYLEGUIDE.md "Data tables") ----------
+   .data-table overrides the legacy accent-filled thead from style.css until
+   that file is retired. .table-scroll adds a max height + sticky header. */
+.table-wrapper {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  margin-bottom: var(--space-3);
+}
+
+.table-scroll {
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.data-table thead {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.data-table th {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-align: left;
+  box-shadow: inset 0 -1px 0 var(--color-border); /* border that scrolls with the sticky header */
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+.data-table tbody tr:last-child td { border-bottom: 0; }
+
+.data-table tbody tr:nth-child(odd) { background: transparent; } /* undo legacy zebra */
+.data-table tbody tr:hover { background: var(--color-accent-subtle); }
+
+.data-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.table-count {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Search inputs (column browser, value table) ---------- */
+input[type="search"].search-input,
+.table-search input,
+.browser-search input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--fs-sm);
+}
+.table-search input::placeholder,
+.browser-search input::placeholder {
+  color: var(--color-text-faint);
+}

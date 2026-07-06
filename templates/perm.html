@@ -1,10 +1,7 @@
 {% extends "layout.html" %}
-{% block head %}
-<title>Minnesota Analysis of Sentencing Trends</title>
-{% endblock %}
+{% block title %} — Crosstab{% endblock %}
 
 {% block body %}
-<body>
 
     <h1>View Table</h1>
     <div class="card">
@@ -12,7 +9,7 @@
         <p>{{ data['entries'] }}</p>
     </div>
     <div class="card">
-        <h3>Dependant Variable</h3>
+        <h3>Dependent Variable</h3>
         <p>{{ variables['d'][0] }} => {{ variables['d'][1] }}</p>
     </div>
     <div class="card">
@@ -48,5 +45,4 @@
         {% endfor %}
     </table>
 
-</body>
 {% endblock %}

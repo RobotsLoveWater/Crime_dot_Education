@@ -48,6 +48,7 @@ Themes switch by setting `data-theme="light|dark"` on `<html>`.
 | `--color-danger` / `-subtle` | `#DC2626` / `#FDEBEB` | Errors, destructive actions |
 | `--color-warning` / `-subtle` | `#B45309` / `#FCF3E3` | Warnings, excluded columns |
 | `--color-focus` | `#4F46E5` | Focus rings |
+| `--overlay` | `rgba(16,19,24,.45)` | Drawer + dialog backdrops |
 
 ### Color — dark theme
 
@@ -69,6 +70,7 @@ Themes switch by setting `data-theme="light|dark"` on `<html>`.
 | `--color-danger` / `-subtle` | `#F87171` / `#2C1A1A` |
 | `--color-warning` / `-subtle` | `#E5A54B` / `#2A2118` |
 | `--color-focus` | `#818CF8` |
+| `--overlay` | `rgba(0,0,0,.55)` |
 
 Dark theme uses **borders, not shadows**, for elevation (shadows are near-invisible on dark).
 
@@ -187,8 +189,17 @@ Touch targets ≥ 44×44px below 1024px.
   container; htmx responses trigger toasts via the `HX-Trigger` header.
 - **Confirm dialog.** Native `<dialog>`, radius `--radius-lg`, `--shadow-2`. Required for
   Clear Data and any revert that discards more than one step. Danger button on the right.
-- **Segmented control.** Radio-group styled as a connected button row (sort orders; crosstab
-  stat toggle N/mean/median/std). One selected at all times; `aria-pressed`/checked radios.
+- **Segmented control.** Connected button row with exactly one segment active (sort orders;
+  crosstab stat toggle N/mean/median/std). Two semantics: form-value state uses
+  `aria-pressed`/checked radios; URL-backed state (e.g. sort orders) uses links, with the
+  active segment rendered as a non-interactive element carrying `aria-current` (never a live
+  link styled as selected).
+- **Column browser** (explore sidebar, below the data-state module). All documented columns
+  grouped by category — groups come from the `group` attribute on `codebook.xml` entries,
+  ordered by `Data.GROUP_ORDER`. Each item: friendly description primary, mono column code
+  secondary. Groups are native `<details open>`; a JS-only search box filters items and
+  hides empty groups. Excluded columns render disabled (`aria-disabled`, faint) with a
+  `title` tooltip saying why. The active column carries `aria-current="page"`.
 - **Progress (lessons).** Slim bar + step dots; completed dots accent-filled, current
   outlined. "Step 3 of 7" text alongside — never the bar alone.
 - **Empty states.** Icon-light: a short muted sentence + one CTA. Zero-case filter result:

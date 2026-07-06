@@ -1,10 +1,7 @@
 {% extends "layout.html" %}
-{% block head %}
-<title>Minnesota Sentencing Explorer - {{ module['title'] }}</title>
-{% endblock %}
+{% block title %} — {{ module['title'] }}{% endblock %}
 
 {% block body %}
-<body>
 
     <div class="container">
         <p><a href="/lesson/{{ module['id'] }}">&larr; {{ module['title'] }}</a></p>
@@ -106,13 +103,13 @@
 
             {% if step_index + 1 < total %}
                 {% if next_locked %}
-                    <span class="btn disabled" title="Answer this question to continue">Next &rarr;</span>
+                    <span class="btn disabled" aria-disabled="true" title="Answer this question to continue">Next &rarr;</span>
                 {% else %}
                     <a href="/lesson/{{ module['id'] }}/{{ step_index + 1 }}" class="btn">Next &rarr;</a>
                 {% endif %}
             {% else %}
                 {% if next_locked %}
-                    <span class="btn disabled" title="Answer this question to continue">Finish &check;</span>
+                    <span class="btn disabled" aria-disabled="true" title="Answer this question to continue">Finish &check;</span>
                 {% else %}
                     <a href="/lesson/{{ module['id'] }}/complete" class="btn">Finish &check;</a>
                 {% endif %}
@@ -120,5 +117,4 @@
         </div>
     </div>
 
-</body>
 {% endblock %}

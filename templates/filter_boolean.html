@@ -1,10 +1,7 @@
 {% extends "layout.html" %}
-{% block head %}
-<title>Minnesota Analysis of Sentencing Trends</title>
-{% endblock %}
+{% block title %} — Filter: {{ data['column_info']['header'] }}{% endblock %}
 
 {% block body %}
-<body>
 
     <h1>{{ data['column_info']['header'] }} Filter</h1>
 
@@ -36,37 +33,22 @@
 
     <h2>Sort By:</h2>
     <div class="btn-bar">
-
-        {% if sorting != "occurrence" %}
-            <a href="/filter/boolean/{{ column }}/occurrence" class="btn">Most Common</a>
-        {% else %}
-            <a href="/filter/boolean/{{ column }}/occurrencee" class="btn disabled">Most Common</a>
-        {% endif %}
-
-        {% if sorting != "reverse_occurrence" %}
-            <a href="/filter/boolean/{{ column }}/reverse_occurrence" class="btn">Least Common</a>
-        {% else %}
-            <a href="/filter/boolean/{{ column }}/reverse_occurrence" class="btn disabled">Least Common</a>
-        {% endif %}
-
-        {% if sorting != "alphanumeric" %}
-            <a href="/filter/boolean/{{ column }}/alphanumeric" class="btn">Alphanumeric</a>
-        {% else %}
-            <a href="/filter/boolean/{{ column }}/alphanumeric" class="btn disabled">Alphanumeric</a>
-        {% endif %}
-
-        {% if sorting != "reverse_alphanumeric" %}
-            <a href="/filter/boolean/{{ column }}/reverse_alphanumeric" class="btn">Reverse Alphanumeric</a>
-        {% else %}
-            <a href="/filter/boolean/{{ column }}/reverse_alphanumeric" class="btn disabled">Reverse Alphanumeric</a>
-        {% endif %}
-
+        {% for key, name in [('occurrence', 'Most Common'),
+                             ('reverse_occurrence', 'Least Common'),
+                             ('alphanumeric', 'Alphanumeric'),
+                             ('reverse_alphanumeric', 'Reverse Alphanumeric')] %}
+            {% if sorting != key %}
+                <a href="/filter/boolean/{{ column }}/{{ key }}" class="btn">{{ name }}</a>
+            {% else %}
+                <span class="btn disabled" aria-disabled="true">{{ name }}</span>
+            {% endif %}
+        {% endfor %}
     </div>
 
     <h2>Filter Options</h2>
 
     {% if data['column_info']['numeric'] == True %}
-    <form method="post">
+    <form method="post" data-loading="Computing statistics…">
         <input type="submit" value="Submit">
         <br>
         Include only values where {{ data['column_info']['header'] }} is:
@@ -97,7 +79,7 @@
 
     {% else %}
 
-    <form method="post">
+    <form method="post" data-loading="Computing statistics…">
         <input type="submit" value="Submit">
         <br>
         Include only values where {{ data['column_info']['header'] }} is:
@@ -112,5 +94,4 @@
 
     {% endif %}
 
-</body>
 {% endblock %}

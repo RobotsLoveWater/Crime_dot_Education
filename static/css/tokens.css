@@ -1,0 +1,135 @@
+/* static/css/tokens.css
+   Design tokens — the single source of truth for color, type, spacing, radius,
+   shadow, and motion. Values mirror the tables in STYLEGUIDE.md; change them
+   there and here together. Components reference tokens only — never raw hex. */
+
+/* ---------- Color: light theme (default) ---------- */
+:root {
+  color-scheme: light;
+
+  --color-bg:             #F6F7F9;
+  --color-surface:        #FFFFFF;
+  --color-sidebar:        #FBFBFC;
+  --color-border:         #E4E7EC;
+  --color-border-strong:  #CDD3DC;
+  --color-text:           #17202B;
+  --color-text-muted:     #5B6675;
+  --color-text-faint:     #8B95A3;
+  --color-accent:         #4F46E5;
+  --color-accent-hover:   #4338CA;
+  --color-accent-subtle:  #EEF0FE;
+  --color-on-accent:      #FFFFFF;
+  --color-success:        #15803D;
+  --color-success-subtle: #E8F5EE;
+  --color-danger:         #DC2626;
+  --color-danger-subtle:  #FDEBEB;
+  --color-warning:        #B45309;
+  --color-warning-subtle: #FCF3E3;
+  --color-focus:          #4F46E5;
+  --overlay:              rgba(16, 19, 24, 0.45); /* drawer + dialog backdrops */
+
+  /* Chart palette (same in both themes) */
+  --chart-1: #6366F1;
+  --chart-2: #0EA5E9;
+  --chart-3: #10B981;
+  --chart-4: #F59E0B;
+  --chart-5: #EF4444;
+  --chart-6: #8B5CF6;
+  --chart-7: #14B8A6;
+  --chart-8: #F472B6;
+
+  /* Typography */
+  --font-base: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --fs-xs:   0.75rem;    /* 12 — chips, badges, chart axis labels */
+  --fs-sm:   0.8125rem;  /* 13 — dense table cells, sidebar metadata */
+  --fs-base: 0.875rem;   /* 14 — UI default */
+  --fs-md:   1rem;       /* 16 — prose */
+  --fs-lg:   1.125rem;   /* 18 — section headings */
+  --fs-xl:   1.375rem;   /* 22 — view/page titles */
+  --fs-2xl:  1.75rem;    /* 28 — landing hero only */
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* Radius */
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-full: 999px;
+
+  /* Shadow (light theme only — dark uses borders for elevation) */
+  --shadow-1: 0 1px 2px rgba(16,19,24,.06), 0 1px 3px rgba(16,19,24,.08);
+  --shadow-2: 0 4px 12px rgba(16,19,24,.10), 0 2px 4px rgba(16,19,24,.06);
+
+  /* Motion */
+  --ease: cubic-bezier(.2,.8,.4,1);
+}
+
+/* ---------- Color: dark theme ---------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg:             #101318;
+  --color-surface:        #171B22;
+  --color-sidebar:        #14181E;
+  --color-border:         #262C36;
+  --color-border-strong:  #38404D;
+  --color-text:           #E7EAEF;
+  --color-text-muted:     #A0A9B8;
+  --color-text-faint:     #6E7787;
+  --color-accent:         #818CF8;
+  --color-accent-hover:   #99A2FA;
+  --color-accent-subtle:  #23263B;
+  --color-on-accent:      #10121A;
+  --color-success:        #3FB966;
+  --color-success-subtle: #16281E;
+  --color-danger:         #F87171;
+  --color-danger-subtle:  #2C1A1A;
+  --color-warning:        #E5A54B;
+  --color-warning-subtle: #2A2118;
+  --color-focus:          #818CF8;
+  --overlay:              rgba(0, 0, 0, 0.55);
+
+  --shadow-1: none;
+  --shadow-2: none;
+}
+
+/* No-JS fallback: honor the OS preference when the FOUC-guard script never ran.
+   (With JS on, <html> always carries an explicit data-theme.) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --color-bg:             #101318;
+    --color-surface:        #171B22;
+    --color-sidebar:        #14181E;
+    --color-border:         #262C36;
+    --color-border-strong:  #38404D;
+    --color-text:           #E7EAEF;
+    --color-text-muted:     #A0A9B8;
+    --color-text-faint:     #6E7787;
+    --color-accent:         #818CF8;
+    --color-accent-hover:   #99A2FA;
+    --color-accent-subtle:  #23263B;
+    --color-on-accent:      #10121A;
+    --color-success:        #3FB966;
+    --color-success-subtle: #16281E;
+    --color-danger:         #F87171;
+    --color-danger-subtle:  #2C1A1A;
+    --color-warning:        #E5A54B;
+    --color-warning-subtle: #2A2118;
+    --color-focus:          #818CF8;
+    --overlay:              rgba(0, 0, 0, 0.55);
+
+    --shadow-1: none;
+    --shadow-2: none;
+  }
+}

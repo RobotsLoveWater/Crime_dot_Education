@@ -33,6 +33,21 @@ class Data:
         'reverse_alphanumeric'
     ]
 
+    # display order for the explore column browser's groups; group names come from
+    # the `group` attribute on codebook.xml entries (parsed into self.groups below).
+    # Any group not listed here - including the "Other" fallback - sorts last.
+    GROUP_ORDER = [
+        'Offense',
+        'Sentence',
+        'Departures & reasons',
+        'Criminal history',
+        'Demographics',
+        'Court & process',
+        'Dates',
+        'Sentencing grid',
+        'Identifiers'
+    ]
+
     def __init__(self, preload=None):
 
         # the active dataframe
@@ -42,12 +57,16 @@ class Data:
         # the codebook for looking up descriptions, this is the entry displayed for undocumented columns
         self.codebook = {False: "<Not Documented>"}
 
+        # column -> column-browser group, from each entry's `group` attribute
+        self.groups = {}
+
         # create codebook from xml
         # descriptions are taken from the codebook provided
         tree = ET.parse(self.CODEBOOK_FILE)
         root = tree.getroot()
         for entry in root:
             self.codebook[entry.tag] = entry.text
+            self.groups[entry.tag] = entry.get('group', 'Other')
 
     def filter(self, column, operation, value, inplace=True, source=None) -> pd.DataFrame:
 

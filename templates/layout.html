@@ -1,93 +1,184 @@
-<!-- templates/layout.html -->
+<!-- templates/layout.html — workbench shell: top bar, data-state sidebar, toasts, dialogs -->
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>Minnesota Sentencing Explorer{% block title %}{% endblock %}</title>
+    <script>
+        // FOUC guard: apply the saved (or OS-preferred) theme before first paint.
+        // Partner of static/js/theme.js, which handles toggling. Also marks the
+        // document as JS-capable so CSS can gate the sidebar drawer (no-JS keeps
+        // the sidebar in the page flow instead of behind a toggle).
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem('theme'); } catch (e) {}
+            if (t !== 'light' && t !== 'dark') {
+                t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', t);
+            document.documentElement.classList.add('js');
+        })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/views.css') }}">
+    <script src="{{ url_for('static', filename='js/vendor/htmx.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/theme.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
     {% block head %}{% endblock %}
 </head>
 
 <body>
 
-    <!-- SITE HEADER / NAV -->
-     <header class="site-header">
-         <div class="container">
-             <a href="/" class="logo">Minnesota Sentencing Explorer</a>
-             <nav>
-                 <ul class="nav-links">
-                     <li><a href="/load">Clear Data</a></li>
-                     <li><a href="/info">Descriptive</a></li>
-                     <li><a href="/table">Crosstab</a></li>
-                     <li><a href="/filter">Filter</a></li>
-                     <li><a href="/lesson">Lessons</a></li>
-                     {% if user and user['is_educator'] %}
-                        <li><a href="/admin">Authoring</a></li>
-                     {% endif %}
-                     {% if user %}
-                        <li><a href="/logout" class="btn-logout">Logout</a></li>
-                     {% else %}
-                        <li><a href="/login" class="btn-logout">Login</a></li>
-                     {% endif %}
-                 </ul>
-             </nav>
-         </div>
-     </header>
+<a class="skip-link" href="#main">Skip to content</a>
 
-{% if user %}
-    <!-- HISTORY -->
-    <div class="container">
-        <h2>Current Data History</h2>
-        <table>
-            <tbody>
-            {% for ih in user['history'] %}
-                <tr>
-                    {% if ih['active'] == False %}
-                    <td><a href="{{ url_for('revert', n=loop.index) }}">Revert</a></td>
-                    {% else %}
-                    <td>Current</td>
-                    {% endif %}
-                    <td>{{ ih['desc'] }}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        <hr>
-    </div>
-{% endif %}
+<!-- Global loading bar; driven by htmx request events in app.js -->
+<div class="progress-track" id="progress-track" aria-hidden="true"><div class="progress-thumb"></div></div>
 
-{% if error %}
-    <!-- FLASHES & ERRORS -->
-    <div class="container">
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div class="flash-messages">
-                    {% for msg in messages %}
-                        <div class="flash">{{ msg }}</div>
-                    {% endfor %}
-                </div>
+<!-- TOP BAR -->
+<header class="topbar">
+    {% if user %}
+    <button type="button" class="sidebar-toggle" id="sidebar-toggle"
+            aria-controls="sidebar" aria-expanded="false" aria-label="Open data sidebar">☰</button>
+    {% endif %}
+    <a href="{{ url_for('index') }}" class="brand">Minnesota Sentencing Explorer</a>
+    {% if user %}
+    {% set p = request.path %}
+    {% set section = 'stats' if p.startswith('/info') or p.startswith('/explore') else
+                     'compare' if p.startswith('/table') else
+                     'filter' if p.startswith('/filter') else
+                     'lessons' if p.startswith('/lesson') else
+                     'authoring' if p.startswith('/admin') else '' %}
+    <nav class="topbar-nav" aria-label="Primary">
+        <ul>
+            <li><a href="{{ url_for('explore') }}" {% if section == 'stats' %}aria-current="page"{% endif %}>Statistics</a></li>
+            <li><a href="{{ url_for('table_menu') }}" {% if section == 'compare' %}aria-current="page"{% endif %}>Compare</a></li>
+            <li><a href="{{ url_for('filter_menu') }}" {% if section == 'filter' %}aria-current="page"{% endif %}>Filter</a></li>
+            <li><a href="{{ url_for('lesson_catalog') }}" {% if section == 'lessons' %}aria-current="page"{% endif %}>Lessons</a></li>
+            {% if user['is_educator'] %}
+            <li><a href="{{ url_for('admin') }}" {% if section == 'authoring' %}aria-current="page"{% endif %}>Authoring</a></li>
             {% endif %}
-        {% endwith %}
-        {% if error %}
-            <div class="flash error">
-                {% for ie in error %}<p>{{ ie }}</p>{% endfor %}
-            </div>
+        </ul>
+    </nav>
+    {% endif %}
+    <div class="topbar-user">
+        <button type="button" id="theme-toggle" class="theme-toggle">Theme</button>
+        {% if user %}
+            <span class="user-identity">{{ user['username'] }}
+                {% if user['is_educator'] %}<span class="badge badge-educator">Educator</span>{% endif %}
+            </span>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm">Log out</a>
+        {% else %}
+            <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm">Log in</a>
         {% endif %}
     </div>
-{% endif %}
+</header>
 
-<!-- MAIN CONTENT -->
-<main class="container">
-    {% block body %}{% endblock %}
-</main>
+<!-- WORKBENCH: sidebar (data state) + main area -->
+<div class="workbench{% if not user %} workbench-single{% endif %}">
+
+    {% if user %}
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+    <aside class="sidebar" id="sidebar" aria-label="Data state" tabindex="-1">
+        <section class="datastate">
+            <div class="datastate-header">
+                <h2 class="sidebar-title">Data state</h2>
+                {% if user['history']|length > 1 %}
+                <a href="{{ url_for('revert', n=1) }}" class="btn btn-danger btn-sm"
+                   data-confirm="Remove all filters and return to the full dataset?"
+                   data-confirm-title="Clear data?"
+                   data-confirm-action="Clear data">Clear data</a>
+                {% endif %}
+            </div>
+
+            {% if datastate %}
+            <p class="count-badge badge badge-accent">
+                <strong>{{ '{:,}'.format(datastate['entries']) }}</strong>&nbsp;of {{ '{:,}'.format(datastate['total']) }} cases
+            </p>
+            {% endif %}
+
+            {% set total = user['history']|length %}
+            {% if total > 1 %}
+            <ol class="chip-chain" aria-label="Active filters, in order">
+                {% for step in user['history'] %}
+                    {% if not loop.first %}
+                    <li class="chip-item">
+                        {% if loop.index < total %}
+                            {% set discard = total - loop.index %}
+                            <a class="chip" href="{{ url_for('revert', n=loop.index) }}"
+                               {% if discard > 1 %}
+                               data-confirm="Revert to “{{ step['desc'] }}”? The {{ discard }} later filter steps will be discarded."
+                               data-confirm-title="Revert data state?"
+                               data-confirm-action="Revert"
+                               {% endif %}
+                               title="Revert to this step"
+                               aria-label="Revert to: {{ step['desc'] }}">{{ step['desc'] }}</a>
+                        {% else %}
+                            <span class="chip chip-current">{{ step['desc'] }}<a class="chip-remove"
+                                href="{{ url_for('revert', n=total - 1) }}"
+                                aria-label="Remove filter: {{ step['desc'] }}">&times;</a></span>
+                        {% endif %}
+                    </li>
+                    {% endif %}
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="datastate-empty">No filters applied — you're exploring the full dataset.
+               Use <a href="{{ url_for('filter_menu') }}">Filter</a> to narrow it.</p>
+            {% endif %}
+        </section>
+
+        {# view-specific sidebar modules (e.g. the explore column browser) #}
+        {% block sidebar_extra %}{% endblock %}
+    </aside>
+    {% endif %}
+
+    <main class="main-area" id="main">
+        {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {% for ie in error %}<p>{{ ie }}</p>{% endfor %}
+        </div>
+        {% endif %}
+        <div class="container">
+            {% block body %}{% endblock %}
+        </div>
+    </main>
+
+</div>
 
 <!-- FOOTER -->
 <footer class="site-footer">
-    <div class="container">
-        &copy; {{ current_year }} Sidney Allen
-    </div>
+    &copy; {{ current_year }} Sidney Allen
 </footer>
+
+<!-- TOASTS: Flask flashes render here; app.js adds auto-dismiss and htmx-triggered toasts -->
+<div class="toast-region" id="toast-region">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, msg in messages %}
+        <div class="toast toast-{{ {'success': 'success', 'danger': 'danger', 'error': 'danger'}.get(category, 'info') }}" role="status">
+            <p class="toast-message">{{ msg }}</p>
+            <button type="button" class="toast-close" aria-label="Dismiss notification">&times;</button>
+        </div>
+        {% endfor %}
+    {% endwith %}
+</div>
+
+<!-- CONFIRM DIALOG: filled and opened by app.js from [data-confirm] triggers -->
+<dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title">
+    <div class="dialog-body">
+        <h2 class="dialog-title" id="confirm-title">Are you sure?</h2>
+        <p class="dialog-message" id="confirm-message"></p>
+        <div class="dialog-actions">
+            <button type="button" class="btn btn-secondary" data-dialog-cancel>Cancel</button>
+            <a href="#" class="btn btn-danger" id="confirm-accept">Confirm</a>
+        </div>
+    </div>
+</dialog>
 
 </body>
 </html>

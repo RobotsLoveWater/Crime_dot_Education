@@ -1,10 +1,7 @@
 {% extends "layout.html" %}
-{% block head %}
-<title>Minnesota Analysis of Sentencing Trends</title>
-{% endblock %}
+{% block title %} — Create crosstab{% endblock %}
 
 {% block body %}
-<body>
 
     <h1>Create Crosstab</h1>
     {% for ie in error %}
@@ -16,16 +13,16 @@
         <p>{{ data['entries'] }}</p>
     </div>
 
-    <form method="post">
+    <form method="post" data-loading="Computing statistics…">
         <input type="submit" value="Create Table">
         <br>
-        <h3><input type="radio" name="dependant" value="#">    Use number of occurrences as dependant variable.</h3>
+        <h3><input type="radio" name="dependant" value="#">    Use number of occurrences as dependent variable.</h3>
         <br>
         <table>
             <thead>
                 <tr>
                     <th>Column Header</th>
-                    <th>Set Dependant</th>
+                    <th>Set Dependent</th>
                     <th>Set X Axis</th>
                     <th>Set Y Axis</th>
                 </tr>
@@ -49,5 +46,4 @@
         </table>
     </form>
 
-</body>
 {% endblock %}

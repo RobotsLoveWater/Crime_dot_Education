@@ -72,22 +72,27 @@ uv run flask --app app run     # add --debug for reload
 | File | Role |
 |------|------|
 | `app.py` | Flask routes + the `is_logged_in` / `not_logged_in` helpers. Thin controller layer. |
-| `data.py` | `Data` class — the actual pandas analysis engine: filtering, cross-tabs, per-column stats, MOC filtering. Also `format_column_info()` (sorting for display). |
+| `data.py` | `Data` class — the actual pandas analysis engine: filtering, cross-tabs, per-column stats, MOC filtering. Also `format_column_info()` (sorting for display) and `GROUP_ORDER` (column-browser group display order). `Data()` with no preload is cheap — it only parses `codebook.xml` (app.py keeps one as `CODEBOOK` for metadata). |
 | `cache.py` | The history→cache→dataframe machinery: `get_data`, `get_moc_options`, `_execute`. `__main__` builds `cache/raw.csv` from `dataset.sav`. (Header comment calls it `precache.py`.) |
 | `account.py` | User accounts as pickles under `user/`. Create/retrieve/history-add/revert, plus **learning-module `progress`/`state` helpers** (`get_progress`, `set_progress`, `set_lesson_state`) and the `is_educator` role flag. |
 | `lessons.py` | Learning-modules loader/validator: `list_modules`, `get_module`, `validate`, `save_module` over `lessons/*.json`. Pure stdlib module (no Flask), mirrors `account.py`. |
 | `make_history.py` | Builds history entry dicts (`action` list + human-readable `desc`). |
 | `moc.py` | `MnOffenseCodes.CODES` — a huge (~1800-line) nested dict decoding the Minnesota Offense Code. Pure data + structure. |
 | `util.py` | `ordinal()` and bcrypt `get_hashed_password` / `check_password`. (Header comment is wrong — says `make_history.py`.) |
-| `codebook.xml` | Maps dataset column names → human descriptions (161 entries). Loaded by `Data.__init__`. |
+| `codebook.xml` | Maps dataset column names → human descriptions; each entry also carries a `group` attribute placing the column in an explore column-browser category (display order in `Data.GROUP_ORDER`). Loaded by `Data.__init__` (descriptions → `self.codebook`, groups → `self.groups`). Some entry names don't match real dataset columns (see gotchas). |
 | `settings.xml` | seaborn palette/style (`deep` / `darkgrid`). Not heavily used yet. |
 | `test.py` | Ad-hoc scratch script for the history→cache-key encoding. Not a real test suite. |
-| `templates/` | Jinja2. `layout.html` is the base (nav + history table + error block); others extend it. Learning-modules views: `lesson_catalog.html`, `lesson.html`, `lesson_step.html`, `admin.html`, `admin_edit.html`. |
+| `templates/` | Jinja2. `layout.html` is the base — the Phase 1 **workbench shell**: top bar (nav + theme toggle + identity), data-state **sidebar** (count badge, filter chips, Clear data; `{% block sidebar_extra %}` hosts view-specific modules), toast region, confirm `<dialog>`, htmx progress bar; others extend it via `{% block body %}`. `explore.html` + `templates/partials/` (`column_browser.html`, `explore_landing.html`, `explore_column.html`) are the Phase 2 statistics workbench — partials render standalone on htmx fragment requests (`fragment=True` adds the `<title>` htmx uses to retitle the page) and are `{% include %}`d on full loads. `error.html` renders the styled 404/500 handlers. Learning-modules views: `lesson_catalog.html`, `lesson.html`, `lesson_step.html`, `admin.html`, `admin_edit.html`. (`info.html`/`info_menu.html` were deleted in Phase 2.) |
 | `lessons/` | Authored learning-module content (`<id>.json`) + `README.md` schema. **Safe to commit** (unlike `user/`). |
 | `LEARNING_MODULES_PROMPTS.md` | Phased build plan for the learning-modules feature. All phases are now implemented; the doc still reads as forward-looking. |
-| `UI_OVERHAUL_PROMPTS.md` | Phased build plan for the UI/UX overhaul (sidebar workbench redesign). **Not yet implemented** — see "Planned: UI/UX overhaul" below. |
+| `UI_OVERHAUL_PROMPTS.md` | Phased build plan for the UI/UX overhaul (sidebar workbench redesign). **Phases 0 (hygiene/tokens/vendored assets), 1 (workbench shell), and 2 (explore workbench) are done**; Phases 3–7 remain — see "In progress: UI/UX overhaul" below. |
 | `STYLEGUIDE.md` | **Design authority** for all UI work: tokens (light+dark), typography, layout, components, htmx conventions, a11y checklist. Read it before touching `templates/` or `static/`. |
-| `static/css/style.css` | Current (pre-overhaul) styling; theme via CSS variables (`--color-accent`, etc.). Slated for replacement by the token system specified in `STYLEGUIDE.md`. |
+| `static/css/tokens.css`, `static/css/base.css` | Phase 0 token system: all design tokens (both themes, exact `STYLEGUIDE.md` tables — plus `--overlay` for drawer/dialog backdrops) and reset/typography/focus/reduced-motion. Loaded first; theme switches via `data-theme` on `<html>` (FOUC-guard inline script in `layout.html` — which also sets a `js` class gating JS-only CSS — toggle in `static/js/theme.js`, persisted to `localStorage.theme`, fires a `themechange` event). |
+| `static/css/components.css`, `static/css/views.css` | Phase 1 shell styles per the styleguide's file organization: `components.css` = buttons/badges/chips/toasts/dialog/alerts/empty-state/loading; `views.css` = top bar, workbench grid, sidebar + tablet drawer, breakpoints. Loaded **after** `style.css` so new shell rules win ties. |
+| `static/css/style.css` | **Legacy** pre-overhaul component styles, re-pointed at the tokens (old names like `--color-panel`/`--color-muted` are aliases in its `:root`). Phase 1 removed its header/nav/flash/footer rules (shell-owned now); the rest is retired once its last consumer is rebuilt. |
+| `static/js/app.js` | Phase 1 shell behaviors (vanilla, no build step): toast auto-dismiss + `HX-Trigger`/`htmx:responseError` toast paths, `[data-confirm]` dialog interception, sidebar drawer with focus trap, htmx-bound global progress bar, `[data-loading]` submit feedback ("Computing statistics…"). |
+| `static/js/explore.js` | Phase 2 explore behaviors: distribution chart (Chart.js; colors read from CSS tokens at render time, re-rendered on `themechange` and htmx swaps/history restores; horizontal bars when labels run long), column-browser search, value-table search + "show more" pagination, active-column `aria-current` sync, tablet-drawer auto-close on column pick. Loaded (with `chart.umd.min.js`) only via `explore.html`'s `{% block head %}`. |
+| `static/js/vendor/` | Vendored, pinned htmx 2.0.10 + Chart.js 4.5.1 (`VERSIONS.md` is the manifest; never hand-edit). Inter variable font at `static/fonts/InterVariable.woff2`. htmx is loaded by `layout.html`; Chart.js only by `explore.html`. |
 
 ## Key data structures
 
@@ -117,19 +122,39 @@ CODES['A'] = [ 'Assault',                 # [0] title (comment '# Complete' = fu
 
 ## Routes (in `app.py`)
 
-- `/`, `/landing` — home dashboard (shows history table via `layout.html`).
+- `/`, `/landing` — home dashboard (the data state renders in the shell's sidebar on every page).
 - `/new`, `/login`, `/logout` — account/session. Session keys: `userid` (`classcode/username`), plus `username`/`classcode`.
-- `/info/`, `/info/<column>/<sorting>` — descriptive stats per column. `sorting` ∈ `Data.VALID_SORTING`.
+- `/explore` (landing) and `/explore/column/<column>[/<sorting>]` — the Phase 2 statistics
+  workbench: sidebar column browser + stat cards, Chart.js distribution (top 20 + "Other"),
+  segmented sort control, searchable value table. `sorting` ∈ `Data.VALID_SORTING` (default
+  `occurrence`, omitted from the canonical URL). One shared renderer (`render_explore`)
+  returns the full page normally and just the `templates/partials/` fragment when
+  `HX-Request` is present (`wants_fragment()` — htmx history restores get the full page);
+  navigation uses `hx-push-url`. Excluded columns and unknown columns bounce to `/explore`
+  with a flash. **Legacy redirects:** `/info/` → `/explore`, `/info/<column>[/<sorting>]` →
+  `/explore/column/...` — endpoint names `info_menu`/`info_specific` survive because
+  `build_explore` still emits `/info/...` deep links (updated in Phase 5).
 - `/table`, `/table/<dependant>/<x_axis>/<y_axis>` — cross-tab (N, mean, median, std). `dependant == '#'` means count only.
 - `/filter/` menu; `/filter/boolean/<column>/<sorting>` — comparison filters (single or OR-multiple); `/filter/moc/...` — offense-code drill-down.
-- `/load` — clear history (revert to the base full-dataset entry). `/revert/<n>` — revert the
-  history to a prior entry (`account.history_revert`, truncating to `history[:n]`; `n` is the
-  1-based row position from the dashboard history table).
+- `/load` — clear history (revert to the base full-dataset entry); no longer linked from the
+  nav (the sidebar's confirmed "Clear data" button hits `/revert/1` instead). `/revert/<n>` —
+  revert the history to a prior entry (`account.history_revert`, truncating to `history[:n]`;
+  `n` is the 1-based history position — the sidebar chips link here: clicking a chip reverts
+  to that step, the last chip's `×` removes just that step). Filter apply, revert, and clear
+  all `flash()` a message that `layout.html` renders as a toast.
 - **Learning modules:** `/lesson` (catalog), `/lesson/<module_id>` (overview), `/lesson/<module_id>/<step>` (render; POST grades a `question`), `/lesson/<module_id>/complete` (mark done). See "Learning Modules" below.
 - **Authoring (educators only):** `/admin` (list your class's modules), `/admin/edit[/<module_id>]` (create/edit → writes validated JSON to `lessons/`). Guarded by `require_educator()`.
 - `/guide` — static guide page (replaced the old buggy `/lesson/get_started` stub). `/download`, `/save`, `/other`, `/settings` — still **stubs** returning "WIP, Feature Not Implemented".
 
 Every data route follows the pattern: `if is_logged_in(): ... else: return not_logged_in()`.
+(`not_logged_in()` is htmx-aware: on an `HX-Request` it answers with an `HX-Redirect` header
+so the client does a full-page redirect instead of swapping the login page into a fragment.)
+
+Styled `404`/`500` handlers render `error.html` (via the never-raising `current_user()` helper).
+The `inject_globals` context processor also computes `datastate` (current + total case count)
+for the sidebar badge on every logged-in render — cheap when cached, but it means the redirect
+after applying a *new* filter pays the history replay immediately rather than on the next data
+view. `hx_toast()` sets the `HX-Trigger` header for htmx-response toasts (used from Phase 2 on).
 
 ## Storage layout (all git-ignored — see `.gitignore`)
 
@@ -147,6 +172,17 @@ Every data route follows the pattern: `if is_logged_in(): ... else: return not_l
 - Rounding idiom throughout `data.py`: `round(x * 10**precision) / 10**precision`.
 - Cache-path bug guard: trailing `/` is stripped in `get_data` before appending `_data.bin`.
 - Header comments in `cache.py` and `util.py` are copy-paste-wrong (say `precache.py` / `make_history.py`). Filenames in the table above are authoritative.
+- **Codebook/dataset name mismatches:** `codebook.xml` documents `saytlnth`, `FindRestOnly`,
+  `subscspred` but the dataset columns are `staylnth`, `FineRestOnly`, `subcscpred` (and
+  `ethnic`, `sentord`, `fine`, `mocwpn`, `weapon`, `post802`, `Raceorig`, `prescon`, `dconv`,
+  `countoff`, `recodeh`, `sextrafficking` have codebook entries but no dataset column at all) —
+  those columns are invisible in the app. Renaming the tags would document them; left for the
+  author to confirm. (Phase 2 already fixed the duplicated `<preason2>` → `<preason3>` and a
+  stray `>` in `pper`'s text.)
+- **Cached pickles can hold stale codebook text.** `_data.bin` stores the codebook-description
+  dict and `<column>.bin` stores a `header`, both frozen at cache-build time. The explore views
+  therefore read display names from the live codebook parse (`CODEBOOK` in `app.py`), never
+  from the cache; only legacy views (crosstab menu) still show cached descriptions.
 - Line-ending: repo is on Windows; git may warn about LF→CRLF. Harmless.
 
 ## Known issues / incomplete (don't assume these work)
@@ -164,11 +200,52 @@ Every data route follows the pattern: `if is_logged_in(): ... else: return not_l
 - Stubbed/`pass`-only: `Data.filter_and`, `filter_or_diff` (partial), `make_history.filter_or_diff`, `filter_and`, `moc_or`; the `d` and `a` action codes are not handled by `_execute` (raise `ValueError`).
 - **Learning-module `checkpoint` steps are not wired up.** `lessons.py` validates a step's `expect_state`, but `app.lesson_step` builds no context for `checkpoint` and `lesson_step.html` falls through to the generic "Interactive step — coming next phase" placeholder — nothing compares the student's active state to `expect_state`. Both shipped lessons (`intro-explorer-basics`, `intro-descriptive-stats`) *end* on such a step. (Note: `current_year` is now injected globally via a context processor and `index` passes `hero_image_url`, so those earlier template-variable gaps are resolved.)
 
-## Planned: UI/UX overhaul (`ui-overhaul` branch)
+## In progress: UI/UX overhaul (`ui-overhaul` branch)
 
-A full redesign of the presentation layer, planned with the author (2026-07) but **not yet
-implemented**. The routes, templates, and CSS described elsewhere in this file are the
-**pre-overhaul state**; update those sections as phases land.
+A full redesign of the presentation layer, planned with the author (2026-07). **Phases 0–2
+are done** (see below); Phases 3–7 are not started. The crosstab/filter view layouts described
+elsewhere in this file are still the pre-overhaul state; update those sections as phases land.
+
+**Phase 0 (done — foundations, no redesign):** every child template's nested `<body>` (and
+`load.html`/`guide.html`'s nested `<head>`) removed — `layout.html` owns the document shell
+and a unified `<title>` via `{% block title %}` ("Minnesota Sentencing Explorer — <Page>");
+flash rendering moved out of the `{% if error %}` conditional (and `/logout` now flashes a
+confirmation, the first real `flash()` call); "disabled" sort/select options render as
+non-interactive `<span aria-disabled="true">` instead of live links (killing the
+`occurrencee` typo'd href); user-facing "Dependant" → "Dependent"; SVG favicon added;
+htmx 2.0.10 + Chart.js 4.5.1 vendored (not yet loaded) and Inter self-hosted;
+`tokens.css`/`base.css`/`theme.js` created with the FOUC-guarded light/dark toggle, and
+`style.css` re-pointed at the tokens so all current pages already work in both themes.
+
+**Phase 1 (done — workbench shell):** `layout.html` rebuilt as the shell — top bar (brand;
+Statistics · Compare · Filter · Lessons nav with `aria-current="page"`; Authoring for
+educators; theme toggle; identity + educator badge; logout) and the **data-state sidebar**
+that replaced the on-page history table: live count badge ("N of 294,467 cases", from the
+`datastate` context processor), filter chips from `history` descs (click a chip = revert to
+that step, `<dialog>`-confirmed when it discards >1 step; only the last chip gets an `×`;
+"Clear data" button — removed from the nav — always confirms and hits `/revert/1`). Sidebar
+is persistent ≥1024px, a focus-trapped slide-over drawer at 768–1023px, hidden <768px with
+JS (no-JS keeps it in-flow; phone treatment is Phase 7). Flask flashes render as **toasts**
+(auto-dismiss 5s, pause on hover; filter apply/revert/clear/logout now flash); the
+`HX-Trigger` toast path and `htmx:responseError` danger toast are wired for later phases.
+htmx is loaded + bound to a global top progress bar (views still full-page-navigate);
+`[data-loading]` forms (boolean/MOC filter, crosstab builder) show a submit spinner +
+"Computing statistics…". Styled 404/500 (`error.html`) + empty-state component. New files:
+`components.css`, `views.css`, `app.js`; new `--overlay` token (folded into `STYLEGUIDE.md`).
+
+**Phase 2 (done — explore workbench):** `/explore` + `/explore/column/<col>[/<sorting>]`
+replace the `/info` statistics views (old URLs redirect; endpoint names kept for lesson deep
+links). One shared renderer serves full pages or `templates/partials/` fragments per
+`wants_fragment()`; browser/sort navigation swaps `#explore-view` via htmx with
+`hx-push-url`, so every state survives hard refresh. Sidebar gained the **column browser**
+(grouped per `codebook.xml` `group` attributes + `Data.GROUP_ORDER`, JS search, excluded
+columns disabled with a tooltip — the `!!!WARNING!!!` marker is gone). The statistics view:
+stat cards (N, missing, mean/median/std), theme-aware Chart.js top-20+"Other" distribution
+(`explore.js`), segmented sort control (links + `aria-current`), sticky-header value table
+with search + "show more", and a "Filter this column" CTA into the Phase 4-pending filter
+route. Display headers come from the live codebook parse, never cached pickles. Codebook
+fixes: duplicate `<preason2>` → `<preason3>`, stray `>` in `pper`. New files: `explore.html`,
+`templates/partials/*`, `explore.js`; deleted `info.html`/`info_menu.html`.
 
 **Locked direction** (author-approved): sidebar **workbench** IA (`/explore` with htmx
 fragment swaps), hand-rolled CSS token system (no build step), Chart.js visuals, light+dark
