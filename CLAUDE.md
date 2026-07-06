@@ -85,6 +85,8 @@ uv run flask --app app run     # add --debug for reload
 | `templates/` | Jinja2. `layout.html` is the base — the Phase 1 **workbench shell**: top bar (nav + theme toggle + identity), data-state **sidebar** (count badge, filter chips, Clear data; `{% block sidebar_extra %}` hosts view-specific modules), toast region, confirm `<dialog>`, htmx progress bar; others extend it via `{% block body %}`. `explore.html` + `templates/partials/` (`column_browser.html`, `explore_landing.html`, `explore_column.html`) are the Phase 2 statistics workbench — partials render standalone on htmx fragment requests (`fragment=True` adds the `<title>` htmx uses to retitle the page) and are `{% include %}`d on full loads. `compare.html` + `partials/compare_builder.html`/`compare_results.html` are the Phase 3 crosstab workbench on the same pattern (replacing the deleted `perm_menu.html`/`perm.html`). `filter.html` + `partials/filter_landing.html`/`filter_column.html`/`filter_preview.html`/`filter_zero.html` are the Phase 4 **Filter workbench** (same fragment pattern; the sidebar reuses the now-parametrized `column_browser.html` pointed at the filter routes), and `moc1.html`/`moc.html` are the rebuilt offense-code chooser + 5-slot stepper. The Phase 4 rewrite deleted `filter_boolean.html`/`filter_boolean_menu.html`. `error.html` renders the styled 404/500 handlers. Learning-modules views (Phase 5 restyled + docked): `lesson_catalog.html`, `lesson.html`, `lesson_step.html` (extends `layout.html`, fills the new `{% block dock %}`; the main area `{% include %}`s `partials/lesson_data.html` — the read-only sandbox data view), `admin.html`, `admin_edit.html`. (`info.html`/`info_menu.html` were deleted in Phase 2.) |
 | `lessons/` | Authored learning-module content (`<id>.json`) + `README.md` schema. **Safe to commit** (unlike `user/`). |
 | `LEARNING_MODULES_PROMPTS.md` | Phased build plan for the learning-modules feature. All phases are now implemented; the doc still reads as forward-looking. |
+| `EDUCATOR_PORTAL.md` | **Design/scope authority** for the planned educator portal + class-code system: features (P0/P1/P2), the resolved class & identity model, privacy rules, open questions. Read before touching that feature. |
+| `EDUCATOR_PORTAL_PROMPTS.md` | Phased build order (14 phases, 0–13, each with a complexity rating → suggested model) for the educator portal + class-code system + auth hardening. **Not yet built** — see "Planned: Educator portal" below. |
 | `UI_OVERHAUL_PROMPTS.md` | Phased build plan for the UI/UX overhaul (sidebar workbench redesign). **Phases 0 (hygiene/tokens/vendored assets), 1 (workbench shell), 2 (explore workbench), 3 (compare workbench + CSV export), 4 (filter workbench: live previews, searchable values, MOC stepper), 5 (docked lessons + checkpoint wiring), 6 (auth pages/landing/logged-in home), and 7 (responsive/a11y/dark QA + `style.css` removal) are done** — the overhaul is feature-complete; see "In progress: UI/UX overhaul" below. |
 | `STYLEGUIDE.md` | **Design authority** for all UI work: tokens (light+dark), typography, layout, components, htmx conventions, a11y checklist. Read it before touching `templates/` or `static/`. |
 | `static/css/tokens.css`, `static/css/base.css` | Phase 0 token system: all design tokens (both themes, exact `STYLEGUIDE.md` tables — plus `--overlay` for drawer/dialog backdrops) and reset/typography/focus/reduced-motion. Loaded first; theme switches via `data-theme` on `<html>` (FOUC-guard inline script in `layout.html` — which also sets a `js` class gating JS-only CSS — toggle in `static/js/theme.js`, persisted to `localStorage.theme`, fires a `themechange` event). |
@@ -237,8 +239,11 @@ view. `hx_toast()` sets the `HX-Trigger` header for htmx-response toasts (used f
 
 - **Login does not verify the password.** `util.check_password` exists but is never called;
   `/login` only checks that the username exists, then creates a session. Treat auth as insecure.
+  **Scheduled to be fixed** in `EDUCATOR_PORTAL_PROMPTS.md` Phase 0 (mind the `html.escape`
+  normalization — `/new` hashes `html.escape(password)`, so verify must match it).
 - **Hardcoded Flask `secret_key`** in `app.py` (marked "DEVELOPMENT ONLY"). The repo is a
   **public** GitHub repo — do not treat this key as secret; rotate + move to env var if productionizing.
+  **Scheduled** in `EDUCATOR_PORTAL_PROMPTS.md` Phase 0 (`secret_key` → environment config).
 - **Account create/login existence checks — fixed.** `get_user_list` now returns bare usernames
   (it used to return `.pickle`-suffixed filenames, so `/new` never detected duplicates — it fell
   through to `create` and crashed — and `/login` rejected every existing user); and
@@ -407,6 +412,40 @@ including phones, all assets vendored (no runtime CDN — school networks filter
 Note: Phase 5 fixed the "checkpoint steps not wired up" known issue above; Phase 6 fixed the
 `/new` session-keys issue. Password verification and the hardcoded `secret_key` stay **out of
 scope** (separate branch — see the prompts doc's Appendix C).
+
+## Planned: Educator portal + class-code system (`educator-portal` branch)
+
+Planned next initiative (scoped with the author, 2026-07) — **not yet built**. Turns the thin
+`edu-` classcode convention into a real portal and class-code system, and hardens auth (the
+portal exposes cross-account student data).
+
+**What it adds:**
+- **Classes as first-class objects.** An educator (an `edu-` account) creates named **classes**,
+  each an immutable `class_id` with a rotatable student **join code**, roster, per-module
+  assignments, and settings — stored as `classes/<class_id>.json` via a new pure-stdlib
+  `classroom.py` (mirroring `account.py`/`lessons.py`; `classes/` is git-ignored). This resolves
+  today's role-from-prefix flaw: students **join with a join code** and stay members
+  (`is_educator=False`) instead of sharing the educator's `edu-` code.
+- **The signup code box becomes lookup-resolved:** blank → public/`unmanaged`; `edu-*` →
+  educator; a live join code → student enrollment (namespaced under `user/<class_id>/`); else an
+  error. Class codes finally get validated.
+- **Educator portal** (`/admin` restructured): student-progress dashboard + "needs attention"
+  triage, class management (create/roster/rotate/archive), per-module assignment & pacing,
+  item-level analytics (a new append-only attempt log per student), gradebook CSV export,
+  shareable data-state links, computed answer keys, retake/feedback policy, per-module teaching
+  notes.
+- **Auth hardening** (Phase 0, prerequisite): wire `util.check_password` into `/login` (minding
+  the `html.escape` normalization so existing hashes still match) and move `secret_key` to
+  environment config — fixing the two auth items in "Known issues" above.
+
+**Scope:** auth + P0 (features 1–6) + P1 (features 7–12) from `EDUCATOR_PORTAL.md`; P2 deferred.
+
+**The two documents that govern the work:**
+- `EDUCATOR_PORTAL.md` — scope & design authority (features, the class/identity model, privacy,
+  open questions).
+- `EDUCATOR_PORTAL_PROMPTS.md` — the build order: 14 phases (0–13), each with read-first files,
+  acceptance criteria, don'ts, and a **complexity rating** (Low/Medium/High → suggested model).
+  Phase 13 updates `README.md` and `ROADMAP.md` to the shipped state.
 
 ## Learning Modules (implemented)
 

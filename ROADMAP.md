@@ -32,6 +32,21 @@ Disseminate Minnesota Sentencing Commission felony-sentencing data through a web
 
 Grouped by theme; ordering within each is roughly by priority.
 
+### 0. Educator portal & class-code system (active initiative)
+
+The current build focus (scoped with the author, 2026-07). Turns the implicit `edu-` classcode
+convention into a real **class-code system** — educators create **classes** as first-class objects
+(immutable id + rotatable student **join code**, roster, assignments), and students **join with a
+code** and stay members — plus an **educator portal** on top: student-progress dashboards +
+"needs attention" triage, class/roster management, per-module assignment & pacing, item-level
+analytics, gradebook CSV export, shareable data-state links, and teaching notes. This **subsumes
+the "Real authentication" item** under Platform hardening (below): its Phase 0 verifies passwords
+and moves `secret_key` to config, since the portal exposes cross-account student data.
+
+Governed by two documents: **`EDUCATOR_PORTAL.md`** (scope & design authority) and
+**`EDUCATOR_PORTAL_PROMPTS.md`** (the 14-phase build order, 0–13, each with a complexity rating).
+Scope: auth + P0 + P1; P2 (fork-and-edit, standards tags, full authoring UI) deferred.
+
 ### 1. Dissemination gaps (closest to the original goals)
 
 - **Reintroduce figures / visualization.** The legacy CLI could graph with Seaborn; the web app
@@ -55,7 +70,9 @@ Grouped by theme; ordering within each is roughly by priority.
 ### 3. Platform hardening (prerequisites for real deployment)
 
 - **Real authentication.** Verify passwords (the bcrypt helper `util.check_password` exists but
-  is never called) and move the Flask `secret_key` out of source into configuration.
+  is never called) and move the Flask `secret_key` out of source into configuration. **Now
+  scoped into the educator-portal initiative** (see section 0) — Phase 0 of
+  `EDUCATOR_PORTAL_PROMPTS.md`.
 - **Fix latent account bugs.** `account.create` returns the wrong value for an already-existing
   user; `/new` does not set all session keys.
 - **Complete stubbed operations** if needed: AND / OR-across-different-columns filters (the `a`
