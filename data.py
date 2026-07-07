@@ -155,6 +155,28 @@ class Data:
     def save(self, filename, ext='.csv') -> None:
         self.df.to_csv(filename + ext)
 
+    def save_parquet(self, filename, ext='.parquet') -> None:
+        # Write the base as a typed columnar Parquet file (Lever C: ~10x smaller on disk,
+        # ~20x faster to parse than the CSV). pyarrow needs a single Arrow type per column,
+        # but a few category columns carry mixed str/float categories (a read_csv
+        # type-inference artifact on messy source values) that can't be dictionary-encoded.
+        # Stringify just those columns' categories; every other column (all float64 + the
+        # clean categoricals) is written verbatim, so a Parquet round-trip is byte-identical
+        # to the CSV base for them. The handful of mixed columns normalize to string labels
+        # (and a couple merge equal-looking values). See BASE_DATAFRAME_OPTIMIZATION.md.
+        out = self.df
+        fixups = {}
+        for col in out.columns:
+            s = out[col]
+            if str(s.dtype) == 'category' and not all(isinstance(c, str) for c in s.cat.categories):
+                obj = s.astype(object)          # category -> object; missing stays NaN
+                mask = s.notna()
+                obj[mask] = obj[mask].map(str)  # str() only the present values (keep NaN)
+                fixups[col] = obj.astype('category')
+        if fixups:
+            out = out.assign(**fixups)          # new frame; self.df is left untouched
+        out.to_parquet(filename + ext, engine='pyarrow', index=False)
+
     def load(self, filename) -> None:
         # load dataframe or concat with existing
         # filenames is expecting a string
@@ -165,10 +187,25 @@ class Data:
         # if the last three characters of the filename is 'sav' assume the file is in spss format, .csv for csv
         if filename[-4:] == '.sav':
             temp_df = pd.read_spss(filename)
+        elif filename[-8:] == '.parquet':
+            # typed columnar base (Lever C): dtypes (category + float64) are stored in the
+            # file, so no type re-inference or category cast is needed on read.
+            temp_df = pd.read_parquet(filename)
         elif filename[-4:] == '.csv':
             temp_df = pd.read_csv(filename)
         else:
-            raise ValueError(filename + " is not a valid SPSS or CSV file.")
+            raise ValueError(filename + " is not a valid SPSS, Parquet, or CSV file.")
+
+        # Lever A (base DataFrame optimization): the string columns dominate the base's
+        # resident memory (~92% of it). Re-type object -> category to cut RAM ~2.5-3.5x.
+        # Numeric columns (float64/int64) are left untouched on purpose: the filter/stat
+        # code branches on `dtype == 'float64'` (filter / get_column_info /
+        # get_numeric_columns above), and eq/ne on a categorical selects the same rows as
+        # on object, so results and cache keys stay byte-identical. See
+        # BASE_DATAFRAME_OPTIMIZATION.md.
+        cast = {c: 'category' for c in temp_df.select_dtypes(include='object').columns}
+        if cast:
+            temp_df = temp_df.astype(cast)
 
         # if no file is currently loaded replace the emptiness with the new dataframe
         if self.df is None:

@@ -40,21 +40,39 @@ Consequences:
 
 ## Data flow / bootstrap (IMPORTANT for setup)
 
-The runtime does **not** read `dataset.sav` directly. It reads `cache/raw.csv`.
+The runtime does **not** read `dataset.sav` directly. It reads the **base datafile** — the typed
+columnar `cache/raw.parquet` when present, else `cache/raw.csv` (Lever C).
 
 ```
 dataset.sav (SPSS, ~141 MB, git-ignored)
     │  one-time precompute:  uv run python cache.py   (its __main__ block)
     ▼
-cache/raw.csv  (~242 MB, git-ignored)   ← DATAFILE that _execute() loads at runtime
+cache/raw.csv  (~242 MB, git-ignored)   ← human-inspectable CSV base + CSV fallback
+    │  cache.py __main__ then re-loads raw.csv and writes:
+    ▼
+cache/raw.parquet  (~23 MB, git-ignored)  ← DATAFILE that _execute() prefers at runtime
     │  optional: also pre-caches per-column stats into cache/data/
     ▼
-runtime: cache._execute() loads cache/raw.csv, replays user history filters
+runtime: cache._base_df() loads the base ONCE per process (Lever B), _execute() replays
+         user history filters on top of that shared, immutable base
 ```
 
 To stand the app up on a fresh machine you must obtain `dataset.sav` (not in git), then run
-`uv run python cache.py` and answer `y` to both prompts to generate `cache/raw.csv` and warm the cache.
-`DATAFILE = 'cache/raw.csv'` and `DATAPATH = 'cache/data/'` are defined at the top of `cache.py`.
+`uv run python cache.py` and answer `y` to the prompts (create raw csv? / create raw parquet? /
+cache info?) to generate `cache/raw.csv` + `cache/raw.parquet` and warm the cache. `cache.py`
+defines `DATAFILE_PARQUET`/`DATAFILE_CSV` and resolves `DATAFILE` to the Parquet base when it
+exists (else the CSV); `DATAPATH = 'cache/data/'`. Repoint `DATAFILE` (or delete `raw.parquet`)
+to force the CSV loader — it stays a working fallback.
+
+**Base DataFrame optimization (Levers A–C, on `base-df-optimization`):** `Data.load` casts the
+116 string columns to `category` (Lever A, ~8× RAM: ~1.72 GiB → ~0.22 GiB); `cache._base_df()`
+memoizes the base so cache misses stop re-parsing it (Lever B); and `cache/raw.parquet` replaces
+the 242 MB CSV parse (~4.2 s) with a ~0.25 s typed load (Lever C, ~10× smaller on disk). All three
+are verified byte-identical against the Phase 0 golden `.bin` snapshot. Numeric columns stay
+`float64` (the three `dtype == 'float64'` checks in `data.py` depend on it). One caveat: Parquet
+needs one type per column, so `save_parquet` stringifies 4 mixed-type category columns
+(`Statute_Chapter`, `Statute_Subdivision`, `presumptlifeid`, `ssection` — none are golden or
+excluded columns); the CSV fallback keeps their original mixed values.
 
 ## Running it
 
@@ -71,9 +89,9 @@ uv run flask --app app run     # add --debug for reload
 
 | File | Role |
 |------|------|
-| `app.py` | Flask routes + the `is_logged_in` / `not_logged_in` helpers. Thin controller layer. |
-| `data.py` | `Data` class — the actual pandas analysis engine: filtering, cross-tabs, per-column stats, MOC filtering. Also `format_column_info()` (sorting for display) and `GROUP_ORDER` (column-browser group display order). `Data()` with no preload is cheap — it only parses `codebook.xml` (app.py keeps one as `CODEBOOK` for metadata). |
-| `cache.py` | The history→cache→dataframe machinery: `get_data`, `get_moc_options`, `_execute`. `__main__` builds `cache/raw.csv` from `dataset.sav`. (Header comment calls it `precache.py`.) |
+| `app.py` | Flask routes + the `is_logged_in` / `not_logged_in` helpers. Thin controller layer. At import time it eagerly warms `cache._base_df()` (guarded — a missing datafile logs and falls back to lazy load) so gunicorn `--preload` shares the base across workers (Lever D). |
+| `data.py` | `Data` class — the actual pandas analysis engine: filtering, cross-tabs, per-column stats, MOC filtering. `load` reads `.sav`/`.parquet`/`.csv` and casts string (`object`) columns to `category` (Lever A — numeric dtypes untouched); `save_parquet` writes the typed Parquet base (Lever C — stringifies 4 mixed-type category columns pyarrow can't encode). Also `format_column_info()` (sorting for display) and `GROUP_ORDER` (column-browser group display order). `Data()` with no preload is cheap — it only parses `codebook.xml` (app.py keeps one as `CODEBOOK` for metadata). |
+| `cache.py` | The history→cache→dataframe machinery: `get_data`, `get_moc_options`, `_execute`, plus `_base_df()` — the load-once base-DataFrame singleton (Lever B; debug-only shape/id mutation tripwire). `DATAFILE` resolves to `cache/raw.parquet` when present, else `cache/raw.csv`. `__main__` builds `cache/raw.csv` from `dataset.sav`, then `cache/raw.parquet` from the CSV. (Header comment calls it `precache.py`.) |
 | `account.py` | User accounts as pickles under `user/`. Create/retrieve/history-add/revert, plus **learning-module `progress`/`state` helpers** (`get_progress`, `set_progress`, `set_lesson_state`) and the `is_educator` role flag. Educator-portal additions: `create(..., classes=)` records class memberships; `add_class`/`remove_class` keep the account's `classes` list in sync with a roster; `reset_progress` and `delete_account` back the portal's roster-management ops. |
 | `lessons.py` | Learning-modules loader/validator: `list_modules`, `get_module`, `validate`, `save_module` over `lessons/*.json`. Pure stdlib module (no Flask), mirrors `account.py`. |
 | `classroom.py` | **Educator-portal class model.** Pure stdlib (no Flask), mirrors `lessons.py`/`account.py` over a git-ignored `classes/<class_id>.json` store. `create_class`/`get_class`/`list_classes`, `find_by_join_code` (case-insensitive, skips archived), roster ops (`enroll`/`remove_student`), `rotate_join_code` (never touches the immutable `class_id` or roster), `set_assignments`/`get_assignments`, `set_email_policy`/`email_allowed`, `set_policy` (retake/feedback), `archive`/`unarchive`, and `validate`. Immutable `class_id` = slug + random suffix; rotatable `join_code` from an unambiguous alphabet (no `0/O/1/I/L`). Schema in `EDUCATOR_PORTAL_PROMPTS.md` Appendix A. |
@@ -84,6 +102,7 @@ uv run flask --app app run     # add --debug for reload
 | `codebook.xml` | Maps dataset column names → human descriptions; each entry also carries a `group` attribute placing the column in an explore column-browser category (display order in `Data.GROUP_ORDER`). Loaded by `Data.__init__` (descriptions → `self.codebook`, groups → `self.groups`). Some entry names don't match real dataset columns (see gotchas). |
 | `settings.xml` | seaborn palette/style (`deep` / `darkgrid`). Not heavily used yet. |
 | `test.py` | Ad-hoc scratch script for the history→cache-key encoding. Not a real test suite. |
+| `test_base_immutability.py` | **Guardrail for the base DataFrame optimization**: asserts the base frame is byte-for-byte unchanged after the full filter/read pipeline and that `cache._execute` matches direct filtering. Run `uv run python test_base_immutability.py`; must keep passing — the load-once/CoW sharing rests on it. |
 | `templates/` | Jinja2. `layout.html` is the base — the Phase 1 **workbench shell**: top bar (nav + theme toggle + identity), data-state **sidebar** (count badge, filter chips, Clear data; `{% block sidebar_extra %}` hosts view-specific modules), toast region, confirm `<dialog>`, htmx progress bar; others extend it via `{% block body %}`. `explore.html` + `templates/partials/` (`column_browser.html`, `explore_landing.html`, `explore_column.html`) are the Phase 2 statistics workbench — partials render standalone on htmx fragment requests (`fragment=True` adds the `<title>` htmx uses to retitle the page) and are `{% include %}`d on full loads. `compare.html` + `partials/compare_builder.html`/`compare_results.html` are the Phase 3 crosstab workbench on the same pattern (replacing the deleted `perm_menu.html`/`perm.html`). `filter.html` + `partials/filter_landing.html`/`filter_column.html`/`filter_preview.html`/`filter_zero.html` are the Phase 4 **Filter workbench** (same fragment pattern; the sidebar reuses the now-parametrized `column_browser.html` pointed at the filter routes), and `moc1.html`/`moc.html` are the rebuilt offense-code chooser + 5-slot stepper. The Phase 4 rewrite deleted `filter_boolean.html`/`filter_boolean_menu.html`. `error.html` renders the styled 404/500 handlers. Learning-modules views (Phase 5 restyled + docked): `lesson_catalog.html`, `lesson.html`, `lesson_step.html` (extends `layout.html`, fills the new `{% block dock %}`; the main area `{% include %}`s `partials/lesson_data.html` — the read-only sandbox data view), `admin.html`, `admin_edit.html`. (`info.html`/`info_menu.html` were deleted in Phase 2.) **Educator-portal views** (all extend `layout.html`, component-system + both themes): `admin.html` is the portal home (Classes + Lessons); `admin_classes.html` (list + create form), `admin_class.html` (detail: join code, roster, email/retake policy, class tools), `admin_class_assignments.html` (per-module assignment editor), `admin_class_progress.html` (progress dashboard + "needs attention" triage + item-level miss rates), `admin_classes_compare.html` (section comparison), `admin_student_attempts.html` (answer-context inspection), `admin_student_delete.html` (two-step full-deletion confirm), `admin_module_answers.html` (computed answer key). Auth: `login.html`/`new.html` (overloaded class-code box) + `join.html` (logged-in "Join a class"). |
 | `lessons/` | Authored learning-module content (`<id>.json`) + `README.md` schema. **Safe to commit** (unlike `user/`). |
 | `LEARNING_MODULES_PROMPTS.md` | Phased build plan for the learning-modules feature. All phases are now implemented; the doc still reads as forward-looking. |
@@ -91,6 +110,8 @@ uv run flask --app app run     # add --debug for reload
 | `EDUCATOR_PORTAL_PROMPTS.md` | Phased build order (14 phases, 0–13, each with a complexity rating → suggested model) for the educator portal + class-code system + auth hardening, plus Appendix A (class schema) and B (attempt-log format). **All phases done** — see "Educator portal (implemented)" below. |
 | `UI_OVERHAUL_PROMPTS.md` | Phased build plan for the UI/UX overhaul (sidebar workbench redesign). **Phases 0 (hygiene/tokens/vendored assets), 1 (workbench shell), 2 (explore workbench), 3 (compare workbench + CSV export), 4 (filter workbench: live previews, searchable values, MOC stepper), 5 (docked lessons + checkpoint wiring), 6 (auth pages/landing/logged-in home), and 7 (responsive/a11y/dark QA + `style.css` removal) are done** — the overhaul is feature-complete; see "In progress: UI/UX overhaul" below. |
 | `STYLEGUIDE.md` | **Design authority** for all UI work: tokens (light+dark), typography, layout, components, htmx conventions, a11y checklist. Read it before touching `templates/` or `static/`. |
+| `BASE_DATAFRAME_OPTIMIZATION.md` | **Design/scope authority** for the runtime memory/latency optimization of the data layer (load-once / categorical-shrink / cross-worker share of the base DataFrame). Measured numbers, the immutability safety argument, the `float64` constraint, expected impact. Read before touching how `_execute`/`Data.load` build the base. **Levers A–D all built on `base-df-optimization` (Phases 0–4).** |
+| `OPTIMIZATION_PROMPTS.md` | Phased build order (Phases 0–4) for the base DataFrame optimization above, house-style like the other `*_PROMPTS.md`. **All phases done (categorical + load-once + Parquet + `--preload`).** |
 | `static/css/tokens.css`, `static/css/base.css` | Phase 0 token system: all design tokens (both themes, exact `STYLEGUIDE.md` tables — plus `--overlay` for drawer/dialog backdrops) and reset/typography/focus/reduced-motion. Loaded first; theme switches via `data-theme` on `<html>` (FOUC-guard inline script in `layout.html` — which also sets a `js` class gating JS-only CSS — toggle in `static/js/theme.js`, persisted to `localStorage.theme`, fires a `themechange` event). |
 | `static/css/components.css`, `static/css/views.css` | Phase 1 shell styles per the styleguide's file organization: `components.css` = buttons/badges/chips/toasts/dialog/alerts/empty-state/loading; `views.css` = top bar, workbench grid, sidebar + tablet drawer, breakpoints, **phone shell (data-state bar, bottom nav, sticky-first-column tables, bottom-sheet dock — Phase 7)**. The retired `style.css` is gone (Phase 7); its still-live base rules (`.container`, bare `h1`/`h2`/`h3`/`p`) moved here + into `base.css`. |
 | `static/js/app.js` | Phase 1 shell behaviors (vanilla, no build step): toast auto-dismiss + `HX-Trigger`/`htmx:responseError` toast paths, `[data-confirm]` dialog interception, sidebar drawer with focus trap (Phase 7: opened by **any** `[aria-controls="sidebar"]` trigger — the tablet ☰ or the phone data-state bar — focus returns to the opener), htmx-bound global progress bar, `[data-loading]` submit feedback ("Computing statistics…"). Phase 3 added the **searchable picker**: a `[data-picker]` wrapper around a native `<select>` gets a filtering combobox (arrows/Enter/Esc); the hidden select keeps carrying the form value (and is the no-JS fallback). |
@@ -238,7 +259,8 @@ view. `hx_toast()` sets the `HX-Trigger` header for htmx-response toasts (used f
 ## Storage layout (all git-ignored — see `.gitignore`)
 
 - `dataset.sav` — raw SPSS source (~141 MB). Not in git.
-- `cache/raw.csv` — CSV the runtime actually loads (~242 MB, exceeds GitHub's 100 MB limit). Not in git.
+- `cache/raw.parquet` — typed columnar base the runtime **prefers** (~23 MB; Lever C). Not in git.
+- `cache/raw.csv` — human-inspectable CSV base + fallback loader (~242 MB, exceeds GitHub's 100 MB limit). Not in git.
 - `cache/data/<history-path>/…bin` — pickled computed results.
 - `user/<classcode>/<username>.pickle` — **user accounts, including bcrypt password hashes.**
   Default classcode when none given: `unmanaged`; enrolled students are namespaced under their
@@ -612,8 +634,10 @@ left loose (`contourpy`, `kiwisolver`, `matplotlib`, `numpy`, `pandas`, `Pillow`
 `seaborn`). Those 8 are held at known-good versions by `[tool.uv] constraint-dependencies`, so
 `uv.lock` reproduces the environment the app was developed against instead of pulling newer
 majors (pandas 3.x, Pillow 12.x, …). **Upgrading is deliberate:** delete a line from
-`constraint-dependencies` and re-run `uv lock`. The project is `package = false` (an app, not a
-library, so uv manages the env without trying to build it).
+`constraint-dependencies` and re-run `uv lock`. One post-migration addition: `pyarrow` (the
+Parquet engine for the Lever C base) was added loose and **is not** in `constraint-dependencies` —
+`uv.lock` records the resolved version (24.0.0 at add time). The project is `package = false`
+(an app, not a library, so uv manages the env without trying to build it).
 
 **`requirements.txt` has been removed** (Phase 4) — `pyproject.toml` + `uv.lock` are the single
 source of truth. If a tool or host ever needs a `requirements.txt`, generate one on demand with
@@ -632,6 +656,45 @@ source of truth. If a tool or host ever needs a `requirements.txt`, generate one
   wheels — uv pulls the same PyPI wheels the app already used.
 
 `.venv/` stays git-ignored; `uv.lock` and `.python-version` are committed.
+
+## Done: base DataFrame optimization (runtime memory/latency)
+
+**All four levers built** on the `base-df-optimization` branch (Phases 0–4 of
+`OPTIMIZATION_PROMPTS.md`). Governed by two docs: **`BASE_DATAFRAME_OPTIMIZATION.md`** (design/scope
+authority — the why) and **`OPTIMIZATION_PROMPTS.md`** (the phased build order — Phases 0–4). Every
+phase is verified byte-identical against the Phase 0 golden `.bin` snapshot (see the immutability
+guardrail `test_base_immutability.py` + the golden dir outside the tree).
+
+**The runtime cost it targeted:** there was **no shared in-memory dataset**. Every request that
+*missed* the disk cache rebuilt the base from scratch — `_execute` → `Data.load` →
+`pd.read_csv('cache/raw.csv')` — a **242 MB text parse into a ~1.85 GB DataFrame** (294,467 rows ×
+176 cols; the 116 string/`object` columns were the memory hogs). Each gunicorn worker did this
+independently (`deploy/setup.sh` defaults to `WORKERS=3`), so cold RAM ≈ `WORKERS × ~1.85 GB`.
+Cache *hits* are cheap (they just `pickle.load` `.bin` files and never touch the base).
+
+**The four independently-shippable levers:** (A) **[done]** cast the 116 `object` columns to
+`category` in `Data.load` — strings only, floats stay `float64` — measured **~8×** (1.72 GiB →
+0.22 GiB), better than the 2.5–3.5× estimate; (B) **[done]** `cache._base_df()` memoizes the base
+(a module-level singleton with a debug-only shape/identity tripwire) so cache misses stop
+re-parsing — base load 4.2 s → ~1 µs on reuse, exactly one base-sized frame alive per process;
+(C) **[done]** `cache/raw.parquet` typed columnar base (`Data.load` `.parquet` branch +
+`save_parquet`; `DATAFILE` prefers it, CSV stays a fallback) — 242 MB → **~23 MB** on disk, cold
+load 4.2 s → **~0.25 s**; (D) **[done]** gunicorn `--preload` (in `deploy/setup.sh`'s `ExecStart`)
++ an **import-time base warm in `app.py`** so the base loads once in the gunicorn master before
+fork and workers inherit it copy-on-write instead of `×WORKERS`. CoW holds because Lever A made the
+heavy columns numpy code-arrays: **~79% of the ~220 MiB base is CoW-shareable numpy** (higher in
+warm-cache steady state, since workers rarely materialize category labels); 3 independent
+(non-preload) copies measured ~2.16 GB total, which `--preload` collapses toward one shared base.
+The import-time warm is best-effort (a missing datafile logs and falls back to per-request lazy
+load); dropping `--preload` reverts cleanly to per-worker load-once. Result: deploy sizing drops
+from 4 vCPU / 8 GB toward a comfortable 1 vCPU / 2 GB for a half-dozen users. The true 3-worker
+shared RSS/PSS is a Linux-target measurement (Windows has no `fork`) — recipe in `deploy/README.md`.
+
+**Two hard constraints** (both in the prompts doc's Global constraints): results and cache keys
+must stay identical (so **numeric columns must stay `float64`** — the three checks at
+[data.py:78](data.py:78)/[246](data.py:246)/[329](data.py:329) depend on it; only strings get
+re-typed), and the base DataFrame is **never mutated in place** today (no `inplace=`/`.drop`/
+`.fillna`/`astype` on `self.df`) — the sharing levers rest on keeping it that way.
 
 ## Git remotes
 
