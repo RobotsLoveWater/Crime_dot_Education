@@ -60,6 +60,10 @@ developed toward a grant, with an emphasis on **education and public disseminati
   to rebuild the filtered dataframe on demand. Each filter serializes to a token (e.g.
   `f.moc1.eq.A`) that doubles as the cache directory key. Learning-module data states reuse this
   same encoding through a sandboxed override that never touches the student's own history.
+- **Shared immutable base.** The full dataset loads **once per process** (from a typed Parquet
+  base, string columns stored as pandas categoricals for ~8× less RAM) and is replayed against
+  read-only — filters always produce new frames. In production, gunicorn `--preload` lets all
+  workers share that one copy copy-on-write.
 - **Deeper architectural notes for contributors live in [`CLAUDE.md`](CLAUDE.md).**
 
 ## Getting started
@@ -80,14 +84,16 @@ virtualenv and no `pip`.
    uv sync
    ```
 
-The runtime does **not** read the SPSS file directly — it loads `cache/raw.csv`. The raw data
-files are large and are **not** committed to git, so first-time setup is a one-time precompute:
+The runtime does **not** read the SPSS file directly — it loads a precomputed base datafile:
+the typed columnar `cache/raw.parquet` (~23 MB, fast to parse) when present, falling back to
+`cache/raw.csv` (~242 MB). The raw data files are large and are **not** committed to git, so
+first-time setup is a one-time precompute:
 
 3. Obtain `dataset.sav` (the SPSS source, ~141 MB) and place it in the project root.
-4. Build the runtime CSV and warm the cache — this writes `cache/raw.csv` (~242 MB) and
-   pre-computes per-column stats into `cache/data/`:
+4. Build the runtime base and warm the cache — this writes `cache/raw.csv`, then
+   `cache/raw.parquet` from it, and pre-computes per-column stats into `cache/data/`:
    ```
-   uv run python cache.py        # answer "y" to both prompts
+   uv run python cache.py        # answer "y" to all three prompts
    ```
 5. Run the app:
    ```

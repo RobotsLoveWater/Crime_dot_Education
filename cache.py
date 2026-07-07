@@ -18,7 +18,13 @@ from data import format_column_info
 
 import account
 
-DATAFILE = 'cache/raw.csv'
+# Base datafile: prefer the typed columnar Parquet base (Lever C -- ~10x smaller on disk,
+# ~20x faster to parse) when it exists, else fall back to the CSV so a machine that only
+# built cache/raw.csv still runs. Both are git-ignored; build them with `uv run python
+# cache.py`. Repoint DATAFILE (or delete raw.parquet) to force the CSV loader.
+DATAFILE_PARQUET = 'cache/raw.parquet'
+DATAFILE_CSV = 'cache/raw.csv'
+DATAFILE = DATAFILE_PARQUET if os.path.exists(DATAFILE_PARQUET) else DATAFILE_CSV
 DATAPATH = 'cache/data/'
 
 EXCLUDED_COLUMNS = [
@@ -185,6 +191,39 @@ def get_moc_options(session, moc_filter, active):
     return temp_options[str(moc_filter)][int(active)-1]
 
 
+# --- base DataFrame singleton (Lever B: load the base once per process) -----------
+# The base (full-dataset) frame is identical for every request and is never mutated
+# in place — filters return new frames via boolean indexing (see the immutability
+# guardrail in test_base_immutability.py). So parse cache/raw.csv exactly once per
+# process and hand every cache miss the same shared frame instead of re-reading the
+# 242 MB CSV each time. History-specific results still live only in the disk cache.
+_BASE = None
+_BASE_FINGERPRINT = None  # (shape, id) captured at first load; debug-only tripwire
+
+
+def _base_df():
+    """Return the process-wide base DataFrame, loading it once on first use.
+
+    The frame is shared and read-only by contract: callers assign it to a fresh
+    Data().df and the first filter replaces that reference with a new frame, so the
+    shared base is never reassigned or mutated. Do not mutate it in place.
+    """
+    global _BASE, _BASE_FINGERPRINT
+
+    if _BASE is None:
+        loader = Data()
+        loader.load(DATAFILE)
+        _BASE = loader.df
+        _BASE_FINGERPRINT = (_BASE.shape, id(_BASE))
+
+    # Debug-only tripwire (stripped under `python -O`): if any request mutated the
+    # base in place, its shape/identity would have drifted from the first load.
+    assert (_BASE.shape, id(_BASE)) == _BASE_FINGERPRINT, \
+        'base DataFrame mutated between requests (shape/identity drift)'
+
+    return _BASE
+
+
 def _execute(session, history_override=None) -> Data:
 
     temp_data = Data()
@@ -217,7 +256,10 @@ def _execute(session, history_override=None) -> Data:
                 raise ValueError
 
         else:
-            temp_data.load(DATAFILE)
+            # base entry: point at the shared, load-once base instead of re-parsing
+            # the CSV. temp_data.df is None here (fresh Data), and the first filter
+            # above replaces this reference with a new frame, so the base stays pristine.
+            temp_data.df = _base_df()
 
     return temp_data
 
@@ -238,6 +280,18 @@ if __name__ == '__main__':
     if input('will you create a raw csv? ').lower() == 'y':
         dataobj.save('cache/raw')
         print('created raw csv')
+
+    if input('will you create a raw parquet? ').lower() == 'y':
+        # Build the Parquet base from cache/raw.csv (not dataset.sav): the CSV round-trip
+        # is what produces the exact dtypes/values the runtime loads and the cache was
+        # warmed against, so mirroring it keeps results byte-identical. Needs raw.csv.
+        if os.path.exists(DATAFILE_CSV):
+            csv_base = Data()
+            csv_base.load(DATAFILE_CSV)
+            csv_base.save_parquet('cache/raw')
+            print('created raw parquet')
+        else:
+            print('skipped: ' + DATAFILE_CSV + ' not found -- create the raw csv first')
 
     cache_list = dataobj.get_columns()
 

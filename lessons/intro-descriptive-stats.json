@@ -42,15 +42,15 @@
     {
       "type": "explore",
       "title": "Short sentences among women",
-      "body": "This view is filtered to `sex == Female`, showing the value counts of `time`. Scroll to the value **12.03 months** - that oddly precise number is 366 days, the traditional **'year and a day'** sentence. Note two things about that row: its **count** and its **percentage**.\n\nAlso glance at the total **N** for this view - women are a small minority of all sentenced counts.",
-      "state": ["f.sex.eq.Female"],
+      "body": "This view is filtered to `sex == female`, showing the value counts of `time`. Scroll to the value **12.03 months** - that oddly precise number is 366 days, the traditional **'year and a day'** sentence. Note two things about that row: its **count** and its **percentage**.\n\nAlso glance at the total **N** for this view - women are a small minority of all sentenced counts.",
+      "state": ["f.sex.eq.female"],
       "focus": { "view": "info", "column": "time" }
     },
     {
       "type": "explore",
       "title": "Short sentences among men",
-      "body": "Same summary, now filtered to `sex == Male`. Find the **12.03-month** row again and compare against what you just saw: the **count** here is far larger, but the **percentage** is far smaller.\n\nThis is a well-documented descriptive pattern in criminal justice data: women appear in the system far less often, and when they do, their sentences run shorter. *Why* that pattern exists is a genuinely hard question - one a later module takes up properly. Today's job is only to read the pattern correctly.",
-      "state": ["f.sex.eq.Male"],
+      "body": "Same summary, now filtered to `sex == male`. Find the **12.03-month** row again and compare against what you just saw: the **count** here is far larger, but the **percentage** is far smaller.\n\nThis is a well-documented descriptive pattern in criminal justice data: women appear in the system far less often, and when they do, their sentences run shorter. *Why* that pattern exists is a genuinely hard question - one a later module takes up properly. Today's job is only to read the pattern correctly.",
+      "state": ["f.sex.eq.male"],
       "focus": { "view": "info", "column": "time" }
     },
     {

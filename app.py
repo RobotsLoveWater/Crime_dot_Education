@@ -40,6 +40,7 @@ import analytics
 
 from data import Data
 
+import cache
 from cache import get_data, get_moc_options, _execute, history_text_to_item, history_item_to_text
 
 # create the app
@@ -68,6 +69,24 @@ MOC = moc.MnOffenseCodes
 # codebook metadata only (descriptions + column-browser groups) — no dataframe is
 # loaded; Data() without a preload just parses codebook.xml
 CODEBOOK = Data()
+
+# Eagerly load the shared, immutable base DataFrame at import time (Lever B's singleton).
+# Under gunicorn `--preload` (Lever D) the WSGI app is imported in the master process
+# BEFORE fork, so this parse happens once in the master and every worker inherits the
+# base copy-on-write instead of parsing its own — collapsing WORKERS x base down to ~one
+# shared copy. CoW only holds because the heavy columns are categorical (Lever A): they
+# are backed by numpy int code-arrays, not per-cell Python objects, so serving reads over
+# them don't churn refcounts and dirty the shared pages. Best-effort: a missing/broken
+# base datafile must not block startup — log and fall back to Lever B's per-request lazy
+# load (also what happens without `--preload`, giving per-worker load-once).
+try:
+    cache._base_df()
+    app.logger.info('Base DataFrame preloaded at import (shared across --preload workers).')
+except Exception as _base_exc:  # noqa: BLE001 — never let a missing base block app startup
+    app.logger.warning(
+        'Base DataFrame not preloaded at import (%s); falling back to lazy per-request load.',
+        _base_exc,
+    )
 
 # sort orders for the statistics value table: internal key -> student-facing label
 SORT_OPTIONS = [

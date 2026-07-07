@@ -93,8 +93,19 @@ boundary) is also still open — see section 3.
 
 ### 5. Deployment & delivery (grant)
 
-- A hosting story that handles the large data file (the ~242 MB `cache/raw.csv` exceeds GitHub's
-  100 MB limit and is git-ignored today).
+- A hosting story that handles the large data files (git-ignored: the ~23 MB `cache/raw.parquet`
+  base the runtime prefers, plus the ~242 MB `cache/raw.csv` it falls back to — the CSV exceeds
+  GitHub's 100 MB limit). A first cut exists in `deploy/` (gunicorn + nginx + systemd
+  provisioner). With the runtime optimization below, sizing a prototype for <6 concurrent users
+  drops from the earlier 4 vCPU / 8 GB estimate to a comfortable **1 vCPU / 2 GB**.
+- **Runtime footprint optimization (done, `base-df-optimization` branch).** The app used to have
+  no shared in-memory dataset: every cache-miss re-parsed the 242 MB CSV into a ~1.85 GB
+  DataFrame, per worker (`WORKERS=3` default). All four levers are now built and verified
+  byte-identical against a golden cache snapshot: categorical string columns (~8× RAM:
+  1.72 GiB → 0.22 GiB), load-once per process (base parse 4.2 s → ~0 on reuse), a typed Parquet
+  base (231 MB → 23 MB on disk; cold load 4.2 s → 0.25 s), and gunicorn `--preload` so workers
+  share one copy-on-write base instead of `workers ×`. Design authority:
+  **`BASE_DATAFRAME_OPTIMIZATION.md`**; build order: **`OPTIMIZATION_PROMPTS.md`** (Phases 0–4).
 - Curated, possibly public (no-login) "research views" for dissemination beyond the classroom.
 
 ## Principles (carried forward)
