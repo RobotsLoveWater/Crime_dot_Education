@@ -30,19 +30,31 @@ developed toward a grant, with an emphasis on **education and public disseminati
 - **Cross-tabulation tables.** N, mean, median, and std of a dependent variable across two
   grouping columns.
 - **Guided learning modules.** Author-written lessons ("preset data views with commentary")
-  made of `read` / `explore` / `question` steps. `explore` steps reconstruct a specific
-  filtered dataset; `question` steps are **auto-graded live** against the data (numeric answers
-  computed from the current filter, choice answers checked server-side). Per-student progress
-  and completion are tracked.
-- **Accounts & classes.** Users are scoped by an optional *classcode*; a classcode beginning
-  `edu-` grants **educator** rights to author modules for that class.
+  made of `read` / `explore` / `question` / `checkpoint` steps, run beside a live read-only view
+  of the data they describe. `explore` steps reconstruct a specific filtered dataset; `question`
+  steps are **auto-graded live** against the data (numeric answers computed from the current
+  filter, choice answers checked server-side); `checkpoint` steps verify the lesson's data state.
+  Per-student progress and completion are tracked.
+- **Accounts, classes & enrollment.** One overloaded sign-up field: leave it blank to join the
+  public group, enter a class **join code** to enroll as a student in that class, or use an `edu-`
+  code to create an **educator** account. Join codes are validated by lookup, so students land in
+  a real class (namespaced under its immutable id) rather than a stray directory.
+- **Educator portal.** Educators create **classes** (each with a rotatable join code and roster),
+  **assign and pace modules** (required / optional / hidden / scheduled with open & due dates),
+  and read a **progress dashboard** with a "needs attention" triage, per-question miss rates,
+  and per-student answer-context inspection. Plus a **gradebook CSV export** (imports cleanly
+  into Canvas / Google Classroom / PowerSchool), computed answer keys, per-class retake/feedback
+  and email-domain policies, roster management, and shareable data-state links.
+- **Data export.** Cross-tabulation tables and the class gradebook download as CSV (UTF-8 with a
+  BOM so Excel opens them cleanly).
 
 ## Architecture (at a glance)
 
 - **Stack:** Flask 3 + Jinja2 templates; pandas / numpy for analysis; SPSS `.sav` read via
   `pyreadstat`.
-- **No database.** User accounts are pickle files under `user/`; computed results are a
-  content-addressed disk cache under `cache/data/`.
+- **No database.** User accounts are pickle files under `user/` (with per-student append-only
+  attempt logs beside them); classes are JSON under `classes/`; computed results are a
+  content-addressed disk cache under `cache/data/`. All of these are git-ignored.
 - **History-driven state.** There is no live per-session dataframe. Each account stores an
   ordered **history** of filter operations; the app replays (or reads from cache) that history
   to rebuild the filtered dataframe on demand. Each filter serializes to a token (e.g.
@@ -90,12 +102,15 @@ Every command runs inside uv's managed environment via `uv run …`, so there is
 This is an **active academic / research prototype**, not a hardened production service. Known
 limitations (see [`ROADMAP.md`](ROADMAP.md) and [`CLAUDE.md`](CLAUDE.md) for the full list):
 
-- **Authentication is not production-grade.** Login only checks that a username exists — it does
-  *not* verify the password — and the Flask `secret_key` is a hardcoded development placeholder.
-  Do not deploy as-is with real or sensitive user data.
-- **No data export yet** (`/download` is a stub) and **no charts/figures** in the web UI (the
-  CLI's Seaborn graphing has not been reintroduced, though the dependencies remain).
-- **`checkpoint` lesson steps** are validated but not yet functional.
+- **Authentication is verified but not fully hardened.** Login now checks the password
+  (bcrypt via `util.check_password`) and the Flask `secret_key` reads from the `SECRET_KEY`
+  environment variable — but there is no rate-limiting or account lockout, no HTTPS enforcement,
+  and the `edu-` **educator role is self-selectable at sign-up** (a classroom-trust convenience,
+  not a public-internet trust boundary). Harden further before any deployment with real data.
+- **Charts are in the web UI** (Chart.js distributions and grouped-bar crosstab companions), but
+  the CLI's Seaborn figure export has not been reintroduced (its dependencies remain).
+- Some engine operations remain **stubbed** — AND / OR-across-different-columns filters (the `a`
+  and `d` action codes) are not implemented.
 
 ## Team
 

@@ -112,6 +112,11 @@ def validate(module, source=None) -> dict:
     if 'order' in module and (isinstance(module['order'], bool) or not isinstance(module['order'], int)):
         raise LessonError(tag + ": 'order' must be an integer")
 
+    # optional: educator-only teaching notes for the whole module (discussion prompts,
+    # misconceptions, framing). Never shown to students -- see app.py's is_educator gate.
+    if 'educator_notes' in module:
+        _validate_educator_notes(module['educator_notes'], tag + ".educator_notes")
+
     steps = module.get('steps')
     if not isinstance(steps, list) or len(steps) == 0:
         raise LessonError(tag + ": 'steps' must be a non-empty list")
@@ -140,6 +145,10 @@ def _validate_step(step, where) -> None:
     if not isinstance(step.get('body'), str):
         raise LessonError(where + ": must have a string 'body'")
 
+    # optional: educator-only teaching notes for this step (any step type may carry them)
+    if 'educator_notes' in step:
+        _validate_educator_notes(step['educator_notes'], where + ".educator_notes")
+
     if stype == 'explore':
         if 'state' in step:
             _validate_state(step['state'], where + ".state")
@@ -157,6 +166,22 @@ def _validate_step(step, where) -> None:
         if 'expect_state' not in step:
             raise LessonError(where + ": must have 'expect_state'")
         _validate_state(step['expect_state'], where + ".expect_state")
+
+
+def _validate_educator_notes(notes, where) -> None:
+    # a single string (one note/paragraph) or a list of strings (discussion prompts,
+    # one per misconception, etc.) -- either shape renders fine in the templates.
+    if isinstance(notes, str):
+        if notes == '':
+            raise LessonError(where + ": must not be an empty string")
+        return
+
+    if isinstance(notes, list):
+        if not all(isinstance(n, str) and n != '' for n in notes):
+            raise LessonError(where + ": list items must be non-empty strings")
+        return
+
+    raise LessonError(where + ": must be a string or a list of strings")
 
 
 def _validate_focus(focus, where) -> None:

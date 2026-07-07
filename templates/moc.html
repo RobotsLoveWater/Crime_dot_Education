@@ -1,97 +1,87 @@
 {% extends "layout.html" %}
+{% block title %} — Filter: {{ code_list[0] }} offense code{% endblock %}
+
 {% block head %}
-<title>Minnesota Analysis of Sentencing Trends</title>
+<script src="{{ url_for('static', filename='js/filter.js') }}" defer></script>
 {% endblock %}
 
 {% block body %}
-<body>
+<article class="moc-view">
 
-    <h1>{{ code_list[0] }}</h1>
+    <header class="view-header">
+        <div class="view-heading">
+            <h1>{{ code_list[0] }}</h1>
+            <p class="view-subtitle">Offense code <code>{{ cur_moc[0] }}</code> · build the code
+                digit by digit, then apply. Each digit you set becomes its own filter.</p>
+        </div>
+        <div class="view-actions">
+            <a class="btn btn-secondary" href="{{ url_for('explore_moc') }}">Choose another offense</a>
+        </div>
+    </header>
 
-    <div class="card">
-        <h3>Entries - With Filters / Total</h3>
-        <p>{{ data['moc_options']['*'] }} / {{ data['entries'] }}</p>
-    </div>
+    {% if data['entries'] == 0 %}
+    {% include 'partials/filter_zero.html' %}
+    {% else %}
 
-    <h2>Setting MOC Code</h2>
-    <h5>MOC1 (Index) is set to {{ cur_moc[0] }}, which is the code for {{ code_list[0] }}.</h5>
-    {% for imoc in range(1,5) %}
-        {% if cur_moc[imoc] != '*' %}
-        <h5>MOC{{ imoc+1 }} ({{ code_list[imoc]['COL'] }}) is set to {{ cur_moc[imoc] }}, which is the code for {{ code_list[imoc][cur_moc[imoc]] }}</h5>
-        {% else %}
-        <h5>MOC{{ imoc+1 }} ({{ code_list[imoc]['COL'] }}) is set to Wildcard, and is not being filtered.</h5>
-        {% endif %}
-    {% endfor %}
-    <h4>Full Code: [{{ cur_moc[0] }}]-[{{ cur_moc[1] }}]-[{{ cur_moc[2] }}]-[{{ cur_moc[3] }}]-[{{ cur_moc[4] }}]</h4>
-
-    <h2>Select</h2>
-    <div class="btn-bar">
-        {% for imc in moc_col %}
-        {% if active == imc %}
-        <a href="{{ imc }}" class="btn disabled">{{ code_list[imc]['COL'] }}</a>
-        {% else %}
-        <a href="{{ imc }}" class="btn">{{ code_list[imc]['COL'] }}</a>
-        {% endif %}
+    {# ---------- The 5-slot stepper ---------- #}
+    <ol class="moc-stepper" aria-label="Offense code, digit by digit">
+        <li class="moc-slot moc-slot-fixed">
+            <span class="moc-slot-label">Offense</span>
+            <span class="moc-slot-value"><span class="moc-slot-digit">{{ cur_moc[0] }}</span>{{ code_list[0] }}</span>
+        </li>
+        {% for slot in slots %}
+        <li class="moc-slot{% if slot['is_active'] %} moc-slot-active{% endif %}{% if slot['is_wildcard'] %} moc-slot-any{% endif %}">
+            <a class="moc-slot-link" href="{{ slot['href'] }}"{% if slot['is_active'] %} aria-current="true"{% endif %}>
+                <span class="moc-slot-label">{{ slot['label'] }}</span>
+                {% if slot['is_wildcard'] %}
+                <span class="moc-slot-value moc-slot-wildcard">Any</span>
+                {% else %}
+                <span class="moc-slot-value">{{ slot['value'] }}</span>
+                {% endif %}
+            </a>
+        </li>
         {% endfor %}
-    </div>
+    </ol>
 
-    <form method="post">
-        <p><input type="submit" value="Run Filters"/>
+    <form method="post" class="moc-apply" data-loading="Computing statistics…">
+        <button type="submit" class="btn btn-primary">Apply this offense-code filter</button>
+        <p class="field-hint">Applies every digit you've set. Digits left as “Any” aren't filtered.</p>
     </form>
 
-    <table>
-        <thead>
-            <tr>
-                <th>MOC Digit</th>
-                <th>Description</th>
-                <th>Remaining Entries After Filter</th>
-            </tr>
-        </thead>
-        <tbody>
+    {# ---------- Options for the active slot, with remaining counts ---------- #}
+    <section aria-label="Choose a value for {{ active_label }}">
+        <div class="view-toolbar">
+            <h2 id="moc-option-heading">{{ active_label }}</h2>
+            <div class="table-search js-only">
+                <label class="visually-hidden" for="moc-option-search">Search options</label>
+                <input type="search" id="moc-option-search" placeholder="Search options…"
+                       autocomplete="off" spellcheck="false">
+            </div>
+        </div>
 
-            <tr>
-                {% if active == 1 %}
-                <td><a href="/filter/moc/{{ cur_moc[0] }}/*/{{ cur_moc[2] }}/{{ cur_moc[3] }}/{{ cur_moc[4] }}/{{ active }}">*</a></td>
-                <td>Reset Filter</td>
-                <td>{{ data['moc_options']['*'] }}</td>
-                {% elif active == 2 %}
-                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/*/{{ cur_moc[3] }}/{{ cur_moc[4] }}/{{ active }}">*</a></td>
-                <td>Reset Filter</td>
-                <td>{{ data['moc_options']['*'] }}</td>
-                {% elif active == 3 %}
-                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/{{ cur_moc[2] }}/*/{{ cur_moc[4] }}/{{ active }}">*</a></td>
-                <td>Reset Filter</td>
-                <td>{{ data['moc_options']['*'] }}</td>
-                {% elif active == 4 %}
-                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/{{ cur_moc[2] }}/{{ cur_moc[3] }}/*/{{ active }}">*</a></td>
-                <td>Reset Filter</td>
-                <td>{{ data['moc_options']['*'] }}</td>
-                {% endif %}
-            </tr>
+        <div class="table-wrapper table-scroll">
+            <table class="data-table" id="moc-option-table" aria-labelledby="moc-option-heading">
+                <caption class="visually-hidden">Options for {{ active_label }} with the case count each would leave</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Code</th>
+                        <th scope="col">Meaning</th>
+                        <th scope="col" class="num">Cases if chosen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for opt in options %}
+                    <tr data-search="{{ (opt['code'] ~ ' ' ~ opt['label'])|lower }}"{% if opt['is_reset'] %} class="moc-option-reset"{% endif %}>
+                        <td><a class="moc-option-code" href="{{ opt['href'] }}">{{ opt['code'] }}</a></td>
+                        <td>{{ opt['label'] }}</td>
+                        <td class="num">{{ '{:,}'.format(opt['count']|int) if opt['count'] is not none else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
 
-            {% for moc in code_list[active] %}
-            <tr>
-                {% if moc != 'INC' and moc != 'COL' %}
-
-                {% if active == 1 %}
-                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ moc }}/{{ cur_moc[2] }}/{{ cur_moc[3] }}/{{ cur_moc[4] }}/{{ active }}">{{ moc }}</a></td>
-                {% elif active == 2 %}
-                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/{{ moc }}/{{ cur_moc[3] }}/{{ cur_moc[4] }}/{{ active }}">{{ moc }}</a></td>
-                {% elif active == 3 %}
-                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/{{ cur_moc[2] }}/{{ moc }}/{{ cur_moc[4] }}/{{ active }}">{{ moc }}</a></td>
-                {% elif active == 4 %}
-                <td><a href="/filter/moc/{{ cur_moc[0] }}/{{ cur_moc[1] }}/{{ cur_moc[2] }}/{{ cur_moc[3] }}/{{ moc }}/{{ active }}">{{ moc }}</a></td>
-                {% endif %}
-
-                <td>{{ code_list[active][moc] }}</td>
-                <td>{{ data['moc_options'][moc] }}</td>
-
-                {% endif %}
-            </tr>
-            {% endfor %}
-
-        </tbody>
-    </table>
-
-</body>
+</article>
 {% endblock %}

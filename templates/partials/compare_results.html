@@ -1,0 +1,114 @@
+{# Compare results (Phase 3): heatmapped crosstab with client-side stat toggle
+   (all four stats ship in the markup — compare.js only shows/hides), N totals,
+   sticky headers, CSV export, and a grouped-bar companion chart for small
+   tables. Served as a fragment on htmx requests and included by compare.html
+   on full loads. #}
+{% if fragment %}<title>Minnesota Sentencing Explorer — Compare</title>{% endif %}
+
+<article class="compare-results">
+
+    <header class="view-header">
+        <div class="view-heading">
+            <h1>{{ row_desc }} by {{ col_desc }}</h1>
+            <p class="view-subtitle">
+                {% if measure %}Statistics of <strong>{{ measure_desc }}</strong>
+                {% else %}Count of cases{% endif %}
+                per cell, computed on your current data state{% if datastate %} —
+                <strong>{{ '{:,}'.format(datastate['entries']) }}</strong> cases{% endif %}.</p>
+        </div>
+        <div class="view-actions">
+            <a class="btn btn-secondary"
+               href="{{ url_for('download', measure=dependant, rows=x_axis, cols=y_axis) }}">Download CSV</a>
+            <a class="btn btn-primary" href="{{ url_for('explore_table') }}"
+               hx-get="{{ url_for('explore_table') }}"
+               hx-target="#compare-view" hx-swap="innerHTML show:window:top"
+               hx-push-url="true">New comparison</a>
+        </div>
+    </header>
+
+    {% if table['rows'] and table['cols'] %}
+
+    {% if measure %}
+    <div class="view-toolbar js-only">
+        <span class="toolbar-label" id="stat-toggle-label">Show in each cell</span>
+        <div class="segmented" role="group" aria-labelledby="stat-toggle-label" id="stat-toggle">
+            <button type="button" class="segmented-item" data-stat="n" aria-pressed="false">Count (N)</button>
+            <button type="button" class="segmented-item" data-stat="mean" aria-pressed="false">Mean</button>
+            <button type="button" class="segmented-item" data-stat="mdn" aria-pressed="false">Median</button>
+            <button type="button" class="segmented-item" data-stat="std" aria-pressed="false">Std. dev.</button>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="table-wrapper table-scroll crosstab-wrapper">
+        <table class="data-table crosstab" id="crosstab" data-default-stat="{{ default_stat }}">
+            <caption class="visually-hidden">Crosstab of {{ row_desc }} by {{ col_desc }}{% if measure %},
+                showing case counts and the mean, median, and standard deviation of {{ measure_desc }}{% else %},
+                showing case counts{% endif %}</caption>
+            <thead>
+                <tr>
+                    <th scope="col" class="crosstab-corner">{{ row_desc }}</th>
+                    {% for y in table['cols'] %}
+                    <th scope="col" class="num">{{ y|display_value }}</th>
+                    {% endfor %}
+                    <th scope="col" class="num crosstab-total">Total cases</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for x in table['rows'] %}
+                {% set i = loop.index0 %}
+                <tr>
+                    <th scope="row">{{ x|display_value }}</th>
+                    {% for cell in table['grid'][i] %}
+                    <td class="num cell{% if cell['heat']['n'] %} heat-{{ cell['heat']['n'] }}{% endif %}"
+                        {%- for stat in table['stats'] %} data-heat-{{ stat }}="{{ cell['heat'][stat] }}"{% endfor %}>
+                        <span class="cell-stat cell-n" {% if measure %}data-label="N"{% endif %}>{{ cell['display']['n'] }}</span>
+                        {%- if measure %}
+                        <span class="cell-stat cell-mean" data-label="Mean">{{ cell['display']['mean'] }}</span>
+                        <span class="cell-stat cell-mdn" data-label="Median">{{ cell['display']['mdn'] }}</span>
+                        <span class="cell-stat cell-std" data-label="Std">{{ cell['display']['std'] }}</span>
+                        {%- endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="num crosstab-total">{{ '{:,}'.format(table['row_totals'][i]) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th scope="row">Total cases</th>
+                    {% for t in table['col_totals'] %}
+                    <td class="num crosstab-total">{{ '{:,}'.format(t) }}</td>
+                    {% endfor %}
+                    <td class="num crosstab-total">{{ '{:,}'.format(table['total']) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    <p class="table-note">Cases missing a value in either column aren't shown — the totals
+        count the {{ '{:,}'.format(table['total']) }} cases that appear in the table.</p>
+
+    {% if chart %}
+    <section class="chart-card" aria-label="Comparison chart">
+        <h2>Chart</h2>
+        <p class="chart-note">Grouped bars — one group per {{ row_desc }} value, one bar
+            per {{ col_desc }} value. The table above carries the same numbers.</p>
+        <div class="chart-box"><canvas id="compare-chart" role="img"
+            aria-label="Grouped bar chart of the crosstab; the table above repeats these numbers"></canvas></div>
+        <script type="application/json" id="compare-chart-data">{{ chart|tojson }}</script>
+    </section>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <h2>Nothing to cross-tabulate</h2>
+        <p>No case in your current data state has a value for both of these columns.
+           Try removing a filter, or pick different columns.</p>
+        <a class="btn btn-primary" href="{{ url_for('explore_table') }}"
+           hx-get="{{ url_for('explore_table') }}"
+           hx-target="#compare-view" hx-swap="innerHTML show:window:top"
+           hx-push-url="true">New comparison</a>
+    </div>
+    {% endif %}
+
+</article>

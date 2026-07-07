@@ -21,10 +21,10 @@ Disseminate Minnesota Sentencing Commission felony-sentencing data through a web
 | Original goal | Status | Notes |
 |---|---|---|
 | Findings clearly & concisely presented | Partial | Self-serve stats + guided lessons; no curated public "findings" views yet. |
-| Data easily accessible | Partial | Web-accessible, but gated behind (insecure) login and with no export. |
+| Data easily accessible | Partial | Web-accessible behind a real (password-verified) login; crosstab + gradebook CSV export exist, but there is still no login-free public view and no filtered-dataset export. |
 | Filter by column, exclude by row value | **Done** | Core filter engine — `eq/ne/gt/ge/lt/le`, OR-same-column, MOC drill-down. |
 | Date/time expressed sensibly & dynamically | Open | Year / sentence-length are plain numeric columns; no dynamic date handling. |
-| Informative figures **and** tables | Tables only | Cross-tabs exist; **no visualization** in the web UI (a regression from the CLI). |
+| Informative figures **and** tables | Partial | Cross-tabs + interactive Chart.js figures (distribution bars, grouped-bar crosstab companions) now in the web UI; the CLI's exportable Seaborn figures are still not reintroduced. |
 | Dynamically contextualize data | Partial | MOC decoder + codebook labels + lesson narrative. |
 | Preset data views with team commentary | **Done (evolved)** | Became the **learning-modules** feature — graded and authorable. |
 
@@ -32,32 +32,57 @@ Disseminate Minnesota Sentencing Commission felony-sentencing data through a web
 
 Grouped by theme; ordering within each is roughly by priority.
 
+### 0. Educator portal & class-code system — **shipped** ✅
+
+Delivered (scoped and built with the author, 2026-07). The implicit `edu-` classcode convention is
+now a real **class-code system** — educators create **classes** as first-class objects (immutable
+id + rotatable student **join code**, roster, assignments), and students **join with a code** and
+stay members — with an **educator portal** on top: a student-progress dashboard + "needs
+attention" triage, class/roster management (rotate / remove / reset / archive / delete),
+per-module assignment & pacing, item-level analytics, gradebook CSV export, shareable data-state
+links, computed answer keys, retake/feedback + email-domain policies, and per-module teaching
+notes. This **subsumed the "Real authentication" item** under Platform hardening (below): Phase 0
+now verifies passwords and reads `secret_key` from config, since the portal exposes cross-account
+student data.
+
+Governed by two documents: **`EDUCATOR_PORTAL.md`** (scope & design authority) and
+**`EDUCATOR_PORTAL_PROMPTS.md`** (the 14-phase build order, 0–13). Delivered scope: auth + P0 + P1.
+**Still deferred (P2 / grant scope):** fork-and-edit modules, standards-alignment tags, and a full
+authoring UI — see section 5. Residual auth hardening (rate-limiting, HTTPS, a real educator-role
+boundary) is also still open — see section 3.
+
 ### 1. Dissemination gaps (closest to the original goals)
 
-- **Reintroduce figures / visualization.** The legacy CLI could graph with Seaborn; the web app
-  cannot. `matplotlib`/`seaborn` are already dependencies and `settings.xml` still holds a
-  palette — wire charts into the `/info` and `/table` views.
-- **Data export.** Implement the stubbed `/download` so users can save a filtered view to CSV
-  (reusing `Data.save`).
+- **Richer figures / visualization.** The web app now has **interactive Chart.js charts** —
+  distribution bars on the statistics view and grouped-bar companions on crosstabs (added in the
+  UI overhaul). Still open: the legacy CLI's **exportable Seaborn figures** have not been
+  reintroduced (`matplotlib`/`seaborn` remain dependencies and `settings.xml` still holds a
+  palette), and there are no map/time-series figure types yet.
+- **Data export.** Crosstab CSV and the class gradebook CSV now export (both UTF-8 + BOM).
+  Still missing: a **filtered-dataset export** — saving the current filtered view itself to CSV
+  (reusing `Data.save`), not just its cross-tabulation.
 - **Sensible date/time handling.** Present year and sentence-length columns as dates / durations
   rather than bare floats.
 
 ### 2. Learning modules (continue the strongest thread)
 
-- **Wire or retire `checkpoint` steps.** They are validated but inert today, and the sample
-  lesson ends on one. Decide whether checkpoints become meaningful (which requires giving
-  students agency over the lesson's data state) or are dropped.
-- **Grow the lesson library** beyond the single intro module, with educator-facing authoring
-  documentation.
+- ~~**Wire or retire `checkpoint` steps.**~~ **Done** — `checkpoint` steps compare the lesson's
+  data state to an expected token multiset and gate progress (learning-modules Phase 5).
+- **Grow the lesson library** beyond the current three intro modules, with educator-facing
+  authoring documentation. (Per-module **teaching notes** now exist — an educator-only field on
+  the lesson JSON — as does a computed answer-key view.)
 - **Align the lesson docs.** `lessons/README.md` and `LEARNING_MODULES_PROMPTS.md` still read as
   forward-looking plans; update them to the shipped implementation (as `CLAUDE.md` now is).
 
 ### 3. Platform hardening (prerequisites for real deployment)
 
-- **Real authentication.** Verify passwords (the bcrypt helper `util.check_password` exists but
-  is never called) and move the Flask `secret_key` out of source into configuration.
-- **Fix latent account bugs.** `account.create` returns the wrong value for an already-existing
-  user; `/new` does not set all session keys.
+- ~~**Real authentication.**~~ **Done (Phase 0)** — `/login` verifies the password via
+  `util.check_password`, and `secret_key` reads from the `SECRET_KEY` environment variable.
+  **Still open — residual hardening:** no rate-limiting / account lockout, no HTTPS enforcement,
+  and the `edu-` **educator role is still self-selectable at sign-up** (a classroom-trust
+  convenience, not a trust boundary for who may author). These matter before any public deployment.
+- ~~**Fix latent account bugs.**~~ **Done** — `account.create` returns `retrieve(userid)` on the
+  already-exists path, and `/new` sets all three session keys.
 - **Complete stubbed operations** if needed: AND / OR-across-different-columns filters (the `a`
   and `d` action codes), which are currently unimplemented.
 

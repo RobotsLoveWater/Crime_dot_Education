@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+{% block title %} — Delete {{ username }}{% endblock %}
+
+{% block body %}
+
+<p><a class="dock-back" href="{{ url_for('admin_class', class_id=class_obj['class_id']) }}">&larr; {{ class_obj['name'] }}</a></p>
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Delete account permanently</h1>
+        <p class="view-subtitle">This is different from removing {{ username }} from the class.</p>
+    </div>
+</header>
+
+<div class="alert alert-danger" role="alert">
+    <p><strong>This permanently deletes {{ username }}'s account, learning-module progress, and
+        attempt history.</strong> It cannot be undone — there is no recovery.</p>
+    <p>If you only want to unenroll {{ username }} and keep their account, go back and use
+        <strong>Remove</strong> on the class page instead.</p>
+</div>
+
+{% if errors %}
+<div class="alert alert-danger" role="alert">
+    {% for message in errors %}<p>{{ message }}</p>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" class="filter-form">
+    <div class="field">
+        <label for="confirm_username">Type <strong>{{ username }}</strong> to confirm</label>
+        <input type="text" id="confirm_username" name="confirm_username"
+               autocomplete="off" autocapitalize="off" spellcheck="false" required>
+    </div>
+    <div class="view-actions">
+        <button type="submit" class="btn btn-danger">Delete account permanently</button>
+        <a class="btn btn-secondary" href="{{ url_for('admin_class', class_id=class_obj['class_id']) }}">Cancel</a>
+    </div>
+</form>
+
+{% endblock %}

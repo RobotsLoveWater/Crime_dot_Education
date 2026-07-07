@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+{% block title %} — {{ header if column else 'Statistics' }}{% endblock %}
+
+{% block head %}
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/explore.js') }}" defer></script>
+{% endblock %}
+
+{% block sidebar_extra %}
+{% include 'partials/column_browser.html' %}
+{% endblock %}
+
+{% block body %}
+{# htmx swap target: the view fragment (statistics for one column, or the landing
+   view) is replaced here; hx-push-url keeps every state bookmarkable #}
+<div id="explore-view" class="explore-view">
+    {% if column %}
+        {% include 'partials/explore_column.html' %}
+    {% else %}
+        {% include 'partials/explore_landing.html' %}
+    {% endif %}
+</div>
+{% endblock %}

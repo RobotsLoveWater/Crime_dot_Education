@@ -1,0 +1,68 @@
+{% extends "layout.html" %}
+{% block title %} — Compare sections{% endblock %}
+
+{% block body %}
+
+<p><a class="dock-back" href="{{ url_for('admin_classes') }}">&larr; Classes</a></p>
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Compare sections</h1>
+        <p class="view-subtitle">Completion rate and median score per lesson, across your active classes.</p>
+    </div>
+</header>
+
+{% if sections|length < 2 %}
+<div class="empty-state">
+    <h2>Nothing to compare yet</h2>
+    <p>Create a second class to see sections side by side.</p>
+</div>
+{% elif modules and sections %}
+<div class="table-wrapper">
+    <div class="table-scroll">
+        <table class="data-table">
+            <caption class="visually-hidden">Per-lesson completion rate and median score, one column per class section.</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Lesson</th>
+                    {% for s in sections %}
+                    <th scope="col" class="num">
+                        <a href="{{ url_for('admin_class_progress', class_id=s['class_obj']['class_id']) }}">{{ s['class_obj']['name'] }}</a><br>
+                        <span class="muted-cell">{{ s['roster_size'] }} student{{ '' if s['roster_size'] == 1 else 's' }}</span>
+                    </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in modules %}
+                <tr>
+                    <th scope="row">{{ m['title'] }}</th>
+                    {% for s in sections %}
+                    {% set r = s['rollup_by_id'].get(m['id']) %}
+                    <td class="num">
+                        {% if r and r['completion_rate'] is not none %}
+                        {{ (100 * r['completion_rate'])|round|int }}%
+                        {% if r['median_score'] is not none %}
+                        <br><span class="muted-cell">median {{ (100 * r['median_score'])|round|int }}%</span>
+                        {% endif %}
+                        {% else %}
+                        <span class="muted-cell">—</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<p class="dashboard-note">Completion rate is completed ÷ roster size for that section; median score is
+    over students who have answered at least one graded question.</p>
+{% else %}
+<div class="empty-state">
+    <h2>No lessons yet</h2>
+    <p>There's nothing to compare until a lesson exists.</p>
+</div>
+{% endif %}
+
+{% endblock %}

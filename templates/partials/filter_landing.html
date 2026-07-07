@@ -1,0 +1,34 @@
+{# Filter landing (Phase 4): pick a column from the sidebar browser, or jump into
+   the offense-code drill-down. Served as a fragment on htmx requests and included
+   by filter.html on full loads. #}
+{% if fragment %}<title>Minnesota Sentencing Explorer — Filter</title>{% endif %}
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Filter</h1>
+        <p class="view-subtitle">Narrow the data to just the cases you want to study. Every
+            filter you apply shows up as a chip in the sidebar{% if datastate %} — you're at
+            <strong>{{ '{:,}'.format(datastate['entries']) }}</strong> of
+            {{ '{:,}'.format(datastate['total']) }} cases{% endif %}.</p>
+    </div>
+</header>
+
+{% if data['entries'] == 0 %}
+{% include 'partials/filter_zero.html' %}
+{% else %}
+<div class="filter-entry-grid">
+    <section class="filter-entry-card">
+        <h2>Filter by a column</h2>
+        <p>Pick any column from the <strong>Filter a column</strong> list in the sidebar. You
+            can keep cases above a threshold (for example, sentence length greater than 14) or
+            keep only certain categories.</p>
+    </section>
+
+    <section class="filter-entry-card">
+        <h2>Filter by offense code</h2>
+        <p>Build a Minnesota Offense Code (MOC) one digit at a time — start with the offense
+            category, then narrow by level, act, and type.</p>
+        <a class="btn btn-primary" href="{{ url_for('explore_moc') }}">Filter by offense code</a>
+    </section>
+</div>
+{% endif %}

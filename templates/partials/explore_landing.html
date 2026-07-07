@@ -1,0 +1,33 @@
+{# Explore landing view: rendered when no column is selected. Served as a
+   fragment on htmx requests (fragment=True adds the <title> htmx uses to
+   update the document title) and included by explore.html on full loads. #}
+{% if fragment %}<title>Minnesota Sentencing Explorer — Statistics</title>{% endif %}
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Statistics</h1>
+        <p class="view-subtitle">Descriptive statistics for any column, computed on your
+            current data state{% if datastate %} —
+            <strong>{{ '{:,}'.format(datastate['entries']) }}</strong> cases right now{% endif %}.</p>
+    </div>
+</header>
+
+<div class="empty-state">
+    <h2>Pick a column to begin</h2>
+    <p>Browse or search the column list in the sidebar. Every column shows its
+       distribution, missing-value count, and — for numeric columns — mean, median,
+       and standard deviation.</p>
+</div>
+
+<section class="quick-links" aria-label="Common starting points"
+         hx-target="#explore-view" hx-swap="innerHTML show:window:top" hx-push-url="true">
+    <h2>Common starting points</h2>
+    <ul class="quick-link-list">
+        {% for code in ['time', 'sentyear', 'moc1', 'race', 'county'] %}
+            {% if code in data['columns'] %}
+            <li><a class="chip" href="{{ url_for('explore_column', column=code) }}"
+                   hx-get="{{ url_for('explore_column', column=code) }}">{{ data['columns'][code] }}</a></li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+</section>

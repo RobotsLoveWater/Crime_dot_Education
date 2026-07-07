@@ -1,0 +1,137 @@
+{% extends "layout.html" %}
+{% block title %} — {{ class_obj['name'] }}{% endblock %}
+
+{% block body %}
+
+<p><a class="dock-back" href="{{ url_for('admin_classes') }}">&larr; Classes</a></p>
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>{{ class_obj['name'] }}
+            {% if class_obj['archived'] %}<span class="badge badge-warning">Archived</span>{% endif %}
+        </h1>
+        <p class="view-subtitle">
+            {{ roster|length }} student{{ '' if roster|length == 1 else 's' }} enrolled.
+        </p>
+    </div>
+</header>
+
+<section class="portal-section">
+    <h2>Join code</h2>
+    <p class="view-subtitle">Students enter this code on the sign-up page to enroll.</p>
+    <div class="join-code-display">
+        <code class="join-code" id="join-code-value">{{ class_obj['join_code'] }}</code>
+        <button type="button" class="btn btn-secondary btn-sm js-only" data-copy="#join-code-value">Copy</button>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('admin_class_rotate_code', class_id=class_obj['class_id']) }}"
+           data-confirm="Generate a new join code for {{ class_obj['name'] }}? The old code stops working immediately. Already-enrolled students are unaffected."
+           data-confirm-title="Rotate join code?"
+           data-confirm-action="Rotate code">Rotate code</a>
+    </div>
+</section>
+
+<section class="portal-section">
+    <h2>Roster</h2>
+    {% if roster %}
+    <div class="table-wrapper">
+        <table class="data-table">
+            <caption class="visually-hidden">Enrolled students and roster actions.</caption>
+            <thead>
+                <tr><th scope="col">Username</th><th scope="col">Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for student in roster %}
+                <tr>
+                    <td>{{ student['username'] }}</td>
+                    <td>
+                        <a href="{{ url_for('admin_class_reset_progress', class_id=class_obj['class_id'], userid=student['userid']) }}"
+                           data-confirm="Clear {{ student['username'] }}'s lesson progress and give them a fresh start? Their attempt history (used for item analytics) is kept."
+                           data-confirm-title="Reset progress?"
+                           data-confirm-action="Reset progress">Reset progress</a> ·
+                        <a href="{{ url_for('admin_class_remove_student', class_id=class_obj['class_id'], userid=student['userid']) }}"
+                           data-confirm="Remove {{ student['username'] }} from {{ class_obj['name'] }}? Their account and progress are kept — they can rejoin with the join code."
+                           data-confirm-title="Remove student?"
+                           data-confirm-action="Remove">Remove</a> ·
+                        <a class="btn btn-danger btn-sm" href="{{ url_for('admin_class_delete_student', class_id=class_obj['class_id'], userid=student['userid']) }}"
+                           data-confirm="Continue to permanently delete {{ student['username'] }}'s account, progress, and attempt history? This is different from Remove and cannot be undone."
+                           data-confirm-title="Delete account permanently?"
+                           data-confirm-action="Continue">Delete permanently</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h2>No students yet</h2>
+        <p>Share the join code above to start enrolling students.</p>
+    </div>
+    {% endif %}
+</section>
+
+<section class="portal-section">
+    <h2>Email policy</h2>
+    <p class="view-subtitle">Require students to sign up with a school email address.</p>
+    <form method="post" class="filter-form">
+        <fieldset class="field">
+            <legend>Email policy</legend>
+            <label class="radio-row">
+                <input type="checkbox" name="email_required" {% if policy['required'] %}checked{% endif %}>
+                Require usernames to be email addresses
+            </label>
+            <div class="field">
+                <label for="email_domains">Allowed domains <span class="field-optional">— optional</span></label>
+                <input type="text" id="email_domains" name="email_domains"
+                       value="{{ policy.get('domains', [])|join(', ') }}" placeholder="district.k12.mn.us">
+                <p class="field-hint">Comma-separated. Leave blank to allow any email address.</p>
+            </div>
+        </fieldset>
+        <button type="submit" class="btn btn-primary">Save email policy</button>
+    </form>
+</section>
+
+<section class="portal-section">
+    <h2>Retake &amp; feedback policy</h2>
+    <p class="view-subtitle">Controls how question steps behave for students enrolled in this class.</p>
+    <form method="post" action="{{ url_for('admin_class_policy', class_id=class_obj['class_id']) }}" class="filter-form">
+        <fieldset class="field">
+            <legend>Retake &amp; feedback policy</legend>
+            <div class="field">
+                <label for="policy-attempts">Attempts allowed per question <span class="field-optional">— optional</span></label>
+                <input type="number" min="1" step="1" id="policy-attempts" name="attempts"
+                       value="{% if retake_policy['attempts'] is not none %}{{ retake_policy['attempts'] }}{% endif %}"
+                       placeholder="Unlimited">
+                <p class="field-hint">Leave blank for unlimited attempts.</p>
+            </div>
+            <label class="radio-row">
+                <input type="checkbox" name="reveal_after_miss" {% if retake_policy['reveal_after_miss'] %}checked{% endif %}>
+                Reveal the correct answer after a miss
+            </label>
+            <label class="radio-row">
+                <input type="checkbox" name="show_tolerance" {% if retake_policy['show_tolerance'] %}checked{% endif %}>
+                Show the numeric tolerance on questions
+            </label>
+        </fieldset>
+        <button type="submit" class="btn btn-primary">Save retake &amp; feedback policy</button>
+    </form>
+</section>
+
+<section class="portal-section">
+    <h2>Class tools</h2>
+    <div class="view-actions">
+        <a class="btn btn-primary" href="{{ url_for('admin_class_progress', class_id=class_obj['class_id']) }}">Progress dashboard</a>
+        <a class="btn btn-secondary" href="{{ url_for('admin_class_assignments', class_id=class_obj['class_id']) }}">Module assignments</a>
+        <a class="btn btn-secondary" href="{{ url_for('admin_class_gradebook', class_id=class_obj['class_id']) }}">Download gradebook</a>
+        <a class="btn btn-secondary" href="{{ url_for('admin_classes_compare') }}">Compare sections</a>
+        {% if class_obj['archived'] %}
+        <a class="btn btn-secondary" href="{{ url_for('admin_class_unarchive', class_id=class_obj['class_id']) }}">Restore section</a>
+        {% else %}
+        <a class="btn btn-danger" href="{{ url_for('admin_class_archive', class_id=class_obj['class_id']) }}"
+           data-confirm="Archive {{ class_obj['name'] }}? It drops off your active class list; the roster and every record are kept, and you can restore it any time."
+           data-confirm-title="Archive class?"
+           data-confirm-action="Archive">Archive section</a>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}

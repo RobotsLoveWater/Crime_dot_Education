@@ -1,29 +1,47 @@
 {% extends "layout.html" %}
-{% block head %}
-<title>Minnesota Analysis of Sentencing Trends</title>
-{% endblock %}
+{% block title %} — Create account{% endblock %}
 
 {% block body %}
-<body>
 
-    <h1>Create a new Account</h1>
-    <p>or, <a href="/login">login</a> to an existing account.</p>
+<div class="auth">
+    <div class="auth-card">
+        <h1 class="auth-title">Create an account</h1>
+        <p class="auth-sub">Already have one? <a href="{{ url_for('login') }}">Log in</a>.</p>
 
-    {% if error %}
-    <p class=error><strong>Error:</strong> {{ error }}
-    {% endif %}
+        {% if errors %}
+        <div class="alert alert-danger" role="alert">
+            {% for e in errors %}<p>{{ e }}</p>{% endfor %}
+        </div>
+        {% endif %}
 
-    <form method=post>
-        <dl>
-            <dt>Username:
-            <dd><input type=text name=username value="{{ request.form.username }}">
-            <dt>Class Code:
-            <dd><input type=text name=classcode value="{{ request.form.classcode }}">
-            <dt>Password:
-            <dd><input type=password name=password value="{{ request.form.password }}">
-        </dl>
-        <p><input type=submit value=Create>
-    </form>
+        <form method="post" class="auth-form">
+            <div class="field">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" value="{{ request.form.username }}"
+                       autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+            </div>
+            <div class="field field-check">
+                <input type="checkbox" id="is_educator" name="is_educator"
+                       {% if request.form.is_educator %}checked{% endif %}
+                       data-educator-toggle aria-controls="classcode-field">
+                <label for="is_educator">I'm an educator</label>
+                <p class="field-hint">Educators create classes and lessons for their students.
+                    Students, leave this unchecked.</p>
+            </div>
+            <div class="field" id="classcode-field" data-educator-hide>
+                <label for="classcode">Class join code <span class="field-optional">— optional</span></label>
+                <input type="text" id="classcode" name="classcode" value="{{ request.form.classcode }}"
+                       autocomplete="off" autocapitalize="none" spellcheck="false">
+                <p class="field-hint">Leave blank to join the public group, or enter the join code
+                    your teacher gave you.</p>
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" autocomplete="new-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Create account</button>
+        </form>
+    </div>
+</div>
 
-</body>
 {% endblock %}

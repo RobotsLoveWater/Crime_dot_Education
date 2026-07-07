@@ -1,36 +1,55 @@
 {% extends "layout.html" %}
-{% block head %}
-<title>Minnesota Sentencing Explorer - {% if editing %}Edit{% else %}New{% endif %} module</title>
-{% endblock %}
+{% block title %} — {% if editing %}Edit{% else %}New{% endif %} module{% endblock %}
 
 {% block body %}
-<body>
 
-    <div class="container">
-        <p><a href="/admin">&larr; Authoring</a></p>
+<p><a class="dock-back" href="{{ url_for('admin') }}">&larr; Authoring</a></p>
+
+<header class="view-header">
+    <div class="view-heading">
         <h1>{% if editing %}Edit{% else %}New{% endif %} module</h1>
-        <!-- validation errors are rendered by layout.html's error block -->
+        <p class="view-subtitle">Lessons are stored as JSON in <code>lessons/</code>.
+            See <code>lessons/README.md</code> for the step schema.</p>
+    </div>
+</header>
 
-        <form method="post">
-            <p><label>Module id (used in the lesson URL; letters, numbers, dashes)<br>
-                <input type="text" name="module_id" value="{{ form['module_id'] }}"
-                       {% if editing %}readonly{% endif %} required></label></p>
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    {% for message in error %}<p>{{ message }}</p>{% endfor %}
+</div>
+{% endif %}
 
-            <p><label>Title<br>
-                <input type="text" name="title" value="{{ form['title'] }}" required></label></p>
-
-            <p><label>Description<br>
-                <textarea name="description" rows="2" style="width: 100%;">{{ form['description'] }}</textarea></label></p>
-
-            <p><label>Objectives (one per line)<br>
-                <textarea name="objectives" rows="4" style="width: 100%;">{{ form['objectives'] }}</textarea></label></p>
-
-            <p><label>Steps (JSON array &mdash; see <code>lessons/README.md</code> for the schema)<br>
-                <textarea name="steps" rows="16" style="width: 100%; font-family: monospace;">{{ form['steps'] }}</textarea></label></p>
-
-            <p><button type="submit">Save module</button></p>
-        </form>
+<form method="post" class="filter-form">
+    <div class="field">
+        <label for="module_id">Module id</label>
+        <input type="text" id="module_id" name="module_id" value="{{ form['module_id'] }}"
+               {% if editing %}readonly{% endif %} required>
+        <p class="field-hint">Used in the lesson URL. Letters, numbers, and dashes only.</p>
     </div>
 
-</body>
+    <div class="field">
+        <label for="title">Title</label>
+        <input type="text" id="title" name="title" value="{{ form['title'] }}" required>
+    </div>
+
+    <div class="field">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="2">{{ form['description'] }}</textarea>
+    </div>
+
+    <div class="field">
+        <label for="objectives">Objectives</label>
+        <textarea id="objectives" name="objectives" rows="4">{{ form['objectives'] }}</textarea>
+        <p class="field-hint">One objective per line.</p>
+    </div>
+
+    <div class="field">
+        <label for="steps">Steps (JSON array)</label>
+        <textarea id="steps" name="steps" rows="16" class="code-area" spellcheck="false">{{ form['steps'] }}</textarea>
+        <p class="field-hint">See <code>lessons/README.md</code> for the schema.</p>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save module</button>
+</form>
+
 {% endblock %}

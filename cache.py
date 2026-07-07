@@ -149,9 +149,12 @@ def get_moc_options(session, moc_filter, active):
 
     full_history = account.retrieve(session['userid'])['history'][1:]
 
+    # encode with the canonical helper so OR-same-column ('o') entries — which carry a
+    # list value and would blow up a bare '.'.join — land in the same cache dir the rest
+    # of the pipeline uses (single 'f' filters encode identically to the old join)
     hist = []
     for item in full_history:
-        hist.append('.'.join(item['action']))
+        hist.append(history_item_to_text(item))
     code = DATAPATH + '/'.join(hist)
 
     # a cache exists to use

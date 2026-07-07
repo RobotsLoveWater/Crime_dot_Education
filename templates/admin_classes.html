@@ -1,0 +1,112 @@
+{% extends "layout.html" %}
+{% block title %} — Classes{% endblock %}
+
+{% block body %}
+
+<p><a class="dock-back" href="{{ url_for('admin') }}">&larr; Portal</a></p>
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Classes</h1>
+        <p class="view-subtitle">Create a class to get a join code students use to enroll.</p>
+    </div>
+    {% if classes|length > 1 %}
+    <div class="view-actions">
+        <a class="btn btn-secondary" href="{{ url_for('admin_classes_compare') }}">Compare sections</a>
+    </div>
+    {% endif %}
+</header>
+
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    {% for message in error %}<p>{{ message }}</p>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" class="filter-form">
+    <div class="field">
+        <label for="name">Class name</label>
+        <input type="text" id="name" name="name" value="{{ form['name'] }}" required
+               placeholder="Intro to Criminology — Fall 2026">
+    </div>
+
+    <fieldset class="field">
+        <legend>Email policy <span class="field-optional">— optional</span></legend>
+        <label class="radio-row">
+            <input type="checkbox" name="email_required" {% if form['email_required'] %}checked{% endif %}>
+            Require usernames to be school email addresses
+        </label>
+        <div class="field">
+            <label for="email_domains">Allowed domains <span class="field-optional">— optional</span></label>
+            <input type="text" id="email_domains" name="email_domains" value="{{ form['email_domains'] }}"
+                   placeholder="district.k12.mn.us">
+            <p class="field-hint">Comma-separated. Leave blank to allow any email address.</p>
+        </div>
+    </fieldset>
+
+    <button type="submit" class="btn btn-primary">Create class</button>
+</form>
+
+{% if classes %}
+<div class="table-wrapper">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Join code</th>
+                <th scope="col" class="num">Students</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in classes %}
+            <tr>
+                <td>{{ c['name'] }}</td>
+                <td><code>{{ c['join_code'] }}</code></td>
+                <td class="num">{{ c['roster']|length }}</td>
+                <td><a href="{{ url_for('admin_class', class_id=c['class_id']) }}">Open</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h2>No classes yet</h2>
+    <p>Create your first class above.</p>
+</div>
+{% endif %}
+
+{% if archived %}
+<section class="portal-section">
+    <details class="rollup-detail">
+        <summary>Archived classes ({{ archived|length }})</summary>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <caption class="visually-hidden">Archived classes. Roster and records are preserved.</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col" class="num">Students</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in archived %}
+                    <tr>
+                        <td>{{ c['name'] }}</td>
+                        <td class="num">{{ c['roster']|length }}</td>
+                        <td>
+                            <a href="{{ url_for('admin_class', class_id=c['class_id']) }}">Open</a> ·
+                            <a href="{{ url_for('admin_class_unarchive', class_id=c['class_id']) }}">Restore</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+</section>
+{% endif %}
+
+{% endblock %}

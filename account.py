@@ -16,7 +16,8 @@ NO_CLASS_CODE = 'unmanaged'
 
 # classcode convention: signing up with a classcode like 'edu-smith' grants educator
 # (authoring) rights, scoped to that classcode. This is a convenience convention, NOT a
-# security boundary -- the app has no real authentication (see CLAUDE.md known issues).
+# security boundary -- anyone can self-select an 'edu-' classcode at signup (the planned
+# class-code system in EDUCATOR_PORTAL.md replaces this).
 EDUCATOR_CLASSCODE_PREFIX = 'edu-'
 
 
@@ -77,7 +78,7 @@ def retrieve(userid) -> dict:
         raise FileNotFoundError
 
 
-def create(username, classcode, password, overwrite=False) -> dict:
+def create(username, classcode, password, overwrite=False, classes=None) -> dict:
 
     # set as unmanaged if no classcode was used
     classcode = clean_classcode(classcode)
@@ -97,10 +98,33 @@ def create(username, classcode, password, overwrite=False) -> dict:
         'history': [{'desc': 'Loaded complete Minnesota felony sentencing data for 2001 to 2019', 'action': None}],
         'saved': [],
         'progress': {},
+        # class memberships for the educator portal (feature 3): the class_id(s) a student has
+        # joined. Empty for public/'edu-' accounts. Read defensively elsewhere (user.get('classes', []))
+        # so pre-portal pickles without this key stay valid.
+        'classes': list(classes) if classes else [],
         'is_educator': is_educator_classcode(classcode)
     }
 
     if not os.path.exists('user/' + classcode): os.mkdir('user/' + classcode)  # create directory if needed
+
+    with open(get_user_directory(userid), 'wb') as handle:
+        pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    return user
+
+
+def add_class(userid, class_id) -> dict:
+
+    # record a class membership on an existing account (the logged-in "Join a class" flow).
+    # Unlike signup enrollment, this does NOT re-namespace the account -- the pickle stays under
+    # its original classcode; only the 'classes' list grows. The class roster is updated
+    # separately by classroom.enroll (the route keeps the two in sync). Idempotent.
+    user = retrieve(userid)
+
+    classes = user.get('classes', [])  # defensive: pre-portal accounts have no 'classes' key
+    if class_id not in classes:
+        classes.append(class_id)
+    user['classes'] = classes
 
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -198,3 +222,58 @@ def set_lesson_state(userid, module_id, state) -> None:
 
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def remove_class(userid, class_id) -> dict:
+
+    # inverse of add_class -- drops a class membership (the roster "Remove" route in the
+    # educator portal keeps this in sync with classroom.remove_student). Leaves the account,
+    # its history, and its progress untouched: only the 'classes' list shrinks, so a removed
+    # student goes back to seeing every module unrestricted, like a public/unmanaged user,
+    # rather than staying gated by assignment rules from a class they're no longer in.
+    user = retrieve(userid)
+
+    classes = user.get('classes', [])
+    if class_id in classes:
+        user['classes'] = [c for c in classes if c != class_id]
+
+        with open(get_user_directory(userid), 'wb') as handle:
+            pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    return user
+
+
+def reset_progress(userid, module_ids) -> dict:
+
+    # Roster-management "reset a student's progress" (educator portal Phase 8, feature 7).
+    # Scope (documented per the phase prompt): clears progress -- resume step, stored
+    # answers, completed flag, and any lesson-sandbox 'state' -- for exactly the module ids
+    # the caller passes in. The educator portal calls this with every lesson module, since
+    # that is the same set the class progress dashboard tracks (dashboards are not filtered
+    # by this class's assignment states). This deliberately does NOT touch the append-only
+    # attempt log (see analytics.delete_attempts) -- item-difficulty history used by the
+    # per-class analytics and the thesis evaluation survives a reset; only the student's own
+    # resume point is cleared, giving them a clean restart on the module.
+    user = retrieve(userid)
+
+    progress = user.get('progress', {})
+    for module_id in module_ids:
+        progress.pop(module_id, None)
+    user['progress'] = progress
+
+    with open(get_user_directory(userid), 'wb') as handle:
+        pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    return user
+
+
+def delete_account(userid) -> None:
+
+    # Educator-initiated full deletion (EDUCATOR_PORTAL.md Privacy section): permanently
+    # removes the account pickle. Callers are also responsible for classroom.remove_student
+    # (drop the roster entry) and analytics.delete_attempts (drop the attempt log) -- this
+    # function only ever touches the account file itself. No-op if already gone, so a retry
+    # or a double-click never raises.
+    path = get_user_directory(userid)
+    if os.path.exists(path):
+        os.remove(path)

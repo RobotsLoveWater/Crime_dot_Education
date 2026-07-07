@@ -1,0 +1,117 @@
+{# Filter one column (Phase 4): numeric columns get a comparison + value input with a
+   live "~N cases would match" preview; categorical columns get a searchable multi-select
+   with per-value counts. Both post the same history tokens the old UI did. Served as a
+   fragment on htmx requests and included by filter.html on full loads. #}
+{% if fragment %}<title>Minnesota Sentencing Explorer — Filter {{ header }}</title>{% endif %}
+
+<article class="filter-column" data-column="{{ column }}">
+
+    <header class="view-header">
+        <div class="view-heading">
+            <h1>Filter: {{ header }}</h1>
+            <p class="view-subtitle">Column <code>{{ column }}</code> · keep only the cases you
+                want, then apply. The result becomes a chip in the sidebar.</p>
+        </div>
+        <div class="view-actions">
+            <a class="btn btn-secondary" href="{{ url_for('explore_column', column=column) }}">See statistics</a>
+        </div>
+    </header>
+    {# validation errors render via layout.html's main-area alert (render_filter passes
+       `error` into the page context); no inline copy here to avoid a double alert #}
+
+    {% if data['entries'] == 0 %}
+    {% include 'partials/filter_zero.html' %}
+
+    {% elif not info['each'] %}
+    <div class="empty-state">
+        <h2>No values to filter</h2>
+        <p>Every case in your current data state is missing a value for this column.
+            Try removing a filter, or pick another column.</p>
+    </div>
+
+    {% elif info['numeric'] %}
+    {# ---------- Numeric: comparison + value + live preview ---------- #}
+    <form method="post" class="filter-form" id="numeric-filter-form" data-loading="Computing statistics…">
+        <fieldset class="field">
+            <legend>Keep cases where {{ header }} is…</legend>
+            <div class="filter-compare-row">
+                <label class="visually-hidden" for="filter-comparison">Comparison</label>
+                <select id="filter-comparison" name="comparison">
+                    <option value="eq">equal to</option>
+                    <option value="ne">not equal to</option>
+                    <option value="gt">greater than</option>
+                    <option value="ge">greater than or equal to</option>
+                    <option value="lt">less than</option>
+                    <option value="le">less than or equal to</option>
+                </select>
+                <label class="visually-hidden" for="filter-value">Value</label>
+                <input type="number" step="any" inputmode="decimal" id="filter-value"
+                       name="value" placeholder="e.g. 14" autocomplete="off">
+            </div>
+        </fieldset>
+
+        <p class="filter-stat-hint">For reference, this column is
+            mean <strong>{{ info['mean'] }}</strong> ·
+            median <strong>{{ info['mdn'] }}</strong> ·
+            std <strong>{{ info['std'] }}</strong>.</p>
+
+        <div class="filter-preview" id="filter-preview" role="status" aria-live="polite"
+             hx-get="{{ url_for('explore_filter_preview', column=column) }}"
+             hx-trigger="change from:#numeric-filter-form, keyup changed delay:600ms from:#numeric-filter-form"
+             hx-include="#numeric-filter-form" hx-target="#filter-preview" hx-swap="innerHTML">
+            <span class="filter-preview-hint">Enter a value to see how many cases match.</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Apply filter</button>
+    </form>
+
+    {% else %}
+    {# ---------- Categorical: searchable multi-select + counts ---------- #}
+    <form method="post" class="filter-form" id="categorical-filter-form" data-loading="Computing statistics…">
+        <fieldset class="field">
+            <legend>Match mode</legend>
+            <label class="radio-row"><input type="radio" name="comparison" value="eq" checked>
+                Keep cases equal to <strong>any</strong> value I select</label>
+            <label class="radio-row"><input type="radio" name="comparison" value="ne">
+                Keep cases <strong>not equal to</strong> the value I select</label>
+            <p class="field-hint">“Not equal to” is meant for a single value.</p>
+        </fieldset>
+
+        <div class="value-picker">
+            <div class="value-picker-toolbar">
+                <div class="table-search js-only">
+                    <label class="visually-hidden" for="cat-value-search">Search values</label>
+                    <input type="search" id="cat-value-search" placeholder="Search values…"
+                           autocomplete="off" spellcheck="false">
+                </div>
+                <div class="value-picker-actions js-only">
+                    <button type="button" class="btn btn-secondary btn-sm" id="cat-select-all">Select shown</button>
+                    <button type="button" class="btn btn-ghost btn-sm" id="cat-clear">Clear</button>
+                </div>
+            </div>
+
+            <ul class="value-check-list" id="value-check-list">
+                {% for row in info['each'] %}
+                <li class="value-check" data-search="{{ row['value']|display_value|lower }}">
+                    <label>
+                        <input type="checkbox" name="value" value="{{ row['value'] }}">
+                        <span class="value-check-name">{{ row['value']|display_value }}</span>
+                        <span class="value-check-count">{{ '{:,}'.format(row['num']) }}</span>
+                    </label>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="filter-preview" id="filter-preview" role="status" aria-live="polite"
+             hx-get="{{ url_for('explore_filter_preview', column=column) }}"
+             hx-trigger="change from:#categorical-filter-form delay:400ms"
+             hx-include="#categorical-filter-form" hx-target="#filter-preview" hx-swap="innerHTML">
+            <span class="filter-preview-hint">Select one or more values to see how many cases match.</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Apply filter</button>
+    </form>
+    {% endif %}
+
+</article>

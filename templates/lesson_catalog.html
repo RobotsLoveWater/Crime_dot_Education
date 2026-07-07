@@ -1,38 +1,61 @@
 {% extends "layout.html" %}
-{% block head %}
-<title>Minnesota Sentencing Explorer - Lessons</title>
-{% endblock %}
+{% block title %} — Lessons{% endblock %}
 
 {% block body %}
-<body>
 
-    <div class="container">
-        <h1>Guided Lessons</h1>
-        <p>Step-by-step activities that walk you through the data and the statistics behind it.</p>
-
-        {% if catalog %}
-        <section class="features" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; padding: 2rem 0;">
-            {% for item in catalog %}
-            <div class="card" style="text-align: left;">
-                {% if item['status'] == 'completed' %}
-                <p style="color: #1a7f37; font-weight: 600;">&check; Completed</p>
-                {% elif item['status'] == 'in_progress' %}
-                <p style="color: var(--color-accent); font-weight: 600;">In progress</p>
-                {% else %}
-                <p style="color: var(--color-muted); font-weight: 600;">Not started</p>
-                {% endif %}
-                <h3>{{ item['module']['title'] }}</h3>
-                <p>{{ item['module']['description'] }}</p>
-                <div class="btn-bar">
-                    <a href="/lesson/{{ item['module']['id'] }}" class="btn">Open Lesson</a>
-                </div>
-            </div>
-            {% endfor %}
-        </section>
-        {% else %}
-        <p>No lessons are available yet. Check back soon.</p>
-        {% endif %}
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Lessons</h1>
+        <p class="view-subtitle">Guided activities that walk you through the data and the
+            statistics behind it. Each runs beside a live, read-only view of the data it describes.</p>
     </div>
+</header>
 
-</body>
+{% if catalog %}
+<div class="lesson-grid">
+    {% for item in catalog %}
+    {% set s = item['status'] %}
+    {% set a = item['assignment'] %}
+    <article class="lesson-card">
+        <div class="lesson-card-meta">
+            {% if a and a['state'] in ('required', 'scheduled') %}
+            <span class="badge badge-warning">Required</span>
+            {% endif %}
+            {% if s == 'completed' %}
+            <span class="badge badge-success"><span aria-hidden="true">&check;</span> Completed</span>
+            {% elif s == 'in_progress' %}
+            <span class="badge badge-accent">In progress</span>
+            {% else %}
+            <span class="badge badge-muted">Not started</span>
+            {% endif %}
+            <span>{{ item['total_steps'] }} steps</span>
+        </div>
+        <h2>{{ item['module']['title'] }}</h2>
+        <p class="lesson-card-desc">{{ item['module']['description'] }}</p>
+        {% if a and a.get('due') %}
+        <p class="lesson-card-due">Due {{ a['due'] }}</p>
+        {% endif %}
+        <div class="lesson-card-actions">
+            {% if item['locked'] %}
+            <span class="btn btn-secondary" aria-disabled="true">Opens {{ a['open'] }}</span>
+            {% elif s == 'not_started' %}
+            <a class="btn btn-primary" href="{{ url_for('lesson_step', module_id=item['module']['id'], step=0) }}">Start lesson</a>
+            {% elif s == 'in_progress' %}
+            <a class="btn btn-primary" href="{{ url_for('lesson_step', module_id=item['module']['id'], step=item['resume']) }}">Resume · step {{ item['resume'] + 1 }}</a>
+            <a class="btn btn-secondary" href="{{ url_for('lesson_overview', module_id=item['module']['id']) }}">Overview</a>
+            {% else %}
+            <a class="btn btn-secondary" href="{{ url_for('lesson_step', module_id=item['module']['id'], step=0) }}">Review</a>
+            <a class="btn btn-secondary" href="{{ url_for('lesson_overview', module_id=item['module']['id']) }}">Overview</a>
+            {% endif %}
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <h2>No lessons yet</h2>
+    <p>Check back soon — guided lessons will appear here.</p>
+</div>
+{% endif %}
+
 {% endblock %}
