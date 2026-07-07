@@ -255,6 +255,19 @@ EOF
 ln -sf "/etc/nginx/sites-available/${APP_NAME}" "/etc/nginx/sites-enabled/${APP_NAME}"
 rm -f /etc/nginx/sites-enabled/default
 
+# nginx serves /static/ straight off APP_DIR, which lives under the service user's
+# home. Modern Ubuntu creates homes as mode 0750, so nginx's worker user can't
+# traverse into it and every CSS/JS asset 403s (the page renders as unstyled HTML).
+# Add nginx's user to the app group (the home dir is group-readable at 0750) so it can
+# traverse in, without exposing the home dir to "other". Restart (below) picks it up.
+NGINX_USER="${NGINX_USER:-www-data}"   # www-data on Ubuntu/Debian
+if id "$NGINX_USER" &>/dev/null; then
+    log "Granting '$NGINX_USER' traversal into ${APP_HOME} (nginx /static/ access)"
+    usermod -aG "$APP_USER" "$NGINX_USER"
+else
+    warn "nginx user '$NGINX_USER' not found — if /static/ 404s/403s, set NGINX_USER and re-run."
+fi
+
 log "Testing + reloading nginx"
 nginx -t
 systemctl enable nginx >/dev/null
