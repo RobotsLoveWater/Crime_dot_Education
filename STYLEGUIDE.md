@@ -188,7 +188,13 @@ reserves its height so the footer is never covered.
   in order; clicking a chip = "revert to this step" (confirm); only the **last** chip gets an
   `×` (history is a chain — middle steps can't be removed alone). A count badge above reads
   "12,431 of 294,467 cases". In lesson mode the module shows a distinct **"Lesson data"**
-  badge and the student's own chips are hidden, not lost.
+  badge and the student's own chips are hidden, not lost. When more than the base entry is
+  active, a **share-link row** appears below the count badge (Phase 9): the full URL as
+  visible/selectable mono text (`--fs-xs`, accent-subtle bg, `text-overflow: ellipsis` so a
+  long chain truncates in the narrow column — the untruncated URL is still the real text
+  content and a `title` tooltip) plus a `.js-only` "Copy link" button, the same
+  `[data-copy]` pattern as the join-code copy affordance below, just sized for a URL instead
+  of a short code.
 - **Badges.** Radius-full, `--fs-xs`, weight 500: count badge (accent-subtle), educator
   badge (warning-subtle), lesson status (success/accent/muted-subtle).
 - **Stat cards.** Surface, radius `--radius-md`, `--shadow-1` (light) / border (dark). Value
@@ -235,10 +241,14 @@ reserves its height so the footer is never covered.
 - **Auth cards** (log in / create account). A single centered `.auth-card` (≤420px, surface +
   border + `--shadow-1`) holding a title, a switch link to the other form, an inline
   `.alert-danger` for validation, and `.field` inputs. **Password inputs never carry a
-  `value`** — the submitted password is never echoed back into the page source. The class-code
-  field is marked optional and explained in a `.field-hint` (blank → public group; an `edu-`
-  prefix grants authoring). The `<form>` is `.auth-form`, which resets the legacy `style.css`
-  form box so the card is the only frame.
+  `value`** — the submitted password is never echoed back into the page source. An **"I'm an
+  educator" checkbox** (`.field-check` — an inline checkbox + label, hint on its own line) is the
+  only educator signal; the `edu-` classcode is derived on the backend (`edu-<username>`) and
+  never shown or typed. The class-code field below it is student-only (blank → public group, else
+  a class join code) and, as progressive enhancement, is **hidden by JS when the educator box is
+  checked** (`[data-educator-toggle]`/`[data-educator-hide]` in `app.js`; no-JS leaves it visible
+  and the server ignores it for educators). The `<form>` is `.auth-form`, which resets the legacy
+  `style.css` form box so the card is the only frame.
 - **Loading.** Global 2px accent progress bar at the viewport top bound to htmx request
   events; local `.htmx-indicator` spinners on buttons/forms. Full-page navigations that may
   recompute the cache show a submit-spinner + "Computing statistics…" text.
@@ -268,10 +278,20 @@ reserves its height so the footer is never covered.
   "New …" action, mirroring the existing lesson-authoring list. `/admin/classes` adds a
   `.filter-form`-width create form (name + an optional email-policy fieldset: a checkbox plus
   a comma-separated allowed-domains input) above the same list. `/admin/classes/<id>` shows the
-  join code (copy affordance above), a roster `.data-table` (username only — no email; minimal
-  PII per `EDUCATOR_PORTAL.md`), the email-policy form again (now editable in place), a
-  **"Progress dashboard"** link, and a disabled (`aria-disabled`) placeholder button for
-  assignments (Phase 6).
+  join code (copy affordance above, with a **rotate** action), a roster `.data-table` (username
+  only — no email; minimal PII per `EDUCATOR_PORTAL.md`) with per-student roster actions
+  (remove / reset / inspect attempts, and a distinct **danger** full-delete), the email-policy
+  form and the **retake & feedback** fieldset (attempts-allowed number + two reveal/tolerance
+  checkboxes, its own save), and a **"Class tools"** row linking the progress dashboard, module
+  assignments, gradebook download, section comparison, and archive. All destructive actions are
+  `[data-confirm]`-gated (full account deletion escalates to its own two-step confirm page).
+- **Module assignments** (`/admin/classes/<id>/assignments`, Phase 6). A `.data-table`, one row
+  per module: a state `<select>` (optional / required / scheduled / hidden) plus `type="date"`
+  open/due inputs that only apply to the **scheduled** state ("scheduled" = required + dates;
+  dates on other states are dropped on save). Each row also carries an "Answer key" detail link.
+  Student-facing: the lesson catalog reflects the class's states — a `.badge`/`.badge-warning`
+  **Required** badge, due-date text, scheduled modules **locked** until their open date, and
+  hidden modules absent (public/`unmanaged` users are unaffected and see everything).
 - **Progress dashboard** (`/admin/classes/<id>/progress`, Phase 5). Exception-first
   (principle 1): a **"Needs attention"** `.attention-list` at the top — warning-accented cards
   (`.attention-item`, left `--color-warning` border) naming each flagged student and their
@@ -284,6 +304,22 @@ reserves its height so the footer is never covered.
   and per-lesson **item-level miss rates** in `<details>` (`.rollup-detail`). New badge
   `.badge-warning` (warning-subtle) flags at-risk rows. Numbers only ever come from stored
   progress/attempt logs — nothing is re-graded at render time.
+- **Answer-context inspection** (`/admin/classes/<id>/roster/<userid>/attempts`, Phase 10). An
+  "Attempts" link on each progress-dashboard row opens a student's full graded history as an
+  `.attempt-list` of `.attempt-item` cards (newest first), each a status badge (`.badge-success`
+  / new `.badge-danger` / `.badge-muted` for correct/incorrect/ungraded — a left `--color-danger`
+  border on incorrect cards via `.attempt-item-incorrect`), the submitted value, and the data
+  state **at answer time** as the same read-only `.chip-chain.chip-chain-static` used by the
+  lesson dock — so a teacher can tell "filtered the wrong year" from "can't read a median"
+  without reconstructing the student's session.
+- **Computed answer key** (`/admin/modules/<id>/answers`, Phase 10). Any educator can open any
+  module's key — an `.answer-key-list` of `.answer-key-item` cards, one per graded question,
+  each showing the live-computed answer (numeric: value ± tolerance; choice: the correct
+  option's label; free: the model answer or "no fixed answer") plus the same read-only state
+  chips as above. Generated fresh every request — never cached — so it tracks the live dataset.
+  Linked from the portal's Lessons list (`admin.html`) and from each row of the per-class
+  assignments table (`.row-detail-link`, `--fs-xs` muted) so it's reachable for modules the
+  viewing educator didn't author.
 
 ## Charts (Chart.js)
 

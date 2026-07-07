@@ -7,6 +7,7 @@
    - global progress bar bound to htmx request events
    - form submit feedback: spinner + "Computing statistics…" on [data-loading] forms
    - searchable pickers over native selects ([data-picker], STYLEGUIDE.md)
+   - educator checkbox on the auth pages: hide the class-code field ([data-educator-toggle])
    Everything here is an enhancement; all actions work as plain links/forms without it. */
 
 (function () {
@@ -498,4 +499,17 @@
   initPickers();
   document.body.addEventListener('htmx:afterSwap', initPickers);
   document.body.addEventListener('htmx:historyRestore', initPickers);
+
+  /* ---------- Educator checkbox (auth pages) ----------
+     The "I'm an educator" checkbox hides the class-code field, which educators don't use — their
+     account is looked up by username on the backend. No-JS: the field stays visible and is simply
+     ignored by the server when the box is checked. */
+
+  document.querySelectorAll('[data-educator-toggle]').forEach(function (box) {
+    var field = document.getElementById(box.getAttribute('aria-controls'));
+    if (!field) return;
+    function sync() { field.hidden = box.checked; }
+    box.addEventListener('change', sync);
+    sync();
+  });
 })();

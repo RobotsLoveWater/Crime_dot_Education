@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% block title %} — {{ username }}'s attempts{% endblock %}
+
+{% block body %}
+
+<p><a class="dock-back" href="{{ url_for('admin_class_progress', class_id=class_obj['class_id']) }}">&larr; {{ class_obj['name'] }} progress</a></p>
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>{{ username }}'s attempts</h1>
+        <p class="view-subtitle">Every graded answer, newest first, with the data filters active when it was submitted.</p>
+    </div>
+</header>
+
+<section class="portal-section">
+    {% if attempts %}
+    <ol class="attempt-list">
+        {% for a in attempts %}
+        <li class="attempt-item{% if a['correct'] == False %} attempt-item-incorrect{% endif %}">
+            <div class="attempt-head">
+                <span class="badge {{ 'badge-success' if a['correct'] else ('badge-danger' if a['correct'] == False else 'badge-muted') }}">
+                    {{ 'Correct' if a['correct'] else ('Incorrect' if a['correct'] == False else 'Ungraded') }}
+                </span>
+                <strong>{{ a['question_title'] }}</strong>
+                <span class="muted-cell">{{ a['module_title'] }}</span>
+                {% if a['ts'] %}<time class="muted-cell attempt-ts" datetime="{{ a['ts'] }}">{{ a['ts'] }}</time>{% endif %}
+            </div>
+            <p class="attempt-submitted">Submitted: <strong>{{ a['submitted'] }}</strong></p>
+            {% if a['chips'] %}
+            <p class="attempt-state-label">Data state at answer time:</p>
+            <ol class="chip-chain chip-chain-static" aria-label="Data state at answer time">
+                {% for chip in a['chips'] %}
+                <li class="chip-item"><span class="chip" title="{{ chip['token'] }}">{{ chip['desc'] }}</span></li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="muted-cell">No filters applied — full dataset.</p>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+    {% else %}
+    <div class="empty-state">
+        <h2>No graded attempts yet</h2>
+        <p>{{ username }} hasn't answered a graded question.</p>
+    </div>
+    {% endif %}
+</section>
+
+{% endblock %}

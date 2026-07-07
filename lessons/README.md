@@ -29,12 +29,15 @@ hardcoded. See `CLAUDE.md` → "Planned: Learning Modules framework" and
 | `author` | string | yes | Owning **classcode** (`unmanaged` is the default classcode). |
 | `order` | integer | no | Catalog sort position (lower shows first). Modules without it sort last, ties broken by `id`. |
 | `objectives` | string[] | yes | Learning objectives shown on the overview page. |
+| `educator_notes` | string or string[] | no | Educator-only teaching notes for the whole module (discussion prompts, common misconceptions, suggested framing). See "Educator notes" below. |
 | `steps` | Step[] | yes | Ordered list; step index (0-based) is the `/lesson/<id>/<step>` segment. |
 
 ## Steps
 
 Every step has a `type` and a `title`. Most also have a `body` (Markdown/HTML — see
-"Markdown" below). Steps are addressed by their **0-based index** in the `steps` array.
+"Markdown" below). Steps are addressed by their **0-based index** in the `steps` array. Any
+step, regardless of type, may also carry `educator_notes` (string or string[]) — see
+"Educator notes" below.
 
 ### `read`
 Static content only. Fields: `title`, `body`.
@@ -63,6 +66,20 @@ submitted an answer (correct or not). See "Answer types".
 ### `checkpoint`
 Asserts the student's current active state matches an expected one. Fields: `title`, `body`,
 `expect_state` (token[]).
+
+## Educator notes
+
+`educator_notes` is optional, may appear on the module (whole-lesson framing) and/or on any
+individual step (notes specific to that step — a common misconception at that point, a
+suggested discussion prompt, why a checkpoint is worded the way it is). Its value is either a
+plain string (one note) or a list of strings (several discrete points, rendered as a bulleted
+list).
+
+Notes are **educator-only**: `lesson.html` (module overview) renders the module-level notes,
+and `lesson_step.html` (the docked step view) renders that step's notes, both gated behind
+`user['is_educator']` — a student account never sees this field, in the rendered page or
+otherwise. Omitting `educator_notes` entirely is the default and is fully backwards-compatible
+(existing modules validate unchanged).
 
 ## Markdown
 

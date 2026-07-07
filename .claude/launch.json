@@ -72,6 +72,55 @@
       "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5185"],
       "port": 5185,
       "autoPort": false
+    },
+    {
+      "name": "explorer-edu-phase6",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5196"],
+      "port": 5196,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-edu-phase7",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5207"],
+      "port": 5207,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-edu-phase8",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5218"],
+      "port": 5218,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-edu-phase9",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5229"],
+      "port": 5229,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-edu-phase10",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5240"],
+      "port": 5240,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-edu-phase11",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5251"],
+      "port": 5251,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-edu-phase12",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5262"],
+      "port": 5262,
+      "autoPort": false
     }
   ]
 }

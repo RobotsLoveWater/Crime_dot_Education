@@ -81,7 +81,8 @@
                     <td class="num">{{ m['steps']|length }}</td>
                     <td>
                         <a href="{{ url_for('admin_edit', module_id=m['id']) }}">Edit</a> ·
-                        <a href="{{ url_for('lesson_overview', module_id=m['id']) }}">View</a>
+                        <a href="{{ url_for('lesson_overview', module_id=m['id']) }}">View</a> ·
+                        <a href="{{ url_for('admin_module_answers', module_id=m['id']) }}">Answer key</a>
                     </td>
                 </tr>
                 {% endfor %}

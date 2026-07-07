@@ -101,6 +101,10 @@
   background: var(--color-warning-subtle);
   color: var(--color-warning);
 }
+.badge-danger {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
 
 /* ---------- Filter chips (data-state module) ---------- */
 .chip-chain {
@@ -267,6 +271,20 @@ a.chip:hover {
 
 /* legacy inline error paragraphs in pre-overhaul views (login, crosstab menu) */
 p.error { color: var(--color-danger); }
+
+/* ---------- Educator notes (teaching-notes pane, gated by is_educator) ---------- */
+.educator-notes {
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-subtle);
+}
+.educator-notes .badge { margin-bottom: var(--space-2); }
+.educator-notes p,
+.educator-notes ul { margin: 0; }
+.educator-notes ul { padding-left: var(--space-5); }
+.educator-notes li + li { margin-top: var(--space-1); }
 
 /* ---------- Empty state ---------- */
 .empty-state {
@@ -559,6 +577,24 @@ fieldset.field > legend {
 }
 .radio-row input {
   flex-shrink: 0;
+}
+
+/* inline checkbox + label (e.g. the "I'm an educator" toggle on the auth cards) */
+.field-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.field-check > input[type="checkbox"] {
+  flex-shrink: 0;
+}
+.field-check > label {
+  margin: 0; /* override .field > label's block layout + bottom margin */
+}
+.field-check > .field-hint {
+  flex-basis: 100%; /* hint drops onto its own full-width line under the checkbox */
+  margin-top: 0;
 }
 
 /* ---------- Searchable picker (STYLEGUIDE.md "Searchable picker") ----------

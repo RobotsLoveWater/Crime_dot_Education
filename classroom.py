@@ -201,6 +201,19 @@ def set_assignments(class_id, assignments) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# retake & feedback policy (feature 11)
+# ---------------------------------------------------------------------------
+
+def set_policy(class_id, policy) -> dict:
+
+    class_obj = get_class(class_id)
+    _validate_policy(policy, class_id + '.policy')
+    class_obj['policy'] = policy
+    _write_class(class_obj)
+    return class_obj
+
+
+# ---------------------------------------------------------------------------
 # email policy / archive
 # ---------------------------------------------------------------------------
 

@@ -34,6 +34,22 @@
 </ul>
 {% endif %}
 
+{% if user['is_educator'] and module.get('educator_notes') %}
+<div class="educator-notes">
+    <p class="badge badge-educator">Educator notes</p>
+    {% set notes = module['educator_notes'] %}
+    {% if notes is string %}
+    <p>{{ notes }}</p>
+    {% else %}
+    <ul>
+        {% for note in notes %}
+        <li>{{ note }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</div>
+{% endif %}
+
 <div class="lesson-card-actions">
     {% if status == 'not_started' %}
     <a class="btn btn-primary" href="{{ url_for('lesson_step', module_id=module['id'], step=0) }}">Start lesson</a>

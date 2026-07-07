@@ -28,6 +28,7 @@ import io
 import csv
 import collections
 import statistics
+import urllib.parse
 
 import util
 import make_history
@@ -39,7 +40,7 @@ import analytics
 
 from data import Data
 
-from cache import get_data, get_moc_options, _execute, history_text_to_item
+from cache import get_data, get_moc_options, _execute, history_text_to_item, history_item_to_text
 
 # create the app
 app = Flask(__name__)
@@ -78,6 +79,18 @@ SORT_OPTIONS = [
 
 # tooltip for the excluded columns in the column browser (replaces !!!WARNING!!!)
 EXCLUDED_NOTE = 'Excluded from analysis — identifies individual people or cases.'
+
+
+@app.template_filter('share_chain')
+def share_chain(history):
+    # Builds the /share/<chain> path segment from a user's own active filters (educator
+    # portal Phase 9): history[1:] -- history[0] is always the base "load everything" entry
+    # (action=None) and isn't itself a token. Each step's token is percent-encoded
+    # independently before joining on ',' so a literal ',' (or '/', etc.) inside a filter
+    # value can never be mistaken for the outer delimiter -- apply_share below reverses this
+    # exactly (split on ',', then unquote each piece).
+    tokens = [history_item_to_text(entry) for entry in history[1:]]
+    return ','.join(urllib.parse.quote(t, safe='') for t in tokens)
 
 
 @app.template_filter('lesson_body')
@@ -189,10 +202,103 @@ def internal_server_error(e):
                                    'safe — try again, or head back home.'), 500
 
 
+def resolve_assignment(user, module_id):
+    # Effective per-module assignment state across every class a student is enrolled in
+    # (educator portal Phase 6, feature 4). None means "no restriction" — public/unmanaged
+    # users and educators (neither carries a 'classes' membership) always see every module.
+    # A module is hidden only when EVERY enrolled class hides it; otherwise the most
+    # permissive non-hidden entry applies (required/scheduled outrank optional, soonest due
+    # date first) — a student in two sections isn't blocked by one section's settings. A
+    # class with no explicit entry for a module defaults to 'optional'.
+    class_ids = user.get('classes', [])
+    if not class_ids:
+        return None
+
+    entries = []
+    for class_id in class_ids:
+        try:
+            class_obj = classroom.get_class(class_id)
+        except classroom.ClassError:
+            continue
+        entries.append(class_obj.get('assignments', {}).get(
+            module_id, {'state': 'optional', 'open': None, 'due': None}))
+
+    if not entries:
+        return {'state': 'optional', 'open': None, 'due': None}
+
+    visible = [e for e in entries if e.get('state') != 'hidden']
+    if not visible:
+        return {'state': 'hidden', 'open': None, 'due': None}
+
+    def rank(e):
+        priority = 0 if e['state'] in ('required', 'scheduled') else 1
+        return (priority, e.get('due') or '9999-12-31')
+
+    return min(visible, key=rank)
+
+
+def visible_modules(user):
+    # Catalog filtering (Phase 6): an enrolled student sees only their class's non-hidden
+    # assigned modules; public/unmanaged users and educators see every module.
+    modules = lessons.list_modules()
+    if not user:
+        return modules
+    return [m for m in modules if (resolve_assignment(user, m['id']) or {}).get('state') != 'hidden']
+
+
+_DEFAULT_POLICY = {'attempts': None, 'reveal_after_miss': False, 'show_tolerance': False}
+
+
+def resolve_policy(user):
+    # Retake & feedback policy (educator portal Phase 11, feature 11): per-class toggles that
+    # govern the question flow -- attempts allowed, whether a miss reveals the correct answer,
+    # whether the numeric tolerance is shown. Public/unmanaged users and educators (no 'classes'
+    # membership) always get the permissive defaults above -- current behavior, unaffected.
+    # A student in multiple classes takes the STRICTEST setting across all of them (mirrors
+    # resolve_assignment's cross-class aggregation): the smallest attempts cap, and reveal/
+    # tolerance only when every enrolled class allows it.
+    class_ids = user.get('classes', [])
+    if not class_ids:
+        return dict(_DEFAULT_POLICY)
+
+    entries = []
+    for class_id in class_ids:
+        try:
+            class_obj = classroom.get_class(class_id)
+        except classroom.ClassError:
+            continue
+        entries.append(class_obj.get('policy', _DEFAULT_POLICY))
+
+    if not entries:
+        return dict(_DEFAULT_POLICY)
+
+    capped = [e.get('attempts') for e in entries if e.get('attempts') is not None]
+    return {
+        'attempts': min(capped) if capped else None,
+        'reveal_after_miss': all(e.get('reveal_after_miss', False) for e in entries),
+        'show_tolerance': all(e.get('show_tolerance', False) for e in entries),
+    }
+
+
+def attempts_used_for(userid, module_id, step_index):
+    # Count of already-graded attempts on one question, read back from the append-only
+    # attempt log (feature 5) -- the same source the item-analytics dashboard reads, so the
+    # attempt cap and the "N misses" triage view can never disagree.
+    attempts = analytics.read_attempts(userid)
+    return analytics.item_stats(attempts, module_id).get(str(step_index), {}).get('attempts', 0)
+
+
+def question_locked(userid, module_id, step_index, step, policy):
+    # 'free' answers are never logged as attempts (nothing to grade), so a cap never applies.
+    if step['answer']['type'] == 'free' or policy['attempts'] is None:
+        return False
+    return attempts_used_for(userid, module_id, step_index) >= policy['attempts']
+
+
 def render_landing(user):
     # The marketing landing (logged-out home, and /landing for anyone). Honest metric
     # cards: the fixed dataset facts plus the real lesson count / completion for this user.
-    modules = lessons.list_modules()
+    modules = visible_modules(user)
 
     lessons_completed = 0
     if user:
@@ -207,7 +313,7 @@ def in_progress_lesson(user):
     # The first started-but-unfinished lesson (in catalog order), for the "Continue …"
     # resume nudge on arrival. Reads only stored progress — no data replay. None if none.
     progress = user.get('progress', {})
-    for m in lessons.list_modules():
+    for m in visible_modules(user):
         entry = progress.get(m['id'])
         if entry and not entry.get('completed'):
             return {'id': m['id'], 'title': m['title'],
@@ -222,7 +328,15 @@ def index():
     # one-time "Continue <lesson>" toast when a lesson is still in progress. Logged out: the
     # landing. (/landing below always renders the landing, even when signed in.)
     if is_logged_in():
-        user = account.retrieve(session['userid'])
+        try:
+            user = account.retrieve(session['userid'])
+        except FileNotFoundError:
+            # the session points at an account that no longer exists (e.g. it was deleted from
+            # the roster, or the user store was reset) — clear the stale cookie and treat the
+            # visitor as logged out rather than 500ing. "/" is the entry point everyone hits, so
+            # clearing here recovers the whole app for that session.
+            session.clear()
+            return render_landing(None)
         resume = in_progress_lesson(user)
         if resume:
             # Markup.format escapes the substituted title; the url_for value is already safe
@@ -301,6 +415,18 @@ def email_policy_message(class_obj):
     return 'This class requires your username to be a valid email address.'
 
 
+def educator_namespace(username):
+    # An educator account is stored under a namespace DERIVED from its own username
+    # (edu-<username>), so the "I'm an educator" checkbox is the only thing an educator ever
+    # supplies — /login can find the account without them typing any code. The edu- prefix stays
+    # a BACKEND-ONLY convention: it still flips is_educator via account.is_educator_classcode,
+    # but it is never shown or typed. Deriving the namespace from the username keeps each
+    # educator's module-authoring scope (module 'author' == classcode) unique and makes educator
+    # usernames globally unique. Pass the already-html.escaped username (as /new and /login do),
+    # so the namespace matches the userid that form_userid builds.
+    return account.EDUCATOR_CLASSCODE_PREFIX + username
+
+
 # account creation page
 @app.route("/new", methods=['GET', 'POST'])
 def new():
@@ -313,45 +439,57 @@ def new():
         password = util.normalize_password(request.form['password'])
         username = html.escape(request.form['username'])
 
-        # resolve the overloaded "code" box: public / educator / class enrollment / error
-        resolution = resolve_class_code(request.form['classcode'])
-
-        # a non-blank, non-edu code matching no live class creates nothing (the old behavior
-        # silently spun up a stray user/<code>/ directory — that is what this replaces)
-        if resolution['kind'] == 'unknown':
-            errors = ['No class found with that code. Leave the code blank to join the public '
-                      'group, or check the join code with your teacher.']
-            return render_template('new.html', errors=errors)
-
-        # email-domain policy (feature 3) is a join-time check — enforce before creating anything
-        if resolution['kind'] == 'class' and not classroom.email_allowed(
-                resolution['class_obj'].get('email_policy', {}), username):
-            return render_template('new.html', errors=[email_policy_message(resolution['class_obj'])])
-
-        classcode = resolution['classcode']
-
-        # the already-exists check runs against the RESOLVED namespace (the class_id for a class)
-        if username in account.get_user_list(classcode):
-            errortext = 'A user by the name ' + username + ' already exists'
-            if resolution['kind'] == 'class':
-                errortext += ' in ' + resolution['class_obj']['name']
-            elif classcode != account.NO_CLASS_CODE:
-                errortext += ' in class ' + classcode
-            return render_template('new.html', errors=[errortext])
-
-        hashed_password = util.get_hashed_password(password)
-
-        if resolution['kind'] == 'class':
-            # student enrollment: the account is namespaced under the immutable class_id, its
-            # membership is recorded on the pickle, and it is added to the class roster. Role
-            # stays student (is_educator=False — a class_id never carries the edu- prefix). The
-            # roster write and the 'classes' key are set together here so they cannot drift.
-            class_id = resolution['class_obj']['class_id']
-            new_user = account.create(username, class_id, hashed_password, classes=[class_id])
-            classroom.enroll(class_id, new_user['userid'])
+        if request.form.get('is_educator') == 'on':
+            # Educator signup: the "I'm an educator" checkbox is the only signal — the class-code
+            # box is ignored. The account is namespaced under edu-<username> (educator_namespace),
+            # a backend-only convention that account.create turns into is_educator=True.
+            classcode = educator_namespace(username)
+            if username in account.get_user_list(classcode):
+                return render_template('new.html',
+                                       errors=['An educator account named ' + username + ' already exists.'])
+            new_user = account.create(username, classcode, util.get_hashed_password(password))
         else:
-            # public ('unmanaged') or educator ('edu-*') — unchanged
-            new_user = account.create(username, classcode, hashed_password)
+            # resolve the student/public "code" box: public / class enrollment / error. (Typing a
+            # literal edu- code still resolves to an educator account as a legacy fallback, but the
+            # checkbox above is the supported way to sign up as an educator.)
+            resolution = resolve_class_code(request.form['classcode'])
+
+            # a non-blank, non-edu code matching no live class creates nothing (the old behavior
+            # silently spun up a stray user/<code>/ directory — that is what this replaces)
+            if resolution['kind'] == 'unknown':
+                return render_template('new.html',
+                                       errors=['No class found with that code. Leave the code blank to join '
+                                               'the public group, or check the join code with your teacher.'])
+
+            # email-domain policy (feature 3) is a join-time check — enforce before creating anything
+            if resolution['kind'] == 'class' and not classroom.email_allowed(
+                    resolution['class_obj'].get('email_policy', {}), username):
+                return render_template('new.html', errors=[email_policy_message(resolution['class_obj'])])
+
+            classcode = resolution['classcode']
+
+            # the already-exists check runs against the RESOLVED namespace (the class_id for a class)
+            if username in account.get_user_list(classcode):
+                errortext = 'A user by the name ' + username + ' already exists'
+                if resolution['kind'] == 'class':
+                    errortext += ' in ' + resolution['class_obj']['name']
+                elif classcode != account.NO_CLASS_CODE:
+                    errortext += ' in class ' + classcode
+                return render_template('new.html', errors=[errortext])
+
+            hashed_password = util.get_hashed_password(password)
+
+            if resolution['kind'] == 'class':
+                # student enrollment: the account is namespaced under the immutable class_id, its
+                # membership is recorded on the pickle, and it is added to the class roster. Role
+                # stays student (is_educator=False — a class_id never carries the edu- prefix). The
+                # roster write and the 'classes' key are set together here so they cannot drift.
+                class_id = resolution['class_obj']['class_id']
+                new_user = account.create(username, class_id, hashed_password, classes=[class_id])
+                classroom.enroll(class_id, new_user['userid'])
+            else:
+                # public ('unmanaged') or a legacy typed edu- code — unchanged
+                new_user = account.create(username, classcode, hashed_password)
 
         # sign them in — set all three session keys (userid + username/classcode), matching /login
         session['username'] = new_user['username']
@@ -385,11 +523,17 @@ def login():
             # login form can't be used to enumerate which usernames exist in a class
             bad_credentials = ['Username or password is incorrect.']
 
-            # resolve the code box the SAME way /new does, so a student who enrolled with a join
-            # code signs in with that same code (it maps back to their class_id namespace). Legacy
-            # accounts under a bare classcode still resolve via the 'unknown' branch (classcode =
-            # the typed code), so Phase 0 login behavior is unchanged for them.
-            classcode = resolve_class_code(request.form['classcode'])['classcode']
+            if request.form.get('is_educator') == 'on':
+                # Educator login: look the account up by its derived edu-<username> namespace, so
+                # the educator never types a code — the checkbox is the only signal (mirrors /new).
+                # The class-code box is ignored here.
+                classcode = educator_namespace(username)
+            else:
+                # resolve the code box the SAME way /new does, so a student who enrolled with a join
+                # code signs in with that same code (it maps back to their class_id namespace). Legacy
+                # accounts under a bare classcode still resolve via the 'unknown' branch (classcode =
+                # the typed code), so Phase 0 login behavior is unchanged for them.
+                classcode = resolve_class_code(request.form['classcode'])['classcode']
 
             if username not in account.get_user_list(classcode):
                 error = bad_credentials
@@ -1239,6 +1383,88 @@ def revert(n):
         return not_logged_in()
 
 
+# ---------------------------------------------------------------------------
+# Shareable data states (educator portal Phase 9, feature 8)
+# ---------------------------------------------------------------------------
+#
+# The one deliberate exception to "never mutate history except via the user's own filter
+# actions": opening a share link resets the visiting user's OWN history to the shared chain,
+# same as clicking through Clear Data + re-applying each filter by hand. Unlike lesson state
+# (which is a read-only sandbox overlay, see build_lesson_data), this really does rewrite
+# user['history'] -- that's the point (a projector-led "everyone look at this view" link).
+# The chain is untrusted URL input, so every token is re-validated against the live dataset
+# shape before anything is written (never trust history_text_to_item's parse alone).
+
+SHARE_MAX_TOKENS = 25
+SHARE_MAX_CHAIN_LEN = 4000
+
+
+def parse_share_token(token, data):
+    # Validates one decoded share-chain token against the current dataset shape and returns
+    # (code, column, op, value) -- value is a single string for 'f', a list for 'o'. Raises
+    # ValueError (a short, user-facing reason) on anything malformed, unknown, or excluded.
+    try:
+        code, column, op, value = history_text_to_item(token)['action']
+    except (ValueError, IndexError):
+        raise ValueError('an unrecognized filter token')
+
+    if op not in ('eq', 'ne', 'gt', 'ge', 'lt', 'le'):
+        raise ValueError('an unknown comparison')
+    if column not in data['column_list'] or not CODEBOOK.codebook.get(column):
+        raise ValueError('a column that no longer exists')
+    if column in data['excluded']:
+        raise ValueError('a column excluded from filtering')
+
+    values = value if code == 'o' else [value]
+    if not values or any(v == '' for v in values):
+        raise ValueError('a missing value')
+    if op in ('gt', 'ge', 'lt', 'le') or column in data['numeric']:
+        if numeric_value_error(values):
+            raise ValueError('a non-numeric value on a numeric comparison')
+
+    return code, column, op, value
+
+
+@app.route('/share/<chain>')
+def apply_share(chain):
+    if not is_logged_in():
+        return not_logged_in()
+
+    raw_tokens = [t for t in chain.split(',') if t]
+    if not raw_tokens or len(raw_tokens) > SHARE_MAX_TOKENS or len(chain) > SHARE_MAX_CHAIN_LEN:
+        flash('That share link is invalid or too long.', 'danger')
+        return redirect(url_for('explore'))
+
+    # dataset shape (column_list/excluded/numeric) doesn't depend on filter state, so this
+    # is safe to read before resetting history
+    data = get_data(session)
+
+    entries = []
+    for encoded in raw_tokens:
+        token = urllib.parse.unquote(encoded)
+        try:
+            code, column, op, value = parse_share_token(token, data)
+        except ValueError as reason:
+            flash('That share link contains ' + str(reason) + ' and could not be applied.', 'danger')
+            return redirect(url_for('explore'))
+        # rebuild through make_history (not by hand) so the resulting entry — desc included —
+        # is identical to what a manual filter apply would have produced
+        if code == 'f':
+            entries.append(make_history.filter_single(column, op, value))
+        else:
+            entries.append(make_history.filter_or_same(column, op, value))
+
+    # reset to the base entry, then replay the shared chain in order -- reproduces the
+    # sharer's exact view (and lands in the same cache directory a manual replay would)
+    account.history_revert(session['userid'], 1)
+    for entry in entries:
+        account.history_add(session['userid'], entry)
+
+    remaining = get_data(session)['entries']
+    flash('Shared data state applied — {:,} cases shown.'.format(remaining), 'success')
+    return redirect(url_for('explore'))
+
+
 @app.route('/save', methods=['GET', 'POST'])
 def save():
     if is_logged_in():
@@ -1301,11 +1527,39 @@ def slugify(text):
     return re.sub(r'[^a-z0-9-]+', '-', text.strip().lower()).strip('-')
 
 
+def student_display_name(userid):
+    # roster entries are full userids ("<namespace>/<username>") -- strip the namespace for
+    # display (classes hold no PII beyond userids; see classroom.py). Used by the class detail
+    # roster table and by the roster-management flashes below.
+    return userid.split('/', 1)[1] if '/' in userid else userid
+
+
 def parse_email_policy(form):
     # shared "email policy" fieldset parsing (new-class form + class-detail form): a checkbox
     # plus a comma/whitespace-separated domain list.
     domains = [d.strip() for d in re.split(r'[,\s]+', form.get('email_domains', '')) if d.strip()]
     return {'required': form.get('email_required') == 'on', 'domains': domains}
+
+
+def parse_retake_policy(form):
+    # "Retake & feedback policy" fieldset parsing (feature 11): blank attempts field means
+    # unlimited (stored as None, classroom.py's existing default).
+    raw = form.get('attempts', '').strip()
+    if raw == '':
+        attempts = None
+    else:
+        try:
+            attempts = int(raw)
+        except ValueError:
+            raise classroom.ClassError("Attempts allowed must be a whole number, or blank for unlimited.")
+        if attempts < 1:
+            raise classroom.ClassError("Attempts allowed must be at least 1.")
+
+    return {
+        'attempts': attempts,
+        'reveal_after_miss': form.get('reveal_after_miss') == 'on',
+        'show_tolerance': form.get('show_tolerance') == 'on',
+    }
 
 
 @app.route('/admin')
@@ -1317,7 +1571,9 @@ def admin():
     user = account.retrieve(session['userid'])
     classcode = user['classcode']
 
-    classes = classroom.list_classes(session['userid'])
+    # archived sections drop off active lists (Phase 8, feature 7) -- still reachable from
+    # /admin/classes's "Archived classes" panel, just not surfaced on the portal home
+    classes = [c for c in classroom.list_classes(session['userid']) if not c.get('archived')]
     # educators manage the modules scoped to their own classcode
     mine = [m for m in lessons.list_modules() if m.get('author') == classcode]
 
@@ -1347,8 +1603,37 @@ def admin_classes():
         except classroom.ClassError as e:
             error.append(str(e))
 
-    classes = classroom.list_classes(session['userid'])
-    return render_template('admin_classes.html', user=user, classes=classes, form=form, error=error)
+    all_classes = classroom.list_classes(session['userid'])
+    classes = [c for c in all_classes if not c.get('archived')]
+    archived = [c for c in all_classes if c.get('archived')]
+    return render_template('admin_classes.html', user=user, classes=classes, archived=archived,
+                           form=form, error=error)
+
+
+@app.route('/admin/classes/compare')
+def admin_classes_compare():
+    # Multiple-sections-per-educator comparison view (Phase 8, feature 7): completion rate and
+    # median score per lesson, one column per active class. Reuses build_class_dashboard (the
+    # per-student progress dashboard's own aggregator) so the numbers can never drift from what
+    # a class's own progress page shows; archived sections are left out, matching admin/admin_classes.
+    blocked = require_educator()
+    if blocked:
+        return blocked
+
+    user = account.retrieve(session['userid'])
+    classes = [c for c in classroom.list_classes(session['userid']) if not c.get('archived')]
+    modules = [{'id': m['id'], 'title': m['title']} for m in lessons.list_modules()]
+
+    sections = []
+    for class_obj in classes:
+        dashboard = build_class_dashboard(class_obj)
+        sections.append({
+            'class_obj': class_obj,
+            'roster_size': dashboard['roster_size'],
+            'rollup_by_id': {r['id']: r for r in dashboard['rollups']},
+        })
+
+    return render_template('admin_classes_compare.html', user=user, modules=modules, sections=sections)
 
 
 @app.route('/admin/classes/<class_id>', methods=['GET', 'POST'])
@@ -1366,13 +1651,228 @@ def admin_class(class_id):
 
     class_obj = classroom.get_class(class_id)
     policy = class_obj.get('email_policy', {'required': False, 'domains': []})
-    # roster entries are userids ("<class_id>/<username>") — split for display, no account
-    # reads needed (classes hold no PII beyond userids; see classroom.py)
-    roster = [{'userid': u, 'username': u.split('/', 1)[1] if '/' in u else u}
-              for u in class_obj['roster']]
+    retake_policy = class_obj.get('policy', {'attempts': None, 'reveal_after_miss': False, 'show_tolerance': False})
+    # roster entries are userids ("<class_id>/<username>", or a joined-in-place student's
+    # original "<classcode>/<username>") — split for display, no account reads needed
+    # (classes hold no PII beyond userids; see classroom.py)
+    roster = [{'userid': u, 'username': student_display_name(u)} for u in class_obj['roster']]
 
     return render_template('admin_class.html', user=user, class_obj=class_obj,
-                           roster=roster, policy=policy)
+                           roster=roster, policy=policy, retake_policy=retake_policy)
+
+
+@app.route('/admin/classes/<class_id>/policy', methods=['POST'])
+def admin_class_policy(class_id):
+    # Retake & feedback policy (feature 11): its own route/form, separate from admin_class's
+    # email-policy POST, since the two fieldsets live on the same page but save independently.
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    try:
+        classroom.set_policy(class_id, parse_retake_policy(request.form))
+        flash('Retake & feedback policy updated.', 'success')
+    except classroom.ClassError as e:
+        flash(str(e), 'danger')
+
+    return redirect(url_for('admin_class', class_id=class_id))
+
+
+# ---------------------------------------------------------------------------
+# Roster management (educator portal Phase 8, feature 7)
+# ---------------------------------------------------------------------------
+#
+# Every action below is reached only through require_class_owner, and every route re-checks
+# that the target userid is actually on THIS class's roster before touching anything -- an
+# educator can only ever act on their own students, never on an arbitrary userid guessed off
+# another class. All are GET links (matching the existing revert/clear-data convention, and
+# guarded client-side by the same [data-confirm] dialog) except full account deletion, which
+# gets its own GET+POST confirmation page instead of just the one-click dialog (see
+# admin_class_delete_student).
+
+def _roster_or_none(class_obj, userid):
+    # Shared guard for every roster action: bounces with a flash if userid isn't on this
+    # class's roster, else returns the class_obj unchanged (so callers can chain it in an if).
+    if userid not in class_obj.get('roster', []):
+        flash("That student isn't on this class's roster.", 'danger')
+        return None
+    return class_obj
+
+
+@app.route('/admin/classes/<class_id>/roster/<path:userid>/remove')
+def admin_class_remove_student(class_id, userid):
+    # Unenroll a student: drops the roster entry and the class from their own 'classes' list,
+    # but keeps their account, history, and progress intact -- they can rejoin with the join
+    # code later. Distinct from admin_class_delete_student, which destroys the account.
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    class_obj = classroom.get_class(class_id)
+    if _roster_or_none(class_obj, userid):
+        classroom.remove_student(class_id, userid)
+        try:
+            account.remove_class(userid, class_id)
+        except FileNotFoundError:
+            pass  # roster entry with no account (shouldn't happen) -- roster is fixed either way
+        flash('Removed ' + student_display_name(userid) + ' from ' + class_obj['name'] + '.', 'success')
+
+    return redirect(url_for('admin_class', class_id=class_id))
+
+
+@app.route('/admin/classes/<class_id>/roster/<path:userid>/reset')
+def admin_class_reset_progress(class_id, userid):
+    # Clears the student's lesson progress across every module the class dashboard tracks
+    # (account.reset_progress documents the scope) so they get a clean restart. The attempt
+    # log is deliberately left alone -- it backs the item-level analytics/thesis data.
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    class_obj = classroom.get_class(class_id)
+    if _roster_or_none(class_obj, userid):
+        module_ids = [m['id'] for m in lessons.list_modules()]
+        try:
+            account.reset_progress(userid, module_ids)
+            flash("Reset " + student_display_name(userid) + "'s lesson progress.", 'success')
+        except FileNotFoundError:
+            flash("That student's account could not be found.", 'danger')
+
+    return redirect(url_for('admin_class', class_id=class_id))
+
+
+@app.route('/admin/classes/<class_id>/rotate-code')
+def admin_class_rotate_code(class_id):
+    # New join code; class_id (the storage key) and the roster are untouched, so no
+    # already-enrolled student is displaced -- only the old code stops working.
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    class_obj = classroom.rotate_join_code(class_id)
+    flash('New join code: ' + class_obj['join_code'] + '. The old code no longer works.', 'success')
+    return redirect(url_for('admin_class', class_id=class_id))
+
+
+@app.route('/admin/classes/<class_id>/archive')
+def admin_class_archive(class_id):
+    # Archiving drops a section off the active /admin and /admin/classes lists (feature 7) --
+    # the roster and every record stay intact, and it can be restored any time.
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    class_obj = classroom.archive(class_id)
+    flash(class_obj['name'] + ' archived. Restore it any time from Archived classes.', 'success')
+    return redirect(url_for('admin_class', class_id=class_id))
+
+
+@app.route('/admin/classes/<class_id>/unarchive')
+def admin_class_unarchive(class_id):
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    class_obj = classroom.unarchive(class_id)
+    flash(class_obj['name'] + ' restored to your active classes.', 'success')
+    return redirect(url_for('admin_class', class_id=class_id))
+
+
+@app.route('/admin/classes/<class_id>/roster/<path:userid>/delete', methods=['GET', 'POST'])
+def admin_class_delete_student(class_id, userid):
+    # Educator-initiated full deletion (EDUCATOR_PORTAL.md Privacy section) -- permanently
+    # destroys the account pickle and the attempt log, not just the roster membership. This
+    # is meaningfully more destructive than "Remove", so it is guarded harder: a dedicated,
+    # visually distinct confirmation page (not just the one-click dialog) that requires typing
+    # the student's exact username before the POST is honored.
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    class_obj = classroom.get_class(class_id)
+    if _roster_or_none(class_obj, userid) is None:
+        return redirect(url_for('admin_class', class_id=class_id))
+
+    username = student_display_name(userid)
+    # named 'errors' (list), not 'error' -- layout.html's top-of-main alert renders any
+    # truthy 'error' in context by iterating it, so a plain string there gets shredded into
+    # one <p> per character (same gotcha new.html/login.html already dodge this way)
+    errors = None
+
+    if request.method == 'POST':
+        if request.form.get('confirm_username', '') != username:
+            errors = ['Type the username exactly as shown below to confirm.']
+        else:
+            classroom.remove_student(class_id, userid)
+            analytics.delete_attempts(userid)
+            account.delete_account(userid)
+            flash('Permanently deleted ' + username + "'s account, progress, and attempt history.", 'success')
+            return redirect(url_for('admin_class', class_id=class_id))
+
+    return render_template('admin_student_delete.html', user=account.retrieve(session['userid']),
+                           class_obj=class_obj, username=username, errors=errors)
+
+
+# ISO date (YYYY-MM-DD) — same lexical form <input type="date"> emits, so string
+# comparison against date.today().isoformat() sorts correctly without parsing.
+_ISO_DATE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+
+
+@app.route('/admin/classes/<class_id>/assignments', methods=['GET', 'POST'])
+def admin_class_assignments(class_id):
+    # Per-module assignment control (educator portal Phase 6, feature 4): required /
+    # optional / hidden / scheduled, the last with an open and/or due date.
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    user = account.retrieve(session['userid'])
+    class_obj = classroom.get_class(class_id)
+    modules = lessons.list_modules()
+    current = class_obj.get('assignments', {})
+    error = []
+
+    if request.method == 'POST':
+        assignments = {}
+
+        for m in modules:
+            mid = m['id']
+            state = request.form.get('state_' + mid, 'optional')
+            if state not in classroom.VALID_ASSIGNMENT_STATES:
+                state = 'optional'
+
+            open_date = request.form.get('open_' + mid, '').strip()
+            due_date = request.form.get('due_' + mid, '').strip()
+            if open_date and not _ISO_DATE.match(open_date):
+                error.append(m['title'] + ': open date must be YYYY-MM-DD.')
+                open_date = ''
+            if due_date and not _ISO_DATE.match(due_date):
+                error.append(m['title'] + ': due date must be YYYY-MM-DD.')
+                due_date = ''
+
+            if state == 'scheduled' and not open_date and not due_date:
+                error.append(m['title'] + ': Scheduled needs an open and/or due date.')
+
+            # dates only mean anything for a scheduled module — drop stray values left
+            # over from switching a module's state away from Scheduled
+            if state != 'scheduled':
+                open_date = due_date = ''
+
+            assignments[mid] = {'state': state, 'open': open_date or None, 'due': due_date or None}
+
+        if not error:
+            classroom.set_assignments(class_id, assignments)
+            flash('Assignments updated.', 'success')
+            return redirect(url_for('admin_class_assignments', class_id=class_id))
+
+        current = assignments  # re-render with what they just typed, not the stored state
+
+    rows = [{'module': m,
+             'assignment': current.get(m['id'], {'state': 'optional', 'open': None, 'due': None})}
+            for m in modules]
+
+    return render_template('admin_class_assignments.html', user=user, class_obj=class_obj,
+                           rows=rows, error=error)
 
 
 # ---------------------------------------------------------------------------
@@ -1598,6 +2098,150 @@ def admin_class_progress(class_id):
                            class_obj=class_obj, dashboard=dashboard)
 
 
+# ---------------------------------------------------------------------------
+# Answer-context inspection (educator portal Phase 10, feature 9)
+# ---------------------------------------------------------------------------
+
+def build_student_attempts(userid):
+    # One student's full attempt history, newest first. Module/question titles and choice
+    # labels are resolved from the LIVE module (a module can be edited after the attempt was
+    # logged), but the 'state' tokens are exactly what was recorded at answer time -- decoded to
+    # plain language via describe_token so a teacher can tell "filtered the wrong year" from
+    # "can't read a median" on an incorrect answer.
+    modules = {}
+    rows = []
+
+    for record in reversed(analytics.read_attempts(userid)):
+        mid = record.get('module')
+        if mid not in modules:
+            try:
+                modules[mid] = lessons.get_module(mid)
+            except lessons.LessonError:
+                modules[mid] = None
+        module = modules[mid]
+
+        step_i = record.get('step')
+        step = None
+        if module and isinstance(step_i, int) and 0 <= step_i < len(module['steps']):
+            step = module['steps'][step_i]
+
+        # a deleted/edited-away choice option just falls back to the raw stored index
+        submitted = record.get('submitted')
+        if step and record.get('type') == 'choice':
+            options = step.get('answer', {}).get('options', [])
+            if isinstance(submitted, int) and 0 <= submitted < len(options):
+                submitted = options[submitted]
+
+        rows.append({
+            'ts': record.get('ts'),
+            'module_title': module['title'] if module else (mid or 'Unknown module'),
+            'question_title': step['title'] if step else ('Step ' + str(step_i)),
+            'type': record.get('type'),
+            'submitted': submitted,
+            'correct': record.get('correct'),
+            'chips': lesson_chips(record.get('state', [])),
+        })
+
+    return rows
+
+
+@app.route('/admin/classes/<class_id>/roster/<path:userid>/attempts')
+def admin_student_attempts(class_id, userid):
+    # From the progress dashboard, drill into one student's graded history to see the data
+    # state active when each answer was submitted (feature 9). Same roster guard as every other
+    # per-student action -- an educator can only ever inspect their own class's students.
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    class_obj = classroom.get_class(class_id)
+    if _roster_or_none(class_obj, userid) is None:
+        return redirect(url_for('admin_class_progress', class_id=class_id))
+
+    try:
+        account.retrieve(userid)
+    except FileNotFoundError:
+        flash("That student's account could not be found.", 'danger')
+        return redirect(url_for('admin_class_progress', class_id=class_id))
+
+    user = account.retrieve(session['userid'])
+    return render_template('admin_student_attempts.html', user=user, class_obj=class_obj,
+                           username=student_display_name(userid),
+                           attempts=build_student_attempts(userid))
+
+
+def class_gradebook_csv(class_obj):
+    # Flat gradebook export (feature 6): one row per student, two columns per module
+    # (completion + score), plus one last-active timestamp column. Deliberately flat --
+    # no title/preamble rows like crosstab_csv's -- so it imports cleanly into Canvas /
+    # Google Classroom / PowerSchool. Built from build_class_dashboard so the numbers
+    # always match the progress dashboard.
+    #
+    # "Complete" (EDUCATOR_PORTAL.md open question 4) defaults to the module's own
+    # `completed` flag -- the same definition module_status/the dashboard already use,
+    # not a separate per-class setting.
+    dashboard = build_class_dashboard(class_obj)
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+
+    header = ['Username']
+    for m in dashboard['modules']:
+        header += [m['title'] + ' - Completed', m['title'] + ' - Score (%)']
+    header.append('Last Active (UTC)')
+    writer.writerow(header)
+
+    for row in dashboard['rows']:
+        line = [row['username']]
+        for m in dashboard['modules']:
+            cell = row['cells'][m['id']]
+            line.append('Yes' if cell['status'] == 'completed' else 'No')
+            line.append('' if cell['score'] is None else round(cell['score'] * 100))
+        line.append(row['last_active'] or '')
+        writer.writerow(line)
+
+    filename = 'gradebook-' + class_obj['class_id'] + '.csv'
+    # BOM so Excel reads the file as UTF-8 (matches crosstab_csv)
+    response = Response('﻿' + buffer.getvalue(), mimetype='text/csv')
+    response.headers['Content-Disposition'] = 'attachment; filename="' + filename + '"'
+    return response
+
+
+@app.route('/admin/classes/<class_id>/gradebook.csv')
+def admin_class_gradebook(class_id):
+    blocked = require_class_owner(class_id)
+    if blocked:
+        return blocked
+
+    class_obj = classroom.get_class(class_id)
+    return class_gradebook_csv(class_obj)
+
+
+# ---------------------------------------------------------------------------
+# Computed answer key (educator portal Phase 10, feature 10)
+# ---------------------------------------------------------------------------
+
+@app.route('/admin/modules/<module_id>/answers')
+def admin_module_answers(module_id):
+    # Any educator can view any module's key -- it carries no student data, so it isn't scoped
+    # to modules this educator authored (classes routinely run the shared starter lessons
+    # authored under 'unmanaged'). Generated fresh every request, never persisted, so it always
+    # matches the live dataset.
+    blocked = require_educator()
+    if blocked:
+        return blocked
+
+    try:
+        module = lessons.get_module(module_id)
+    except lessons.LessonError:
+        flash("That module doesn't exist.", 'danger')
+        return redirect(url_for('admin'))
+
+    user = account.retrieve(session['userid'])
+    return render_template('admin_module_answers.html', user=user, module=module,
+                           answer_key=build_answer_key(module))
+
+
 @app.route('/admin/edit', methods=['GET', 'POST'])
 @app.route('/admin/edit/<module_id>', methods=['GET', 'POST'])
 def admin_edit(module_id=None):
@@ -1697,15 +2341,22 @@ def lesson_catalog():
         user = account.retrieve(session['userid'])
 
         progress = user.get('progress', {})
+        today = datetime.date.today().isoformat()
         catalog = []
-        for m in lessons.list_modules():
+        for m in visible_modules(user):
+            assignment = resolve_assignment(user, m['id'])
             entry = progress.get(m['id'])
             total = len(m['steps'])
+            # scheduled modules stay in the catalog but are locked until their open date
+            locked = bool(assignment and assignment['state'] == 'scheduled'
+                          and assignment.get('open') and assignment['open'] > today)
             catalog.append({
                 'module': m,
                 'status': module_status(entry),
                 'resume': resume_step(entry, total),
                 'total_steps': total,
+                'assignment': assignment,
+                'locked': locked,
             })
 
         return render_template('lesson_catalog.html', catalog=catalog, user=user)
@@ -1754,10 +2405,14 @@ def lesson_step(module_id, step):
         return redirect(url_for('lesson_overview', module_id=module_id))
 
     current = steps[step]
+    policy = resolve_policy(user)
 
-    # POST an answer -> grade it server-side, persist, then redirect back (Post/Redirect/Get)
+    # POST an answer -> grade it server-side, persist, then redirect back (Post/Redirect/Get).
+    # A locked question (attempt cap already reached) never grades another try, even if the
+    # client bypasses the disabled form -- the policy is enforced here, not just in the UI.
     if request.method == 'POST' and current['type'] == 'question':
-        grade_and_store(module_id, step, current)
+        if not question_locked(session['userid'], module_id, step, current, policy):
+            grade_and_store(module_id, step, current)
         return redirect(url_for('lesson_step', module_id=module_id, step=step))
 
     # record the resume pointer, but only when it actually moves (avoid redundant writes)
@@ -1773,7 +2428,7 @@ def lesson_step(module_id, step):
     lesson_data = build_lesson_data(module_id, current, focus)
 
     # question steps render their form + any prior answer/feedback read back from progress
-    question = build_question(module_id, step, current) if current['type'] == 'question' else None
+    question = build_question(module_id, step, current, policy) if current['type'] == 'question' else None
     # checkpoint steps compare the active lesson state to expect_state (Phase 5)
     checkpoint = build_checkpoint(module_id, current) if current['type'] == 'checkpoint' else None
 
@@ -1819,6 +2474,17 @@ def resolve_lesson_state(module_id, step):
     if 'state' in step:
         return step['state']
     return account.get_progress(session['userid'], module_id).get('state', [])
+
+
+def resolve_module_state(module, step_index):
+    # Static counterpart to resolve_lesson_state: walks the module's OWN step list backward for
+    # the nearest 'state' (mirrors lesson_active_focus's focus inheritance) instead of reading
+    # any signed-in student's progress. Used by the answer-key view (Phase 10, feature 10),
+    # which previews a module cold rather than from a specific learner's walkthrough.
+    for i in range(step_index, -1, -1):
+        if 'state' in module['steps'][i]:
+            return module['steps'][i]['state']
+    return []
 
 
 # op code -> readable phrase, for lesson chips and the checkpoint diff
@@ -1925,11 +2591,14 @@ def build_checkpoint(module_id, step):
 _STAT_KEY = {'mean': 'mean', 'median': 'mdn', 'std': 'std'}
 
 
-def compute_expected(module_id, step):
+def compute_expected(module_id, step, state=None):
     # Live-compute the expected numeric answer from the step's data state via Data
-    # (never hardcoded), so grading stays correct if the state's filters change.
+    # (never hardcoded), so grading stays correct if the state's filters change. `state`
+    # overrides the (session-bound) resolved state -- used by the answer-key view (Phase 10,
+    # feature 10), which has no signed-in student to resolve progress from.
     compute = step['answer']['compute']
-    override = [history_text_to_item(token) for token in resolve_lesson_state(module_id, step)]
+    tokens = state if state is not None else resolve_lesson_state(module_id, step)
+    override = [history_text_to_item(token) for token in tokens]
 
     summary = get_data(None, history_override=override)
 
@@ -1943,6 +2612,34 @@ def compute_expected(module_id, step):
     info = get_data(None, compute['column'], 'occurrence', override)['column_info']
     value = info[_STAT_KEY[compute['stat']]]
     return float(value) if value is not None else None
+
+
+def build_answer_key(module):
+    # Computed answer key for every graded question in a module (feature 10): generated fresh
+    # on each request -- never cached -- so it always reflects the live dataset. Numeric answers
+    # reuse compute_expected (the exact function that grades a real submission); choice answers
+    # just resolve the authored correct option; free-response questions have no fixed answer.
+    rows = []
+
+    for i, step in enumerate(module['steps']):
+        if step.get('type') != 'question':
+            continue
+
+        answer = step['answer']
+        state = resolve_module_state(module, i)
+        row = {'step': i, 'title': step['title'], 'type': answer['type'], 'chips': lesson_chips(state)}
+
+        if answer['type'] == 'numeric':
+            row['expected'] = compute_expected(module['id'], step, state=state)
+            row['tolerance'] = answer['tolerance']
+        elif answer['type'] == 'choice':
+            row['correct_label'] = answer['options'][answer['correct']]
+        else:  # free -- ungraded, no fixed answer
+            row['model_answer'] = answer.get('model_answer')
+
+        rows.append(row)
+
+    return rows
 
 
 def grade_and_store(module_id, step_index, step):
@@ -1995,10 +2692,23 @@ def grade_and_store(module_id, step_index, step):
         })
 
 
-def build_question(module_id, step_index, step):
-    # GET-render context for a question step: the form inputs plus any prior answer/feedback.
+def build_question(module_id, step_index, step, policy):
+    # GET-render context for a question step: the form inputs plus any prior answer/feedback,
+    # shaped by the resolved retake & feedback policy (feature 11).
     answer = step['answer']
     prior = account.get_progress(session['userid'], module_id).get('answers', {}).get(str(step_index))
+
+    attempts_used = attempts_used_for(session['userid'], module_id, step_index) if answer['type'] != 'free' else 0
+    attempts_allowed = policy['attempts']
+
+    # reveal the correct answer only after a miss, and only when the policy allows it -- 'free'
+    # answers have no fixed correct value to reveal (model_answer, below, covers that case)
+    reveal = None
+    if policy['reveal_after_miss'] and prior is not None and prior.get('correct') is False:
+        if answer['type'] == 'numeric':
+            reveal = compute_expected(module_id, step)
+        elif answer['type'] == 'choice':
+            reveal = answer['options'][answer['correct']]
 
     return {
         'type': answer['type'],
@@ -2006,7 +2716,13 @@ def build_question(module_id, step_index, step):
         'model_answer': answer.get('model_answer'),  # free
         'prior': prior,                            # {'type','value','correct'} or None
         'answered': prior is not None,
-        'require_answer': step.get('require_answer', False)
+        'require_answer': step.get('require_answer', False),
+        'attempts_used': attempts_used,
+        'attempts_allowed': attempts_allowed,
+        'locked': attempts_allowed is not None and attempts_used >= attempts_allowed,
+        'reveal': reveal,
+        'show_tolerance': policy['show_tolerance'],
+        'tolerance': answer.get('tolerance'),       # numeric
     }
 
 

@@ -46,6 +46,16 @@ def log_attempt(userid, record) -> None:
         handle.write(json.dumps(record, ensure_ascii=False) + '\n')
 
 
+def delete_attempts(userid) -> None:
+    # Companion to account.delete_account for educator-initiated full deletion (Phase 8) --
+    # removes this student's entire attempt log. Distinct from account.reset_progress, which
+    # deliberately leaves this log alone; full deletion is the one path that also erases it.
+    # No-op if the student never logged an attempt.
+    path = _log_path(userid)
+    if os.path.exists(path):
+        os.remove(path)
+
+
 def read_attempts(userid) -> list:
     # Full attempt history for one student, oldest first. No log yet -> []. A corrupted line
     # (e.g. a torn write) is skipped rather than failing the whole read -- an append-only log

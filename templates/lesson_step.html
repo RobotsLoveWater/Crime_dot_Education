@@ -33,14 +33,36 @@
 
         <div class="lesson-body">{{ step['body']|lesson_body }}</div>
 
+        {% if user['is_educator'] and step.get('educator_notes') %}
+        <div class="educator-notes">
+            <p class="badge badge-educator">Educator notes</p>
+            {% set notes = step['educator_notes'] %}
+            {% if notes is string %}
+            <p>{{ notes }}</p>
+            {% else %}
+            <ul>
+                {% for note in notes %}
+                <li>{{ note }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endif %}
+
         {% if step['type'] == 'question' and question %}
-        {# Answers are graded server-side; the client never submits a correctness flag. #}
+        {# Answers are graded server-side; the client never submits a correctness flag. A locked
+           question (attempt cap reached, feature 11) drops the form entirely rather than just
+           disabling it -- there's nothing left to submit. #}
+        {% if not question['locked'] %}
         <form class="lesson-question" method="post">
             {% if question['type'] == 'numeric' %}
             <div class="field">
                 <label for="answer-input">Your answer</label>
                 <input type="number" step="any" id="answer-input" name="answer" required
                        value="{% if question['prior'] %}{{ question['prior']['value'] }}{% endif %}">
+                {% if question['show_tolerance'] and question['tolerance'] is not none %}
+                <p class="field-hint">Answers within &plusmn;{{ question['tolerance'] }} of the correct value count as correct.</p>
+                {% endif %}
             </div>
             {% elif question['type'] == 'choice' %}
             <fieldset class="field">
@@ -60,18 +82,30 @@
             </div>
             {% endif %}
             <button type="submit" class="btn btn-primary">{% if question['answered'] %}Resubmit{% else %}Submit answer{% endif %}</button>
+            {% if question['attempts_allowed'] is not none %}
+            <p class="field-hint">Attempt {{ question['attempts_used'] + 1 }} of {{ question['attempts_allowed'] }}.</p>
+            {% endif %}
         </form>
+        {% endif %}
 
         {% if question['answered'] %}
             {% if question['prior']['correct'] == True %}
             <p class="lesson-feedback lesson-feedback-correct" role="status"><span aria-hidden="true">&check;</span> Correct!</p>
             {% elif question['prior']['correct'] == False %}
-            <p class="lesson-feedback lesson-feedback-wrong" role="status"><span aria-hidden="true">&times;</span> Not quite — try again.</p>
+            <p class="lesson-feedback lesson-feedback-wrong" role="status"><span aria-hidden="true">&times;</span> Not quite{% if not question['locked'] %} — try again{% endif %}.</p>
             {% else %}
             <p class="lesson-feedback" role="status">Answer submitted.</p>
             {% if question['model_answer'] %}
             <p class="lesson-model"><em>Model answer:</em> {{ question['model_answer'] }}</p>
             {% endif %}
+            {% endif %}
+
+            {% if question['locked'] %}
+            <p class="lesson-model">You've used all {{ question['attempts_allowed'] }} allowed attempt{{ '' if question['attempts_allowed'] == 1 else 's' }} for this question.</p>
+            {% endif %}
+
+            {% if question['reveal'] is not none %}
+            <p class="lesson-model"><em>Correct answer:</em> {{ question['reveal'] }}{% if question['type'] == 'numeric' and question['show_tolerance'] and question['tolerance'] is not none %} (&plusmn;{{ question['tolerance'] }}){% endif %}</p>
             {% endif %}
         {% endif %}
 

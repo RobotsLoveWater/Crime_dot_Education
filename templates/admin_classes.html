@@ -10,6 +10,11 @@
         <h1>Classes</h1>
         <p class="view-subtitle">Create a class to get a join code students use to enroll.</p>
     </div>
+    {% if classes|length > 1 %}
+    <div class="view-actions">
+        <a class="btn btn-secondary" href="{{ url_for('admin_classes_compare') }}">Compare sections</a>
+    </div>
+    {% endif %}
 </header>
 
 {% if error %}
@@ -70,6 +75,38 @@
     <h2>No classes yet</h2>
     <p>Create your first class above.</p>
 </div>
+{% endif %}
+
+{% if archived %}
+<section class="portal-section">
+    <details class="rollup-detail">
+        <summary>Archived classes ({{ archived|length }})</summary>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <caption class="visually-hidden">Archived classes. Roster and records are preserved.</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col" class="num">Students</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in archived %}
+                    <tr>
+                        <td>{{ c['name'] }}</td>
+                        <td class="num">{{ c['roster']|length }}</td>
+                        <td>
+                            <a href="{{ url_for('admin_class', class_id=c['class_id']) }}">Open</a> ·
+                            <a href="{{ url_for('admin_class_unarchive', class_id=c['class_id']) }}">Restore</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+</section>
 {% endif %}
 
 {% endblock %}

@@ -171,6 +171,29 @@ body {
   font-size: var(--fs-sm);
 }
 
+/* Shareable data-state link (Phase 9) — a compact variant of the join-code copy affordance
+   (.join-code below): same visible-text + [data-copy] button pattern, but sized for a long
+   URL in a narrow sidebar column instead of a short code. */
+.share-link-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.share-link {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-radius: var(--radius-sm);
+}
+
 /* ---------- Main area ---------- */
 .main-area {
   min-width: 0;
@@ -629,6 +652,11 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
   color: var(--color-text-muted);
   margin: 0;
 }
+.lesson-card-due {
+  color: var(--color-warning);
+  font-size: var(--fs-sm);
+  margin: 0;
+}
 .lesson-card-meta {
   display: flex;
   align-items: center;
@@ -1028,6 +1056,69 @@ th[aria-sort="descending"] .col-sort { color: var(--color-accent); }
   color: var(--color-text);
 }
 .rollup-detail > summary:hover { color: var(--color-accent); }
+
+/* Small secondary link inside a table cell/header (e.g. a module row's "Answer key" link) */
+.row-detail-link {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+/* Student attempt history (answer-context inspection, Phase 10 feature 9) */
+.attempt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.attempt-item {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+.attempt-item-incorrect { border-left: 3px solid var(--color-danger); }
+.attempt-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.attempt-ts { margin-left: auto; font-size: var(--fs-xs); }
+.attempt-submitted {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-sm);
+}
+.attempt-state-label {
+  margin: 0 0 var(--space-1);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+/* Computed answer key (Phase 10 feature 10) */
+.answer-key-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+.answer-key-item {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+.answer-key-title {
+  font-size: var(--fs-base);
+  margin: 0 0 var(--space-2);
+}
+.answer-key-value {
+  margin: 0 0 var(--space-2);
+}
 
 /* ---------- Footer ---------- */
 .site-footer {

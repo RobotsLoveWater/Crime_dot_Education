@@ -1,0 +1,76 @@
+{% extends "layout.html" %}
+{% block title %} — {{ class_obj['name'] }} assignments{% endblock %}
+
+{% block body %}
+
+<p><a class="dock-back" href="{{ url_for('admin_class', class_id=class_obj['class_id']) }}">&larr; {{ class_obj['name'] }}</a></p>
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Module assignments</h1>
+        <p class="view-subtitle">Choose which lessons this class sees, and pace them with open/due dates.</p>
+    </div>
+</header>
+
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    {% for message in error %}<p>{{ message }}</p>{% endfor %}
+</div>
+{% endif %}
+
+{% if rows %}
+<form method="post" class="filter-form">
+    <div class="table-wrapper">
+        <table class="data-table">
+            <caption class="visually-hidden">Per-module assignment state, open date, and due date.</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Lesson</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Opens</th>
+                    <th scope="col">Due</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                {% set mid = row['module']['id'] %}
+                {% set a = row['assignment'] %}
+                <tr>
+                    <th scope="row">
+                        {{ row['module']['title'] }}<br>
+                        <a class="row-detail-link" href="{{ url_for('admin_module_answers', module_id=mid) }}">Answer key</a>
+                    </th>
+                    <td>
+                        <label class="visually-hidden" for="state_{{ mid }}">Status for {{ row['module']['title'] }}</label>
+                        <select id="state_{{ mid }}" name="state_{{ mid }}">
+                            <option value="optional" {% if a['state'] == 'optional' %}selected{% endif %}>Optional</option>
+                            <option value="required" {% if a['state'] == 'required' %}selected{% endif %}>Required</option>
+                            <option value="scheduled" {% if a['state'] == 'scheduled' %}selected{% endif %}>Scheduled (required + dates)</option>
+                            <option value="hidden" {% if a['state'] == 'hidden' %}selected{% endif %}>Hidden</option>
+                        </select>
+                    </td>
+                    <td>
+                        <label class="visually-hidden" for="open_{{ mid }}">Open date for {{ row['module']['title'] }}</label>
+                        <input type="date" id="open_{{ mid }}" name="open_{{ mid }}" value="{{ a['open'] or '' }}">
+                    </td>
+                    <td>
+                        <label class="visually-hidden" for="due_{{ mid }}">Due date for {{ row['module']['title'] }}</label>
+                        <input type="date" id="due_{{ mid }}" name="due_{{ mid }}" value="{{ a['due'] or '' }}">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="field-hint">Open/due dates only take effect for modules set to Scheduled. Hidden modules
+        disappear from the student catalog; you can still author and preview them here.</p>
+    <button type="submit" class="btn btn-primary">Save assignments</button>
+</form>
+{% else %}
+<div class="empty-state">
+    <h2>No lessons yet</h2>
+    <p>There's nothing to assign until a lesson exists.</p>
+</div>
+{% endif %}
+
+{% endblock %}

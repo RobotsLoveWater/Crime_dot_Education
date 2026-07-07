@@ -4,6 +4,14 @@ Guidelines for building the **educator portal** for MAST / Minnesota Sentencing 
 This document is the source of truth for scope, priorities, and design constraints. When
 implementation details here conflict with the codebase, trust the codebase and update this file.
 
+> **Status (2026-07, `educator-portal` branch): implemented.** Auth hardening + all of **P0
+> (features 1–6)** and **P1 (features 7–12)** shipped across the 14 phases in
+> `EDUCATOR_PORTAL_PROMPTS.md`. **P2 (13 fork-and-edit, 14 standards tags, 15 full authoring UI)
+> is deferred.** The class/identity model, attempt-log location (open question 1), storage
+> (open question 2), and the gradebook "complete" definition (open question 4) are all resolved
+> below. Treat `CLAUDE.md` → "Educator portal (implemented)" as the current-state authority for
+> *how* it was built; this doc remains the authority for *why* (scope, privacy, decisions).
+
 ## Context (read first)
 
 - Educators already exist in the model: a *classcode* beginning `edu-` grants educator rights.
@@ -48,23 +56,27 @@ feature list below, which conflates three now-distinct concepts:
 class. JSON, like `lessons/` (classes hold no non-serializable data); private, like `user/`
 (rosters tie to real students). This resolves open question 2.
 
-**The signup code box is resolved by lookup** — one field, but this is where class codes finally
-get *validated*:
-- blank → public / `unmanaged` (unchanged);
-- `edu-*` → educator account;
-- matches a live `join_code` → enroll as a student in that class (namespaced under
+**The signup form has an "I'm an educator" checkbox + a student code box.** *(Updated
+post-launch: the `edu-` prefix is no longer typed — see below.)* Resolution:
+- **educator checkbox ticked** → educator account under `edu-<username>` (`educator_namespace()`);
+  the `edu-` prefix is backend-only, never shown; the code box is ignored;
+- checkbox off, blank code → public / `unmanaged` (unchanged);
+- checkbox off, a live `join_code` → enroll as a student in that class (namespaced under
   `user/<class_id>/`, added to the roster; enforce `email_policy` if set);
-- anything else → an error ("no class with that code"), instead of silently creating a stray
-  directory as today.
+- checkbox off, a literal `edu-…` → educator account (a **legacy fallback** for the old typed form);
+- checkbox off, anything else → an error ("no class with that code"), instead of silently creating
+  a stray directory as today.
 
 A logged-in student may also join from a "Join a class" action (same lookup).
 
-**Login resolves the same code box.** `/login` runs the typed code through the identical
-resolver so a student who enrolled with a join code signs in with that same code (it maps back
-to their immutable `class_id` namespace). Legacy/bare-directory and `edu-`/blank accounts are
-untouched — a code matching no live class falls through to being treated as the typed classcode,
-exactly as before. (Because join codes are rotatable, a returning student uses the class's
-*current* code; a rotated code invalidates the old one for fresh logins, not the enrollment.)
+**Login has the same checkbox.** When ticked, `/login` looks the educator account up by its
+derived `edu-<username>` namespace — the educator types no code. When unticked, it runs the typed
+code through the identical student resolver so a student who enrolled with a join code signs in
+with that same code (it maps back to their immutable `class_id` namespace); a code matching no live
+class falls through to the typed classcode (legacy/bare-directory accounts still work). (Because
+join codes are rotatable, a returning student uses the class's *current* code; a rotated code
+invalidates the old one for fresh logins, not the enrollment.) The checkbox is exactly as
+self-selectable as typing `edu-` was — it adds no trust boundary (see Privacy → residual caveat).
 
 **Authorization.** A `require_class_owner(class_id)` guard beside `require_educator()` — an
 educator may only view or edit classes they own (load-bearing once auth is real; see Privacy).
@@ -187,16 +199,20 @@ No forced migration — classes are adopted lazily as educators create them.
 ## Privacy & compliance (blocking for real deployment)
 
 - **Real authentication is a prerequisite, not a nice-to-have**, once identifiable student
-  progress is stored. "Full hardening" here is concretely:
-  - **Verify passwords** — wire the existing `util.check_password` into `/login` (today login
-    only checks that the username exists; the helper is never called). *Gotcha:* `/new` hashes
-    `html.escape(password)`, so `/login` must escape identically before comparing, or every
-    existing hash mismatches — pick escape-identically or a one-time migration, but don't
-    silently drop the escaping.
-  - **Move `secret_key` out of source** into environment/instance config (a hardcoded dev key
-    sits in this public repo today).
-  - The two "latent account bugs" the roadmap cites are **already fixed** (`/new` sets all three
-    session keys; `account.create` returns `retrieve(userid)`) — scope is just the two above.
+  progress is stored. "Full hardening" here was concretely — **both now DONE (Phase 0):**
+  - ✅ **Verify passwords** — `util.check_password` is wired into `/login` through the shared
+    `util.normalize_password` helper, which preserves the historical `html.escape` normalization
+    so existing hashes still match (the escape gotcha is handled by using one helper for both
+    create and verify; changing it needs a migration). Unknown-username and wrong-password give
+    the same generic message (no enumeration).
+  - ✅ **Move `secret_key` out of source** — `app.py` reads `SECRET_KEY` from the environment,
+    falling back to a clearly-marked insecure dev key with a startup warning. The literal key is
+    gone from source.
+  - The two "latent account bugs" the roadmap cited are also fixed (`/new` sets all three session
+    keys; `account.create` returns `retrieve(userid)`).
+  - **Residual, honest caveat:** verified ≠ hardened. There is no rate-limiting/lockout, no HTTPS
+    enforcement, and the `edu-` educator role is still self-selectable at signup — classroom
+    trust, not public-internet grade. Note this in any deployment/grant writeup.
 - Minimal-PII defaults: display names in all dashboards; emails visible only in roster
   management, only to the class's educator.
 - Educator-initiated deletion: remove a student's account and progress records completely.
@@ -205,6 +221,10 @@ No forced migration — classes are adopted lazily as educators create them.
 - If email-domain policy (feature 3) is enabled, that email is PII — treat accordingly.
 
 ## Implementation phasing
+
+**Built** (2026-07). This is the design-doc's coarse phase sketch; the actual build followed the
+finer 14-phase order in `EDUCATOR_PORTAL_PROMPTS.md` (0–13), and all of it — auth + P0 + P1 —
+shipped. Kept below as the original plan of record.
 
 Build order, following the project's phased-plan convention (`UI_OVERHAUL_PROMPTS.md`,
 `LEARNING_MODULES_PROMPTS.md`). Auth comes first because the portal exposes cross-account data.
@@ -256,5 +276,7 @@ Phases 0–4 deliver the P0 set; Phase 5 is the P1 fast-follows; P2 stays grant 
    (CLAUDE.md, learning-modules Phase 5), so the original worry (inert checkpoints under due
    dates) is largely moot; still decide whether "reached the final checkpoint" counts toward
    due-date completion (ties into #4). *Mostly resolved.*
-4. **Definition of "complete"** for the gradebook — all questions attempted, all correct, or
-   final checkpoint reached? Pick a default and expose it as a per-class setting. *Open.*
+4. **Resolved** — "complete" for the gradebook is the module's own `completed` flag (the same
+   one `module_status`/the progress dashboard already read, set when a student reaches the end of
+   a module via `/lesson/<id>/complete`). Not exposed as a separate per-class setting — one
+   definition, used everywhere a module's status is shown. See `class_gradebook_csv` in `app.py`.

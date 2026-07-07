@@ -78,6 +78,7 @@
                         {% for m in dashboard['modules'] %}
                         {{ sortth(m['title'], 'mod:' + m['id'], numeric=True) }}
                         {% endfor %}
+                        <th scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -111,6 +112,7 @@
                         </td>
                         {% endif %}
                         {% endfor %}
+                        <td><a href="{{ url_for('admin_student_attempts', class_id=class_obj['class_id'], userid=row['userid']) }}">Attempts</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>

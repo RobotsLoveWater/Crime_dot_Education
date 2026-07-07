@@ -147,6 +147,15 @@
 
             {% set total = user['history']|length %}
             {% if total > 1 %}
+            {# Shareable data states (Phase 9): a link encoding this exact filter chain —
+               opening it as a logged-in user resets THEIR history to reproduce this view. #}
+            {% set share_url = url_for('apply_share', chain=user['history']|share_chain, _external=True) %}
+            <div class="share-link-row">
+                <code class="share-link" id="share-link-value" title="{{ share_url }}">{{ share_url }}</code>
+                <button type="button" class="btn btn-secondary btn-sm js-only" data-copy="#share-link-value">Copy link</button>
+            </div>
+            {% endif %}
+            {% if total > 1 %}
             <ol class="chip-chain" aria-label="Active filters, in order">
                 {% for step in user['history'] %}
                     {% if not loop.first %}

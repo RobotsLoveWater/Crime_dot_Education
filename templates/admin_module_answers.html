@@ -1,0 +1,59 @@
+{% extends "layout.html" %}
+{% block title %} — {{ module['title'] }} answer key{% endblock %}
+
+{% block body %}
+
+<p><a class="dock-back" href="{{ url_for('admin') }}">&larr; Educator portal</a></p>
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Answer key</h1>
+        <p class="view-subtitle">{{ module['title'] }} — computed live from the current dataset; not stored.</p>
+    </div>
+</header>
+
+<section class="portal-section">
+    {% if answer_key %}
+    <ol class="answer-key-list">
+        {% for row in answer_key %}
+        <li class="answer-key-item">
+            <h2 class="answer-key-title">{{ loop.index }}. {{ row['title'] }}</h2>
+
+            {% if row['type'] == 'numeric' %}
+            <p class="answer-key-value">
+                {% if row['expected'] is none %}
+                <span class="muted-cell">Can't be computed — a required column is missing from the current data.</span>
+                {% else %}
+                Answer: <strong>{{ row['expected'] }}</strong> (± {{ row['tolerance'] }})
+                {% endif %}
+            </p>
+            {% elif row['type'] == 'choice' %}
+            <p class="answer-key-value">Answer: <strong>{{ row['correct_label'] }}</strong></p>
+            {% else %}
+            <p class="answer-key-value">
+                {% if row['model_answer'] %}Model answer: {{ row['model_answer'] }}{% else %}<span class="muted-cell">Free response — no fixed answer.</span>{% endif %}
+            </p>
+            {% endif %}
+
+            {% if row['chips'] %}
+            <p class="attempt-state-label">Data state used:</p>
+            <ol class="chip-chain chip-chain-static" aria-label="Data state for this question">
+                {% for chip in row['chips'] %}
+                <li class="chip-item"><span class="chip" title="{{ chip['token'] }}">{{ chip['desc'] }}</span></li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="muted-cell">Full dataset — no filters.</p>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+    {% else %}
+    <div class="empty-state">
+        <h2>No graded questions</h2>
+        <p>This module has no numeric or choice questions to key.</p>
+    </div>
+    {% endif %}
+</section>
+
+{% endblock %}
