@@ -89,8 +89,13 @@ function Invoke-Ssh {
 }
 
 # --- 1. upload setup.sh (strip CRLF so bash on Linux is happy) --------------
+# Write UTF-8 *without* a BOM: Windows PowerShell 5.1's `Set-Content -Encoding utf8`
+# prepends a BOM, which lands on line 1 and breaks the shebang (bash: line 1:
+# '<BOM>#!/usr/bin/env': No such file or directory). WriteAllText with an explicit
+# no-BOM encoding avoids it.
 $tmpSetup = Join-Path $env:TEMP "cde-setup.sh"
-(Get-Content -Raw $setupSh) -replace "`r`n", "`n" | Set-Content -NoNewline -Encoding utf8 $tmpSetup
+$setupBody = (Get-Content -Raw $setupSh) -replace "`r`n", "`n"
+[System.IO.File]::WriteAllText($tmpSetup, $setupBody, (New-Object System.Text.UTF8Encoding($false)))
 Invoke-Scp -LocalPath $tmpSetup -RemotePath "/tmp/cde-setup.sh"
 Remove-Item $tmpSetup -Force
 
