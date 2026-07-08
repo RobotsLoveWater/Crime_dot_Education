@@ -55,6 +55,33 @@ def get_user_list(classcode) -> list[str]:
         return []
 
 
+def find_userids_by_username(username, include_educator=True) -> list[str]:
+
+    # Return the userid of every stored account whose username matches, across ALL class
+    # namespaces. Student usernames are only unique WITHIN a class
+    # (user/<classcode>/<username>.pickle), so a bare username can map to several accounts in
+    # different classes. Login uses this to sign a student in by username + password alone: the
+    # classcode is already baked into the userid the account was created under, so there is no
+    # need to make the student re-type it. Ordering is stable (classcodes sorted) so a
+    # same-username collision resolves deterministically; the caller disambiguates by password.
+    userids = []
+
+    for classcode in sorted(get_classcode_list()):
+
+        # get_classcode_list() is a bare os.listdir('user'); skip anything that isn't a class
+        # directory (defensive -- the tree only holds directories today)
+        if not os.path.isdir(os.path.join('user', classcode)):
+            continue
+
+        if not include_educator and is_educator_classcode(classcode):
+            continue
+
+        if username in get_user_list(classcode):
+            userids.append(form_userid(username, classcode))
+
+    return userids
+
+
 def get_user_directory(userid) -> str: return 'user/' + userid + '.pickle'
 
 

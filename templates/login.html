@@ -22,17 +22,10 @@
             </div>
             <div class="field field-check">
                 <input type="checkbox" id="is_educator" name="is_educator"
-                       {% if request.form.is_educator %}checked{% endif %}
-                       data-educator-toggle aria-controls="classcode-field">
+                       {% if request.form.is_educator %}checked{% endif %}>
                 <label for="is_educator">I'm an educator</label>
-                <p class="field-hint">Educators sign in with just their username and password.</p>
-            </div>
-            <div class="field" id="classcode-field" data-educator-hide>
-                <label for="classcode">Class join code <span class="field-optional">— optional</span></label>
-                <input type="text" id="classcode" name="classcode" value="{{ request.form.classcode }}"
-                       autocomplete="off" autocapitalize="none" spellcheck="false">
-                <p class="field-hint">Leave blank for the public group, or enter your class join
-                    code to sign in to that class.</p>
+                <p class="field-hint">Check this if you sign in as a teacher. Students, leave it
+                    unchecked — just your username and password.</p>
             </div>
             <div class="field">
                 <label for="password">Password</label>

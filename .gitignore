@@ -23,4 +23,4 @@ env/
 # intentionally COMMITTED for reproducibility — do NOT add uv.lock or .python-version here.
 
 # IDE
-.idea/workspace.xml
+.idea/

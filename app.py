@@ -542,37 +542,38 @@ def login():
             # login form can't be used to enumerate which usernames exist in a class
             bad_credentials = ['Username or password is incorrect.']
 
+            # A student no longer re-types their class code to sign in: the classcode is already
+            # baked into the userid the account was created under (once, at signup), so we look
+            # the username up across the class namespaces and let the password pick the account.
             if request.form.get('is_educator') == 'on':
-                # Educator login: look the account up by its derived edu-<username> namespace, so
-                # the educator never types a code — the checkbox is the only signal (mirrors /new).
-                # The class-code box is ignored here.
-                classcode = educator_namespace(username)
+                # Educator login: scope the lookup to the derived edu-<username> namespace — the
+                # checkbox is the only signal, mirroring /new. (Educators already type no code.)
+                edu_ns = educator_namespace(username)
+                candidate_ids = ([account.form_userid(username, edu_ns)]
+                                 if username in account.get_user_list(edu_ns) else [])
             else:
-                # resolve the code box the SAME way /new does, so a student who enrolled with a join
-                # code signs in with that same code (it maps back to their class_id namespace). Legacy
-                # accounts under a bare classcode still resolve via the 'unknown' branch (classcode =
-                # the typed code), so Phase 0 login behavior is unchanged for them.
-                classcode = resolve_class_code(request.form['classcode'])['classcode']
+                # Student / public login: every account with this username under a non-educator
+                # namespace (public 'unmanaged', a class_id, or a legacy bare classcode). A
+                # username shared across classes is disambiguated by the password check below.
+                candidate_ids = account.find_userids_by_username(username, include_educator=False)
 
-            if username not in account.get_user_list(classcode):
+            user = None
+            for uid in candidate_ids:
+                candidate = account.retrieve(uid)
+                if util.check_password(password, candidate['password']):
+                    user = candidate
+                    break
+
+            if user is None:
                 error = bad_credentials
-
             else:
+                # sign them in from the stored account (classcode already cleaned to
+                # 'unmanaged' when blank), matching what /new stores in the session
+                session['username'] = user['username']
+                session['classcode'] = user['classcode']
+                session['userid'] = user['userid']
 
-                user = account.retrieve(account.form_userid(username, classcode))
-
-                if util.check_password(password, user['password']):
-
-                    # sign them in from the stored account (classcode already cleaned to
-                    # 'unmanaged' when blank), matching what /new stores in the session
-                    session['username'] = user['username']
-                    session['classcode'] = user['classcode']
-                    session['userid'] = user['userid']
-
-                    return redirect(url_for('index'))
-
-                else:
-                    error = bad_credentials
+                return redirect(url_for('index'))
 
     return render_template('login.html', errors=error)
 

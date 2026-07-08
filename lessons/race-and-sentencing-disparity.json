@@ -1,0 +1,203 @@
+{
+  "id": "race-and-sentencing-disparity",
+  "title": "Race and Sentencing Disparity",
+  "description": "The guardrail module. Disparity versus discrimination as the load-bearing distinction: run the naive race crosstab, apply the Module 9 conditioning procedure with full care, watch the gap change, and learn precisely what the result does and does not establish. Descriptive data can document disparity; it cannot, alone, adjudicate discrimination.",
+  "author": "unmanaged",
+  "order": 12,
+  "objectives": [
+    "Distinguish a disparity (a measured difference in outcomes between groups) from discrimination (a causal claim about unequal treatment)",
+    "Explain why an unadjusted racial crosstab can mislead, including how Simpson's paradox can reverse an aggregate pattern",
+    "Apply the Module 9 conditioning procedure with care and read the conditioned result honestly, whether a gap survives or closes",
+    "Identify why a conditioned gap settles nothing on its own, in either direction: unobserved confounders, conditioning on post-treatment variables, and selection into the dataset",
+    "Summarize the major scholarly theories of racial disparity and where in the criminal-justice funnel each locates the mechanism",
+    "State a disparity finding with appropriate precision, reserving causal language for causal evidence"
+  ],
+  "steps": [
+    {
+      "type": "read",
+      "title": "Why this module comes with a warning label",
+      "body": "This is the module the whole course has been building toward, and the one it is most cautious about. You now have every tool you need to split sentence length by any group in the data, including race. The temptation is to run that split, see a gap, and conclude the system is discriminating. This module exists to slow that last step down.\n\nHere is its single most important idea: **descriptive data can document a disparity, but it cannot, by itself, prove discrimination** (National Research Council [NRC], 2004).\n\nReturn to the funnel one more time. Every row in this dataset is a person who already fell through policing, prosecution, and the courts to reach sentencing. We only ever see the bottom of the funnel. Everything that shaped *who arrived there* happened upstream, out of frame. Keep that picture in mind, because it drives every caution that follows.\n\n**References (this page)**\n\nNational Research Council. (2004). *Measuring racial discrimination*. National Academies Press. https://doi.org/10.17226/10887"
+    },
+    {
+      "type": "read",
+      "title": "Two words that are not synonyms",
+      "body": "The whole module turns on the difference between two words.\n\n**Disparity** is a measured difference in outcomes between groups. It is purely descriptive. It makes no claim about *why* the difference exists. Two groups can show a disparity for reasons that have nothing to do with how anyone treated them.\n\n**Discrimination** is a causal claim: that race *itself* changed how a case was handled, holding everything else constant. The cleanest way to see the difference is to ask a counterfactual question: *would this defendant's outcome have been different if only their race were different, with the same offense, the same conduct, and the same criminal history?* That phrase, \"all else equal,\" is where the entire difficulty lives (NRC, 2004; Baumer, 2013).\n\nTextbooks in this field put it plainly: a disparity signals that discrimination *might* be present, but establishing discrimination requires showing the difference comes from unequal treatment rather than from other differences between the groups (Garland, Spohn, & Wodahl, 2008).\n\n**References (this page)**\n\nBaumer, E. P. (2013). Reassessing and redirecting research on race and sentencing. *Justice Quarterly, 30*(2), 231–261. https://doi.org/10.1080/07418825.2012.682602\n\nGarland, B. E., Spohn, C., & Wodahl, E. J. (2008). Racial disproportionality in the American prison population: Using the Blumstein method to address the critical race and justice issue of the 21st century. *Justice Policy Journal, 5*(2).\n\nNational Research Council. (2004). *Measuring racial discrimination*. National Academies Press. https://doi.org/10.17226/10887"
+    },
+    {
+      "type": "question",
+      "title": "Disparity or discrimination?",
+      "body": "Which of the following is a *discrimination* claim rather than a *disparity* claim?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Black defendants in this dataset receive longer sentences on average than white defendants.",
+          "For the same offense, same severity, and same criminal history, black defendants are sentenced more harshly because of their race.",
+          "The average felony sentence in the dataset rose between 2001 and 2019.",
+          "Drug offenses make up a large share of the felony sentences in the data."
+        ],
+        "correct": 1,
+        "explanation": "Option 1 describes a gap in outcomes, which is a disparity. Option 2 makes a causal claim about why the gap exists, holding case factors constant, which is discrimination. Options 3 and 4 are not about differences between racial groups at all."
+      }
+    },
+    {
+      "type": "read",
+      "title": "The naive crosstab",
+      "body": "The first thing almost everyone does is split the outcome by race, raw and unadjusted. You will very likely see a gap.\n\nBut a single raw number pools together people whose cases differ in nearly every way that matters legally: different offenses, different severity levels, and different criminal-history scores (Ulmer, 2012). A raw racial gap in sentence length is real *as a description*, but it answers almost none of the questions people actually ask with it, because it has not yet separated \"treated differently\" from \"different cases.\"\n\nThat separation is the entire job of the next few pages.\n\n**References (this page)**\n\nUlmer, J. T. (2012). Recent developments and new directions in sentencing research. *Justice Quarterly, 29*(1), 1–40. https://doi.org/10.1080/07418825.2011.624115"
+    },
+    {
+      "type": "explore",
+      "title": "See the raw gap",
+      "body": "Use the Explorer to look at the median of `time`, then crosstab it by `race`. Do not filter anything yet: this is the raw, unconditioned picture.\n\nYou should see black defendants' median sentence running a few months longer than white defendants'. Note the size of that gap. You will watch it change as you add controls on the next pages.",
+      "state": [],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "read",
+      "title": "Simpson's trap",
+      "body": "Why is the raw number dangerous? Because an aggregated comparison can not only shrink but *reverse* when you break it apart.\n\nThe classic example is not from criminal justice at all. A 1970s analysis of graduate admissions at Berkeley showed an apparent bias against women overall. It vanished, and even slightly reversed, once you looked department by department, because women had applied more often to the most competitive departments (Bickel, Hammel, & O'Connell, 1975). This reversal on disaggregation is called **Simpson's paradox** (Blyth, 1972).\n\nThe lesson for you: a gap measured across mixed-together groups can point the wrong way about what is happening *within* comparable groups. The only way to know is to disaggregate.\n\n**References (this page)**\n\nBickel, P. J., Hammel, E. A., & O'Connell, J. W. (1975). Sex bias in graduate admissions: Data from Berkeley. *Science, 187*(4175), 398–404. https://doi.org/10.1126/science.187.4175.398\n\nBlyth, C. R. (1972). On Simpson's paradox and the sure-thing principle. *Journal of the American Statistical Association, 67*(338), 364–366. https://doi.org/10.1080/01621459.1972.10482387"
+    },
+    {
+      "type": "question",
+      "title": "Reading a reversal",
+      "body": "A raw crosstab shows Group A sentenced more harshly than Group B. After you split by offense family, Group A is sentenced *less* harshly than Group B within every single family. What is the most accurate reading?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "The raw crosstab must be a data error.",
+          "The two results contradict each other, so neither can be trusted.",
+          "Both can be true at once; the groups differ in their mix of offenses, which the raw number hid.",
+          "The within-family results must be wrong because they disagree with the total."
+        ],
+        "correct": 2,
+        "explanation": "This is Simpson's paradox. An aggregate direction can reverse within subgroups when the groups have different compositions. The within-family comparison is usually the more meaningful one, because it compares more similar cases."
+      }
+    },
+    {
+      "type": "read",
+      "title": "Apply Module 9, with full care",
+      "body": "Now do what Module 9 taught, but deliberately and one variable at a time. Hold constant the legally relevant case factors in sequence: **offense family, then severity, then criminal history**, and watch the gap move at each step.\n\nThis is exactly the reasoning scholars used at the national level. Alfred Blumstein (1982) asked how much of the black-white imprisonment gap could be \"accounted for\" by differences in arrests for serious crimes, and found that a large share could be, with the unexplained remainder largest for less serious and drug offenses (Blumstein, 1993).\n\nThe point of the exercise is not the final number. It is watching how much of the raw gap was *composition* (different mixes of cases) rather than *treatment* (different handling of similar cases).\n\n**References (this page)**\n\nBlumstein, A. (1982). On the racial disproportionality of United States' prison populations. *Journal of Criminal Law and Criminology, 73*(3), 1259–1281. https://doi.org/10.2307/1143193\n\nBlumstein, A. (1993). Racial disproportionality of U.S. prison populations revisited. *University of Colorado Law Review, 64*, 743–760."
+    },
+    {
+      "type": "explore",
+      "title": "Build the conditioning chain",
+      "body": "Now rebuild the crosstab, adding controls one at a time, and keep a small table of the gap at each stage. This is your **attenuation table**. Work through one concrete example so the pattern is unmistakable.\n\n1. Filter to a single offense family — here, **assault** (`moc1 == A`) — then crosstab `time` by `race`. Record the gap; it is still roughly three months.\n2. Add a severity filter (`severity == 4`, the most common assault level). Record the gap again — notice it barely moves.\n3. Add a criminal-history filter (`history == 0`, no prior record). Record the gap a third time.\n\nWatch what happens as the cases become more and more alike. In this example the gap does not merely shrink — by the third filter it closes to essentially nothing. Hold onto *which* control did that work, because the next pages turn on it. (The panel beside this lesson shows `time` for the fully conditioned view.)",
+      "state": ["f.moc1.eq.A", "f.severity.eq.4", "f.history.eq.0"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "What did the attenuation show?",
+      "body": "In the assault example, once you condition on offense family, severity, and criminal history, the racial gap in sentence length closes to essentially nothing — and almost all of that closing happened when you added **criminal history**, not severity. What have you established?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "That the raw gap was fake and the data are biased and unusable.",
+          "That there is definitely no discrimination anywhere in the sentencing system.",
+          "That the raw gap was largely composition: the groups differed in their mix of criminal-history scores, not in how similar cases were treated — a finding to interpret carefully, not a clean bill of health.",
+          "That severity is always the most important control in sentencing."
+        ],
+        "correct": 2,
+        "explanation": "Conditioning showed the raw gap was driven mostly by differences in the mix of cases — here, criminal-history scores — rather than by different handling of otherwise-similar cases. That is real and useful, but it is not proof that no discrimination occurred, because the control doing the work (criminal history) is itself shaped by earlier decisions. The honest statement is 'the gap is accounted for by composition, chiefly criminal history,' not 'there is no discrimination.'"
+      }
+    },
+    {
+      "type": "read",
+      "title": "The residual, part 1: what you could not hold constant",
+      "body": "Suppose a gap had *survived* your conditioning — or suppose, as in the assault example, it did *not*. Neither outcome settles the question of discrimination, and it is worth understanding exactly why.\n\nA gap that survives careful conditioning is called the **residual**. There are three reasons a residual is not, by itself, proof of discrimination — and, read the other way, three reasons a *vanished* gap is not proof that discrimination is absent. Here is the first.\n\n**Unobserved confounders.** Your filters can only hold constant what the data actually records. They cannot hold constant the strength of the evidence, the details of what happened within an offense code, whether the victim cooperated, or the quality of the defense attorney. If any of those things correlate with race, the residual quietly absorbs them and mislabels them as a race effect (Baumer, 2013; Klepper, Nagin, & Tierney, 1983).\n\nRemember Module 4: an offense code is a **label**, not the conduct. \"Same offense\" in a filter means same *code*, not same *act*.\n\n**References (this page)**\n\nBaumer, E. P. (2013). Reassessing and redirecting research on race and sentencing. *Justice Quarterly, 30*(2), 231–261. https://doi.org/10.1080/07418825.2012.682602\n\nKlepper, S., Nagin, D., & Tierney, L. J. (1983). Discrimination in the criminal justice system: A critical appraisal of the literature. In A. Blumstein, J. Cohen, S. E. Martin, & M. H. Tonry (Eds.), *Research on sentencing: The search for reform* (Vol. 2, pp. 55–128). National Academy Press."
+    },
+    {
+      "type": "read",
+      "title": "The residual, part 2: the control that hides what you are looking for",
+      "body": "The second reason is subtle and important enough to slow down for.\n\n**Controlling for the wrong things.** Charge severity, mode of conviction, and even parts of a criminal-history score are not fixed facts about a defendant. They are themselves *outcomes* of earlier discretionary decisions by police and prosecutors. Statisticians warn that adjusting for a variable that was itself affected by the process you are studying can bias your answer (Rosenbaum, 1984), and can even manufacture associations that are not really there (Elwert & Winship, 2014).\n\nIn criminal justice this cuts to the bone. One careful federal study found that most of the black-white gap in sentence length traced back to prosecutors' *initial charging decisions*, not to the judge's final call (Rehavi & Starr, 2014). So if prosecutors charge similar conduct more severely for one group, then \"controlling for charge\" removes exactly the effect you were trying to measure. It launders the discrimination out of the estimate. More controls are not always better.\n\nYou have already seen a version of this. In the assault example, the racial gap closed almost entirely when you added **criminal history** — and a criminal-history score is itself the accumulated residue of earlier arrests, charges, and convictions, each a point where discretion could have entered. \"Controlling for\" it may not be removing noise; it may be absorbing the very thing you set out to measure.\n\n**References (this page)**\n\nElwert, F., & Winship, C. (2014). Endogenous selection bias: The problem of conditioning on a collider variable. *Annual Review of Sociology, 40*, 31–53. https://doi.org/10.1146/annurev-soc-071913-043455\n\nRehavi, M. M., & Starr, S. B. (2014). Racial disparity in federal criminal sentences. *Journal of Political Economy, 122*(6), 1320–1354. https://doi.org/10.1086/677255\n\nRosenbaum, P. R. (1984). The consequences of adjustment for a concomitant variable that has been affected by the treatment. *Journal of the Royal Statistical Society: Series A (General), 147*(5), 656–666. https://doi.org/10.2307/2981697"
+    },
+    {
+      "type": "question",
+      "title": "The post-treatment trap",
+      "body": "You control for the top charge and the racial gap in sentence length shrinks. A prosecutor points out that they are the ones who decide the top charge. Why does this complicate your interpretation?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "It doesn't; controlling for more variables always improves the estimate.",
+          "The charge is itself a product of earlier discretion, so controlling for it can remove the very discrimination you are trying to detect.",
+          "It means the judge, not the prosecutor, is responsible for the gap.",
+          "It proves the gap was never real."
+        ],
+        "correct": 1,
+        "explanation": "The charge is a post-treatment variable, an outcome of upstream decisions. Adjusting for it can mask discrimination that entered earlier in the funnel. This is why 'add another control' is not automatically the safer choice."
+      }
+    },
+    {
+      "type": "read",
+      "title": "The residual, part 3: who is even in the data",
+      "body": "The third reason is about the sample itself.\n\n**Selection into the dataset.** Every stage of the funnel is a filter, and the filters may operate differently by race. This dataset contains only people who were arrested, charged, and sentenced. Comparing outcomes among the people who *reached* sentencing is not the same as comparing everyone who offended, because the earlier filters already reshaped who is in the sample.\n\nWhen a sample is defined by surviving earlier stages, conditioning on it can distort the very comparison you want to make (Knox, Lowe, & Mummolo, 2020; Elwert & Winship, 2014). Sentencing researchers have worried about exactly this kind of selection for decades, precisely because their data usually begin only after conviction (Bushway, Johnson, & Slocum, 2007).\n\n**References (this page)**\n\nBushway, S., Johnson, B. D., & Slocum, L. A. (2007). Is the magic still there? The use of the Heckman two-step correction for selection bias in criminology. *Journal of Quantitative Criminology, 23*(2), 151–178. https://doi.org/10.1007/s10940-007-9024-4\n\nElwert, F., & Winship, C. (2014). Endogenous selection bias: The problem of conditioning on a collider variable. *Annual Review of Sociology, 40*, 31–53. https://doi.org/10.1146/annurev-soc-071913-043455\n\nKnox, D., Lowe, W., & Mummolo, J. (2020). Administrative records mask racially biased policing. *American Political Science Review, 114*(3), 619–637. https://doi.org/10.1017/S0003055420000039"
+    },
+    {
+      "type": "read",
+      "title": "So what does the conditioned gap tell you?",
+      "body": "Put the three reasons together.\n\nA gap that *survives* careful conditioning is **consistent with** discrimination — but also with case factors you could not observe, with decisions made upstream in the funnel, and with who was selected into the data in the first place, usually with some mixture of all of these at once.\n\nAnd a gap that *vanishes* under conditioning, as the assault gap did, is **not** a clean bill of health, for the mirror-image reasons. It can vanish because the controls absorbed genuine upstream discrimination (part 2), or because the factors that would reveal it were never measured (part 1), or because the sample was already reshaped before anyone reached sentencing (part 3).\n\nDescriptive data taken at one cross-section of the funnel cannot, on its own, tell you which. That is not a flaw in your analysis. It is the honest ceiling of this kind of evidence (Baumer, 2013). Documenting the disparity — and documenting where it goes when you condition — is real and valuable work. Adjudicating discrimination requires more.\n\n**References (this page)**\n\nBaumer, E. P. (2013). Reassessing and redirecting research on race and sentencing. *Justice Quarterly, 30*(2), 231–261. https://doi.org/10.1080/07418825.2012.682602"
+    },
+    {
+      "type": "question",
+      "title": "Naming the result honestly",
+      "body": "In the assault example the racial gap in sentence length essentially disappears once you condition on offense family, severity, and criminal history. Which statement is the most defensible?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "The vanished gap proves the sentencing system treats black and white defendants equally.",
+          "The gap was largely composition — chiefly criminal-history mix — but because criminal history is itself downstream of earlier discretion, and because the data cannot see everything or capture who was filtered out upstream, this does not prove discrimination is absent.",
+          "Because the gap disappeared, the raw crosstab must have been an error.",
+          "The conditioned gap measures the exact amount of discrimination in the system."
+        ],
+        "correct": 1,
+        "explanation": "The conditioned gap is near zero, but that is not a verdict of 'no discrimination.' The control doing the work — criminal history — is partly a product of earlier decisions (a post-treatment variable), so conditioning on it can absorb the very thing you are trying to measure. Add unobserved factors and selection into the sample, and the honest reading is 'the gap is accounted for by composition,' not 'the system is fair.'"
+      }
+    },
+    {
+      "type": "read",
+      "title": "Theories, part 1: where does the gap come from?",
+      "body": "Scholars have spent decades debating *where in the funnel* racial disparity is generated. The oldest split is between **differential involvement** and **differential selection**.\n\nThe differential-involvement view holds that much of the disparity enters at the *mouth* of the funnel, through differences in offending and arrest for serious crimes. National decompositions found that a large share of the imprisonment gap could be \"accounted for\" this way (Blumstein, 1982), and victimization surveys that do not depend on police discretion broadly matched arrest patterns for serious personal crimes (Hindelang, 1978).\n\nThe differential-selection view holds that disparity is generated, or amplified, at the *discretionary valves*: policing, charging, and sentencing.\n\nA careful reading lands in between. One major review concluded that overt, systematic bias is not the main driver, but that disadvantages accumulate indirectly across stages (Sampson & Lauritsen, 1997). Michael Tonry's influential account largely accepts differential involvement for violent crime, but argues that the *added* disproportion, especially for drug offenses, is the foreseeable disparate impact of policy choices such as the War on Drugs, rather than mainly case-by-case courtroom bias (Tonry, 1995; Tonry & Melewski, 2008).\n\n**References (this page)**\n\nBlumstein, A. (1982). On the racial disproportionality of United States' prison populations. *Journal of Criminal Law and Criminology, 73*(3), 1259–1281. https://doi.org/10.2307/1143193\n\nHindelang, M. J. (1978). Race and involvement in common law personal crimes. *American Sociological Review, 43*(1), 93–109. https://doi.org/10.2307/2094764\n\nSampson, R. J., & Lauritsen, J. L. (1997). Racial and ethnic disparities in crime and criminal justice in the United States. *Crime and Justice, 21*, 311–374. https://doi.org/10.1086/449253\n\nTonry, M. (1995). *Malign neglect: Race, crime, and punishment in America*. Oxford University Press.\n\nTonry, M., & Melewski, M. (2008). The malign effects of drug and crime control policies on Black Americans. *Crime and Justice, 37*(1), 1–44. https://doi.org/10.1086/588492"
+    },
+    {
+      "type": "read",
+      "title": "Theories, part 2: mechanisms at the valves",
+      "body": "When disparity *does* enter at the discretionary stages, three theories describe how.\n\n**Focal concerns** theory says that judges and prosecutors decide under time pressure and with incomplete information, so they lean on perceptual shorthand about blameworthiness and dangerousness. Race can enter through those attributions rather than through open animus, which helps explain why young black men can face the harshest treatment even under sentencing guidelines (Steffensmeier, Ulmer, & Kramer, 1998; Ulmer, 2012).\n\n**Cumulative disadvantage** says the individually small disparities at each stage compound as a case moves down the funnel, so any single-stage analysis *understates* the system-level gap. This theory is really the funnel argument written as statistics (Kutateladze, Andiloro, Johnson, & Spohn, 2014; Kurlychek & Johnson, 2019).\n\n**Racial threat** theory says punishment intensity varies with local politics and demographics, a reminder that pooling many jurisdictions together can hide real variation (Blalock, 1967; Bridges & Crutchfield, 1988).\n\nNotice that each theory predicts a *different* pattern in where gaps appear and how they respond to controls. That is what makes them testable claims rather than just rhetorical positions.\n\n**References (this page)**\n\nBlalock, H. M. (1967). *Toward a theory of minority-group relations*. Wiley.\n\nBridges, G. S., & Crutchfield, R. D. (1988). Law, social standing, and racial disparities in imprisonment. *Social Forces, 66*(3), 699–724. https://doi.org/10.2307/2578760\n\nKurlychek, M. C., & Johnson, B. D. (2019). Cumulative disadvantage in the American criminal justice system. *Annual Review of Criminology, 2*, 291–319. https://doi.org/10.1146/annurev-criminol-011518-024815\n\nKutateladze, B. L., Andiloro, N. R., Johnson, B. D., & Spohn, C. C. (2014). Cumulative disadvantage: Examining racial and ethnic disparity in prosecution and sentencing. *Criminology, 52*(3), 514–551. https://doi.org/10.1111/1745-9125.12047\n\nSteffensmeier, D., Ulmer, J., & Kramer, J. (1998). The interaction of race, gender, and age in criminal sentencing: The punishment cost of being young, Black, and male. *Criminology, 36*(4), 763–798. https://doi.org/10.1111/j.1745-9125.1998.tb01265.x\n\nUlmer, J. T. (2012). Recent developments and new directions in sentencing research. *Justice Quarterly, 29*(1), 1–40. https://doi.org/10.1080/07418825.2011.624115"
+    },
+    {
+      "type": "question",
+      "title": "Match the theory",
+      "body": "Which claim best reflects **cumulative disadvantage** theory?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Disparity comes almost entirely from differences in offending before arrest.",
+          "Small disparities at many stages compound, so measuring only one stage understates the total gap.",
+          "Judges are openly and intentionally biased against certain groups.",
+          "Disparity depends on the racial composition and politics of the local county."
+        ],
+        "correct": 1,
+        "explanation": "Cumulative disadvantage is about compounding across stages of the funnel, which is exactly why a single-stage residual can understate the system-level disparity. Option 1 is differential involvement; option 3 is overt bias; option 4 is racial threat."
+      }
+    },
+    {
+      "type": "read",
+      "title": "What would actually settle it",
+      "body": "If description cannot adjudicate discrimination, what can? Designs that get closer to the counterfactual, that manufacture the \"all else equal\" you cannot get from observational data.\n\n**Audit and correspondence studies** send otherwise-identical profiles that differ only by race and measure the difference in treatment directly. Devah Pager's audit showed that a criminal record cut callbacks far more sharply for black applicants, so much that a white applicant *with* a record fared better than a black applicant *without* one (Pager, 2003; Bertrand & Mullainathan, 2004).\n\n**Natural experiments** exploit the fact that cases are often assigned to judges or juries essentially at random, which holds case characteristics constant on average. Studies using random assignment have found racial bias in bail decisions and have shown that all-white jury pools convict black defendants more often (Abrams, Bertrand, & Mullainathan, 2012; Arnold, Dobbie, & Yang, 2018; Anwar, Bayer, & Hjalmarsson, 2012).\n\nEach of these designs identifies an effect at *one* node of the funnel. That focus is both their power and their limit.\n\n**References (this page)**\n\nAbrams, D. S., Bertrand, M., & Mullainathan, S. (2012). Do judges vary in their treatment of race? *The Journal of Legal Studies, 41*(2), 347–383. https://doi.org/10.1086/666006\n\nAnwar, S., Bayer, P., & Hjalmarsson, R. (2012). The impact of jury race in criminal trials. *The Quarterly Journal of Economics, 127*(2), 1017–1055. https://doi.org/10.1093/qje/qjs014\n\nArnold, D., Dobbie, W., & Yang, C. S. (2018). Racial bias in bail decisions. *The Quarterly Journal of Economics, 133*(4), 1885–1932. https://doi.org/10.1093/qje/qjy012\n\nBertrand, M., & Mullainathan, S. (2004). Are Emily and Greg more employable than Lakisha and Jamal? A field experiment on labor market discrimination. *American Economic Review, 94*(4), 991–1013. https://doi.org/10.1257/0002828042002561\n\nPager, D. (2003). The mark of a criminal record. *American Journal of Sociology, 108*(5), 937–975. https://doi.org/10.1086/374403"
+    },
+    {
+      "type": "read",
+      "title": "How to write it up",
+      "body": "The discipline this module asks of you fits into three rules.\n\nFirst, **say \"disparity\" when you mean a measured gap, and reserve \"discrimination\" for cases with causal evidence.** The words are not interchangeable, and using them carefully is the single clearest sign of a serious analyst.\n\nSecond, **state which stage of the funnel your data observe and what you conditioned on.** A sentence like \"among sentenced felony cases, holding offense family, severity, and criminal history constant\" is not throat-clearing. It keeps you honest and tells the reader exactly how far your claim reaches.\n\nThird, **report the conditioned gap for what it is — whether it survives or, as here, vanishes.** If it remains, it is a gap consistent with several explanations, not by itself a verdict. If it vanishes, say *which* controls absorbed it, and remember that a control like criminal history can absorb discrimination as readily as it absorbs noise. Either way it is an association to interpret, not a verdict to pronounce.\n\nYour filter history is your methods section, and anyone can replay it. That reproducibility is precisely what lets a careful disparity finding be trusted, because it does not overclaim."
+    },
+    {
+      "type": "checkpoint",
+      "title": "Reproduce the conditioned state",
+      "body": "Rebuild the fully conditioned view from the assault example: filter to `moc1 == A`, then `severity == 4`, then `history == 0`, and read `time` by `race`.\n\nYour filter history should show the three controls applied in order. The gap you read off is essentially zero — and you now know that this is *not* a verdict of fairness. The raw gap was composition, chiefly a difference in criminal-history mix, and criminal history is itself downstream of earlier discretion that this cross-section of the funnel cannot see.",
+      "expect_state": ["f.moc1.eq.A", "f.severity.eq.4", "f.history.eq.0"]
+    },
+    {
+      "type": "read",
+      "title": "Full module reference list",
+      "body": "**Full module reference list**\n\nAbrams, D. S., Bertrand, M., & Mullainathan, S. (2012). Do judges vary in their treatment of race? *The Journal of Legal Studies, 41*(2), 347–383. https://doi.org/10.1086/666006\n\nAnwar, S., Bayer, P., & Hjalmarsson, R. (2012). The impact of jury race in criminal trials. *The Quarterly Journal of Economics, 127*(2), 1017–1055. https://doi.org/10.1093/qje/qjs014\n\nArnold, D., Dobbie, W., & Yang, C. S. (2018). Racial bias in bail decisions. *The Quarterly Journal of Economics, 133*(4), 1885–1932. https://doi.org/10.1093/qje/qjy012\n\nBaumer, E. P. (2013). Reassessing and redirecting research on race and sentencing. *Justice Quarterly, 30*(2), 231–261. https://doi.org/10.1080/07418825.2012.682602\n\nBertrand, M., & Mullainathan, S. (2004). Are Emily and Greg more employable than Lakisha and Jamal? A field experiment on labor market discrimination. *American Economic Review, 94*(4), 991–1013. https://doi.org/10.1257/0002828042002561\n\nBickel, P. J., Hammel, E. A., & O'Connell, J. W. (1975). Sex bias in graduate admissions: Data from Berkeley. *Science, 187*(4175), 398–404. https://doi.org/10.1126/science.187.4175.398\n\nBlalock, H. M. (1967). *Toward a theory of minority-group relations*. Wiley.\n\nBlumstein, A. (1982). On the racial disproportionality of United States' prison populations. *Journal of Criminal Law and Criminology, 73*(3), 1259–1281. https://doi.org/10.2307/1143193\n\nBlumstein, A. (1993). Racial disproportionality of U.S. prison populations revisited. *University of Colorado Law Review, 64*, 743–760.\n\nBlyth, C. R. (1972). On Simpson's paradox and the sure-thing principle. *Journal of the American Statistical Association, 67*(338), 364–366. https://doi.org/10.1080/01621459.1972.10482387\n\nBridges, G. S., & Crutchfield, R. D. (1988). Law, social standing, and racial disparities in imprisonment. *Social Forces, 66*(3), 699–724. https://doi.org/10.2307/2578760\n\nBushway, S., Johnson, B. D., & Slocum, L. A. (2007). Is the magic still there? The use of the Heckman two-step correction for selection bias in criminology. *Journal of Quantitative Criminology, 23*(2), 151–178. https://doi.org/10.1007/s10940-007-9024-4\n\nElwert, F., & Winship, C. (2014). Endogenous selection bias: The problem of conditioning on a collider variable. *Annual Review of Sociology, 40*, 31–53. https://doi.org/10.1146/annurev-soc-071913-043455\n\nGarland, B. E., Spohn, C., & Wodahl, E. J. (2008). Racial disproportionality in the American prison population: Using the Blumstein method to address the critical race and justice issue of the 21st century. *Justice Policy Journal, 5*(2).\n\nHindelang, M. J. (1978). Race and involvement in common law personal crimes. *American Sociological Review, 43*(1), 93–109. https://doi.org/10.2307/2094764\n\nKlepper, S., Nagin, D., & Tierney, L. J. (1983). Discrimination in the criminal justice system: A critical appraisal of the literature. In A. Blumstein, J. Cohen, S. E. Martin, & M. H. Tonry (Eds.), *Research on sentencing: The search for reform* (Vol. 2, pp. 55–128). National Academy Press.\n\nKnox, D., Lowe, W., & Mummolo, J. (2020). Administrative records mask racially biased policing. *American Political Science Review, 114*(3), 619–637. https://doi.org/10.1017/S0003055420000039\n\nKurlychek, M. C., & Johnson, B. D. (2019). Cumulative disadvantage in the American criminal justice system. *Annual Review of Criminology, 2*, 291–319. https://doi.org/10.1146/annurev-criminol-011518-024815\n\nKutateladze, B. L., Andiloro, N. R., Johnson, B. D., & Spohn, C. C. (2014). Cumulative disadvantage: Examining racial and ethnic disparity in prosecution and sentencing. *Criminology, 52*(3), 514–551. https://doi.org/10.1111/1745-9125.12047\n\nNational Research Council. (2004). *Measuring racial discrimination*. National Academies Press. https://doi.org/10.17226/10887\n\nPager, D. (2003). The mark of a criminal record. *American Journal of Sociology, 108*(5), 937–975. https://doi.org/10.1086/374403\n\nRehavi, M. M., & Starr, S. B. (2014). Racial disparity in federal criminal sentences. *Journal of Political Economy, 122*(6), 1320–1354. https://doi.org/10.1086/677255\n\nRosenbaum, P. R. (1984). The consequences of adjustment for a concomitant variable that has been affected by the treatment. *Journal of the Royal Statistical Society: Series A (General), 147*(5), 656–666. https://doi.org/10.2307/2981697\n\nSampson, R. J., & Lauritsen, J. L. (1997). Racial and ethnic disparities in crime and criminal justice in the United States. *Crime and Justice, 21*, 311–374. https://doi.org/10.1086/449253\n\nSpohn, C. (2000). Thirty years of sentencing reform: The quest for a racially neutral sentencing process. In *Criminal justice 2000* (Vol. 3, pp. 427–501). National Institute of Justice.\n\nSteffensmeier, D., Ulmer, J., & Kramer, J. (1998). The interaction of race, gender, and age in criminal sentencing: The punishment cost of being young, Black, and male. *Criminology, 36*(4), 763–798. https://doi.org/10.1111/j.1745-9125.1998.tb01265.x\n\nTonry, M. (1995). *Malign neglect: Race, crime, and punishment in America*. Oxford University Press.\n\nTonry, M., & Melewski, M. (2008). The malign effects of drug and crime control policies on Black Americans. *Crime and Justice, 37*(1), 1–44. https://doi.org/10.1086/588492\n\nUlmer, J. T. (2012). Recent developments and new directions in sentencing research. *Justice Quarterly, 29*(1), 1–40. https://doi.org/10.1080/07418825.2011.624115"
+    }
+  ]
+}

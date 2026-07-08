@@ -228,14 +228,20 @@ CODES['A'] = [ 'Assault',                 # [0] title (comment '# Complete' = fu
   (answer-context inspection). `/admin/modules/<module_id>/answers` — computed answer key (any
   educator; generated fresh, never cached). See "Educator portal (implemented)" below.
 - **Accounts / enrollment:** both `/new` and `/login` carry an **"I'm an educator" checkbox**
-  (`is_educator` form field) plus a student **class-code box**. When the box is checked → the
-  account is namespaced under `edu-<username>` (`educator_namespace()`; the `edu-` prefix is
-  backend-only, never typed) — `/new` creates it, `/login` looks it up directly, no code needed.
-  When unchecked → the class-code box resolves the same way for both routes (`resolve_class_code`):
-  blank → public/`unmanaged`; a live **join code** → student enrolled under the class's immutable
-  `class_id` namespace (roster + the pickle's `classes` set together); a literal `edu-…` still
-  resolves to an educator account as a **legacy fallback**; else → error on `/new`, treated as the
-  typed classcode on `/login` (so legacy bare-directory accounts still authenticate). `email_allowed`
+  (`is_educator` form field); only **`/new`** also has a student **class-code box** — the join
+  code is entered **once, at signup**, and is baked into the account's namespace, so **`/login`
+  is just username + password** (no code re-entry). When the box is checked → the account is
+  namespaced under `edu-<username>` (`educator_namespace()`; the `edu-` prefix is backend-only,
+  never typed) — `/new` creates it, `/login` looks it up directly. On **`/new`** with the box
+  unchecked, the class-code box is resolved by `resolve_class_code`: blank → public/`unmanaged`;
+  a live **join code** → student enrolled under the class's immutable `class_id` namespace
+  (roster + the pickle's `classes` set together); a literal `edu-…` still resolves to an educator
+  account as a **legacy fallback**; else → error. On **`/login`** the classcode is not asked for:
+  the checkbox scopes the lookup to `edu-<username>`, and an unchecked login resolves the account
+  by looking the username up across every non-educator namespace
+  (`account.find_userids_by_username`) and letting the **password** pick the match (so a username
+  shared across classes, and legacy bare-directory accounts, still authenticate — the generic
+  "Username or password is incorrect." keeps `/login` non-enumerable). `email_allowed`
   enforces a class's email-domain policy at join time. `/join` — logged-in "Join a class" by code
   (doesn't re-namespace the account; only grows the roster + `classes`). `/` (`index`) clears a
   **stale session** (cookie → deleted account) and falls back to the landing instead of erroring.
@@ -503,12 +509,15 @@ sharing the educator's `edu-` code.
 `new.html`/`login.html`) — the `edu-` classcode is **never shown or typed**. When checked, the
 account lives under `edu-<username>` (`educator_namespace()`): `/new` creates it, `/login` looks it
 up by that derived namespace, so no code is entered. The `edu-` prefix stays a backend-only
-convention that flips `is_educator` via `account.is_educator_classcode`. When unchecked, the
-**student class-code box is lookup-resolved** (`resolve_class_code`, shared by `/new` and `/login`
-so they can't drift): blank → public/`unmanaged`; a live join code → student enrollment (roster +
+convention that flips `is_educator` via `account.is_educator_classcode`. A **student enters a
+class join code only at signup** (`/new`): unchecked, its **class-code box is lookup-resolved**
+(`resolve_class_code`): blank → public/`unmanaged`; a live join code → student enrollment (roster +
 the pickle's `classes` written together); a literal `edu-…` → educator (legacy fallback); anything
-else → an error on `/new`, or the typed classcode on `/login` (legacy bare-directory accounts still
-authenticate). Email-domain policy (`classroom.email_allowed`) is enforced at join time. The
+else → an error. That classcode is then baked into the account's namespace, so **`/login` never
+asks for it again** — an unchecked login resolves the account by matching the username across every
+non-educator namespace (`account.find_userids_by_username`) and letting the password pick it (a
+username shared across classes, and legacy bare-directory accounts, still authenticate).
+Email-domain policy (`classroom.email_allowed`) is enforced at join time. The
 checkbox is exactly as self-selectable as typing `edu-` was — **no new trust boundary** (see the
 residual-posture note under "Known issues").
 

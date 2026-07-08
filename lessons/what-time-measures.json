@@ -1,0 +1,203 @@
+{
+  "id": "what-time-measures",
+  "title": "What `time` Measures - Presumptive vs. Pronounced",
+  "description": "You have been using the `time` variable since Module 1 without asking what it actually is. This module answers that question, and the answer changes how you read every number this course has shown you. `time` is a recommendation, not an outcome: a presumptive sentence in months. Most people sentenced for felonies in Minnesota never serve it as written. You will learn the mechanisms that open a gap between the guideline number and lived reality - stayed sentences, the two-thirds rule, departures, and plea bargaining - and then run the Two-Thirds Translation lab: a short exercise in doing correct arithmetic and asking whether it was correct arithmetic on the right population.",
+  "author": "unmanaged",
+  "order": 7,
+  "objectives": [
+    "Define what `time` encodes: the presumptive sentence duration, in months, recommended by the Minnesota Sentencing Guidelines",
+    "Distinguish presumptive, pronounced, executed, and served time, and explain why they are usually four different numbers",
+    "Explain the two main stay types (stay of execution, stay of imposition) and why most Minnesota felony sentences are stayed",
+    "Apply the statutory two-thirds rule to translate an executed sentence into a term of imprisonment and a supervised release term",
+    "Explain why a correct calculation applied to the wrong population produces a confidently wrong answer",
+    "State what this dataset can and cannot tell you about time actually served"
+  ],
+  "steps": [
+    {
+      "type": "read",
+      "title": "Before you start: open two tabs",
+      "body": "**Keep this lesson open in its own browser tab.** Open the Explorer in a **second tab** - the lab in the middle of this module asks you to filter the data and retrieve statistics yourself, and the final questions are graded against what the data actually says today, not against a stored answer key.\n\nThis module is a turning point in the course. Everything before it taught you how to *compute* with `time`. This module teaches you what you were computing."
+    },
+    {
+      "type": "read",
+      "title": "The naive reading",
+      "body": "Suppose you filter the Explorer to a single case and see `time = 48`.\n\nA reasonable first guess: *this person is going to spend 48 of something - probably years? - behind bars.* That guess is wrong on three separate counts.\n\n1. **It's months, not years.** `time` is recorded in months. (You may have already inferred this from Module 2, where the smallest common nonzero value was 12.03 months - one year and one day.)\n2. **It's a recommendation, not an order.** `time` records the *presumptive* sentence: what the Minnesota Sentencing Guidelines recommend for a typical case with this offense severity and this criminal history. Judges usually follow it - but 'usually' is doing real work in that sentence.\n3. **Almost nobody serves the recommended number as written.** Between stayed sentences, the statutory two-thirds rule, and departures, the pathway from a guideline number to months actually spent in a state prison has several exits.\n\nHold this question through the whole module: **if `time` = 48, what is your best estimate of months actually spent in a Minnesota prison?** By the end you will be able to give the honest answer, which is: *it depends - possibly 32, possibly 0.*"
+    },
+    {
+      "type": "read",
+      "title": "What 'presumptive' means",
+      "body": "When a person is convicted of a felony in Minnesota, the Sentencing Guidelines produce a recommendation from two inputs you already know as columns in this dataset: the **severity level** of the conviction offense and the **criminal history score**. The cell where those two intersect on the sentencing grid contains the *presumptive sentence* (Minnesota Sentencing Guidelines Commission [MSGC], 2024a, § 2.C.1).\n\nThe presumptive sentence answers two questions at once:\n\n- **Disposition** - should this person go to state prison (a *presumptive commitment*), or receive a non-prison sentence (a *presumptive stay*)?\n- **Duration** - for how many months?\n\nTwo details matter for reading `time` correctly.\n\n**First, the number is the center of a band, not a point.** Minnesota statute requires the Guidelines to define a range around each fixed duration - 15 percent below to 20 percent above - within which a judge may sentence without it even counting as a departure (Minn. Stat. § 244.09, subd. 5; MSGC, 2024a, § 1.B). So two judges can pronounce meaningfully different sentences for identical grid cells and *both* be following the guidelines.\n\n**Second, for presumptive prison cases the band has a floor of one year and one day** (MSGC, 2024a, § 2.C.1). This is why 12.03 months appeared as an anchor value back in Module 2: it is the shortest executed prison sentence the guidelines contemplate.\n\n---\n**References (this page)**\n\nMinnesota Sentencing Guidelines Commission. (2024a). *Minnesota sentencing guidelines and commentary: Effective August 1, 2024*. https://mn.gov/sentencing-guidelines/assets/2024_Minn_Sentencing_Guidelines_Commentary_tcm30-639154.pdf\n\nMinnesota Sentencing Guidelines Commission. § 244.09, Minn. Stat. (2024). https://www.revisor.mn.gov/statutes/cite/244.09"
+    },
+    {
+      "type": "question",
+      "title": "Check: reading a presumptive sentence",
+      "body": "A case sits in a grid cell whose presumptive sentence is 48 months, presumptive commitment. The judge pronounces 44 months executed. Which statement is correct?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "This is a downward durational departure, because 44 is less than 48",
+          "This is within the presumptive range, because the guidelines permit sentences from 15% below to 20% above the fixed duration without a departure",
+          "This is illegal; the judge must pronounce exactly 48 months",
+          "This cannot be determined without knowing the offender's race and sex"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "read",
+      "title": "Exit one: the stayed sentence",
+      "body": "The single largest reason `time` is not time served is that **most Minnesota felony sentences are not executed at all**.\n\nWhen the court *stays* a sentence, the person does not go to state prison. Instead the judge places them on probation, usually with conditions - which may include up to 364 days of confinement in a *local* facility such as a county jail or workhouse (MSGC, 2025, § 4.A). Minnesota law provides two forms of stay (Minn. Stat. § 609.135; MSGC, 2024a, § 1.B):\n\n- **Stay of execution.** A prison duration *is* pronounced - the judge says the number out loud - but its execution is suspended while the person completes probation. Violate the conditions, and the pronounced sentence can be executed.\n- **Stay of imposition.** No prison duration is pronounced at all. If the person successfully completes the stay, the conviction is even deemed a misdemeanor on their record under Minn. Stat. § 609.13 (MSGC, 2024a, § 1.B).\n\nHow common is this? In 2024, the actual state prison rate - the share of felony cases resulting in an executed prison sentence - was **24 percent** (MSGC, 2026, Figure 4, p. 21). By implication, roughly **three-quarters of Minnesota felony sentences were stayed**. Note the word *implication*: the Commission reports the prison rate directly and the two stay types separately (about 45% stays of execution and under 30% stays of imposition in 2024; MSGC, 2026, Figure 6, p. 22); the ~76% combined figure is our inference from the complement, not a published statistic.\n\nOne caution before you conclude Minnesota is lenient: a stayed sentence is not 'no confinement.' Counting local jail time served as a probation condition, the **total incarceration rate** - prison *or* local confinement - was **88 percent** of 2024 felony cases (MSGC, 2026, pp. 19-20). The system confines most people it convicts of felonies; it just rarely does so in state prison for the duration printed in the grid cell.\n\n---\n**References (this page)**\n\nMinnesota Sentencing Guidelines Commission. (2024a). *Minnesota sentencing guidelines and commentary: Effective August 1, 2024*. https://mn.gov/sentencing-guidelines/assets/2024_Minn_Sentencing_Guidelines_Commentary_tcm30-639154.pdf\n\nMinnesota Sentencing Guidelines Commission. (2025). *Minnesota sentencing guidelines and commentary: Effective August 1, 2025* [Standard Grid, § 4.A]. https://mn.gov/sentencing-guidelines/assets/2025_Standard_Grid_4A_Minn_Sentencing_Guidelines_Commentary_tcm30-700144.pdf\n\nMinnesota Sentencing Guidelines Commission. (2026). *2026 report to the legislature*. https://mn.gov/sentencing-guidelines/assets/2026-Minn-Sentencing-Guidelines-Comm-Report-to-the-Legislature_tcm30-719777.pdf\n\nStay of imposition or execution of sentence. § 609.135, Minn. Stat. (2024). https://www.revisor.mn.gov/statutes/cite/609.135"
+    },
+    {
+      "type": "question",
+      "title": "Check: the two stays",
+      "body": "A defendant receives a stay of imposition and successfully completes probation. What prison duration was pronounced at sentencing?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "The presumptive duration from the grid cell",
+          "Two-thirds of the presumptive duration",
+          "None - under a stay of imposition, no prison duration is pronounced at all",
+          "364 days"
+        ],
+        "correct": 2
+      }
+    },
+    {
+      "type": "read",
+      "title": "Exit two: the two-thirds rule",
+      "body": "Now consider the minority of cases where the sentence *is* executed - the person is committed to the Commissioner of Corrections. Even here, the pronounced number is not the prison number.\n\nFor crimes committed on or after August 1, 1993, Minnesota law splits every executed sentence into two parts (Minn. Stat. § 244.101, subd. 1):\n\n- a **term of imprisonment** equal to **two-thirds** of the executed sentence, served in prison; and\n- a **supervised release term** equal to the remaining **one-third**, served in the community under conditions set by the Commissioner.\n\nSo a pronounced 48-month executed sentence means, by default, 32 months in prison and 16 months on supervised release. The judge is required to explain this arithmetic at sentencing (MSGC, 2024a, § 4.A).\n\n**The asymmetry matters.** The two-thirds rule reliably *shrinks* prison time relative to the pronounced number - but the mechanism can also claw time back. Disciplinary violations in prison, or violations of supervised release conditions, allow the Commissioner to extend actual confinement, potentially up to the *entire* executed sentence (MSGC, 2024a, § 4.A; see Minn. Stat. § 244.05 for the release-violation machinery). Two-thirds is the default trajectory, not a guarantee.\n\nNotice what this means for your mental model of `time`: even for the ~24 percent of cases that go to prison, `time` overstates expected prison exposure by roughly one-third.\n\n---\n**References (this page)**\n\nMinnesota Sentencing Guidelines Commission. (2024a). *Minnesota sentencing guidelines and commentary: Effective August 1, 2024*. https://mn.gov/sentencing-guidelines/assets/2024_Minn_Sentencing_Guidelines_Commentary_tcm30-639154.pdf\n\nSupervised release. § 244.05, Minn. Stat. (2024). https://www.revisor.mn.gov/statutes/cite/244.05\n\nTerms of imprisonment; supervised release. § 244.101, Minn. Stat. (2024). https://www.revisor.mn.gov/statutes/cite/244.101"
+    },
+    {
+      "type": "question",
+      "title": "Check: translate a sentence",
+      "body": "A judge pronounces a 60-month executed sentence for a 2015 offense. Assuming no disciplinary or release violations, how does the 60 months divide?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "60 months in prison; supervised release is added on top",
+          "40 months in prison, 20 months on supervised release",
+          "30 months in prison, 30 months on supervised release",
+          "20 months in prison, 40 months on supervised release"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "read",
+      "title": "Exits three and four: departures and the shadow of the plea",
+      "body": "**Departures.** A judge may sentence outside the guidelines recommendation if there are substantial and compelling reasons, stated on the record. Departures come in two types (MSGC, 2026, p. 27):\n\n- **Dispositional** - the disposition flips: the guidelines recommended a stay but the court executed prison (aggravated), or the guidelines recommended prison but the court stayed the sentence (mitigated).\n- **Durational** - the pronounced duration falls outside the presumptive range: more than 20 percent above the fixed duration (aggravated) or more than 15 percent below it (mitigated).\n\nThe striking empirical fact is which direction departures flow. In 2024, the total departure rate was about 29 percent of cases - and the traffic was overwhelmingly downward. Aggravated dispositional departures were well under one percent of presumptive-stay cases, while **41 percent of presumptive-commitment cases received a mitigated dispositional departure** - the guidelines said prison, and the judge stayed the sentence (MSGC, 2026, Figures 11-12, pp. 27-28).\n\n*A denominator warning, because this trips up professionals:* '41 percent' is a share of presumptive-*commit* cases only. Expressed as a share of *all* felony cases, mitigated dispositional departures were roughly 16 percent in 2024 (MSGC, 2026, Figure 13, p. 28). Both numbers are true; they answer different questions. When you meet a departure statistic in the wild, your first question is now automatic: *departures as a percentage of what?*\n\n**Plea bargaining's shadow.** The departure statistics understate discretion, because they measure deviation from the presumptive sentence *for the conviction offense* - and the conviction offense is itself frequently the product of negotiation. When a charge is bargained down, the case lands in a different grid cell *before* any presumptive sentence is computed. The guidelines machinery then reports perfect compliance, because the discretion happened upstream of everything the machinery can see. In this dataset, that discretion is invisible: you observe the conviction offense, never the charged offense.\n\n---\n**References (this page)**\n\nMinnesota Sentencing Guidelines Commission. (2026). *2026 report to the legislature*. https://mn.gov/sentencing-guidelines/assets/2026-Minn-Sentencing-Guidelines-Comm-Report-to-the-Legislature_tcm30-719777.pdf"
+    },
+    {
+      "type": "read",
+      "title": "Lab: The Two-Thirds Translation",
+      "body": "Time to make this concrete with your own hands on the data. The lab has three movements:\n\n1. **Filter** to a single, familiar offense category and retrieve its case count and median `time`.\n2. **Translate** that median through the two-thirds rule, exactly as a judge would be required to explain it from the bench.\n3. **Interrogate** your own translation: for what share of these cases is this arithmetic even *valid* - and can this dataset tell you?\n\nThe arithmetic is deliberately easy. The point of this lab is not computation; it is learning to ask *which population a computation applies to* before believing its output. That habit is the difference between analysis and numerology.\n\nWe will use terroristic threats - the offense you met in Module 2 as the textbook symmetric distribution. Its median is stable and its name is unambiguous, which makes it a clean specimen.\n\nIn your Explorer tab, apply the filter now, then answer the questions on the following pages. Do not clear the filter until the lab ends."
+    },
+    {
+      "type": "explore",
+      "title": "Filter: terroristic threats",
+      "body": "Apply the following filter state in your Explorer tab: `moc1 = A`, then `moc2 = 9`. This isolates all terroristic-threats cases in the dataset (the Module 2 anchor). The sandbox on the left shows the same view. Run descriptive statistics on `time` and keep it in front of you for the next four questions.",
+      "state": ["f.moc1.eq.A", "f.moc2.eq.9"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "Q1: How many cases?",
+      "body": "With the terroristic-threats filter applied, how many cases are in your filtered view? (Read **N** from the descriptive statistics panel.) This is your denominator for everything that follows - every claim you make in this lab is a claim about exactly this many cases, no more.",
+      "state": ["f.moc1.eq.A", "f.moc2.eq.9"],
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "count", "column": "time" },
+        "tolerance": 0
+      }
+    },
+    {
+      "type": "question",
+      "title": "Q2: The median presumptive sentence",
+      "body": "Still filtered to terroristic threats: what is the **median** of `time`, in months? (Recall from Module 2 why we reach for the median here: `time` is right-skewed, and the median resists the pull of extreme values.) Write this number down - you are about to translate it.",
+      "state": ["f.moc1.eq.A", "f.moc2.eq.9"],
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "median", "column": "time" },
+        "tolerance": 0.1
+      }
+    },
+    {
+      "type": "question",
+      "title": "Q3: The implied term of imprisonment",
+      "body": "Assume - and mark that word, because we are going to audit it - that the median case from Q2 (15 months) received an **executed** sentence at exactly the median duration. Under Minn. Stat. § 244.101, the term of imprisonment served in prison is **two-thirds** of the executed sentence. What is two-thirds of the 15-month median?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "15 months - the full median; supervised release is added on top of it",
+          "10 months - two-thirds of the 15-month median",
+          "5 months - one-third of the median",
+          "22.5 months - the median plus one-half"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "question",
+      "title": "Q4: The supervised release term",
+      "body": "Same assumption. The supervised release term - served in the community, and revocable back into prison for violations - is the remaining **one-third** of the executed sentence. What is one-third of the 15-month median?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "5 months - one-third of the 15-month median",
+          "10 months - two-thirds of the median",
+          "15 months - the full median",
+          "0 months - supervised release is not part of the pronounced sentence"
+        ],
+        "correct": 0
+      }
+    },
+    {
+      "type": "question",
+      "title": "Q5: The audit",
+      "body": "You have now computed a term of imprisonment (10 months) and a supervised release term (5 months) from the median `time` for terroristic threats. Under what condition is that arithmetic actually a description of what happened to a real person?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Always - the two-thirds rule applies to every felony sentence in Minnesota",
+          "Only if the sentence was executed (a commitment to the Commissioner of Corrections); for stayed sentences the calculation describes nothing",
+          "Only if the defendant pleaded guilty",
+          "Only for offenses committed before August 1, 1993"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "read",
+      "title": "So which cases in your filter were executed?",
+      "body": "The natural next move is obvious: filter your terroristic-threats cases down to just the executed ones and re-run the median. Can you?\n\nYou can. This dataset **does** record disposition. The column `prison` - 'Executed Prison Sentence?' - is a simple Yes/No flag on every case. Add `prison = Yes` to your terroristic-threats filter and the Explorer will show you only the cases that actually resulted in a committed prison sentence: the cases for which your two-thirds arithmetic is even meaningful.\n\nDo it in your own tab now, then turn the page. What you are about to see is the whole point of the lab."
+    },
+    {
+      "type": "explore",
+      "title": "Filter to the executed cases",
+      "body": "Here is the executed-only view: terroristic threats with `prison = Yes`. Two things jump out.\n\nFirst, the **N collapses** - from the full terroristic-threats count (Q1) down to roughly a tenth of it. Most of these sentences were *not* executed; they were stayed, and for a stayed sentence the two-thirds split describes nothing at all. Your Q3 and Q4 arithmetic, applied to the full cell, was correct arithmetic on the wrong population.\n\nSecond, the **executed-only median is markedly higher** than the all-cases median you recorded in Q2 - about **27 months** against 15. That gap is not an error; it is **selection**. The cases a court chooses to send to prison are, on average, the more serious ones - higher severity, longer criminal history - so the executed subset is pulled toward longer sentences. Filtering to the population your calculation actually describes changes the number, and the change *is* the finding.",
+      "state": ["f.moc1.eq.A", "f.moc2.eq.9", "f.prison.eq.Yes"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "Correct arithmetic, wrong population",
+      "body": "You computed a two-thirds split from the *all-cases* median (15 months), but the split only describes *executed* sentences, whose median is about 27 months. What is the cleanest statement of what happened?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Nothing went wrong; the median is the median regardless of which cases you include",
+          "The arithmetic was wrong - two-thirds of 15 is not 10",
+          "The arithmetic was correct but applied to the wrong population: the two-thirds rule describes only executed cases, whose median differs from the all-cases median because executed cases are selected toward more serious offenses",
+          "The `prison` column is unreliable, so no comparison is possible"
+        ],
+        "correct": 2
+      }
+    },
+    {
+      "type": "read",
+      "title": "Close: one number, three realities",
+      "body": "Return to the question from the top of the module. If `time` = 48, how long in prison?\n\n- If the sentence was **stayed** - as most Minnesota felony sentences are - the answer is **0 months in state prison**, though probably some local jail time as a probation condition, and the pronounced 48 hangs overhead as the consequence of violating probation.\n- If the sentence was **executed** and served without violations, the answer is **32 months**, with the remaining 16 on supervised release.\n- If it was executed and release was revoked, the answer lands somewhere between 32 and the full **48**.\n\nOne number. Three realities. This dataset can tell you which cases were executed - you just used the `prison` column to separate them - but it cannot tell you, for an executed case, whether release was later revoked, or how much local jail time a stayed case actually served. The `time` column by itself remains a recommendation, not a record of punishment.\n\nFrom here forward in this course, read `time` as what it is: **the system's recommendation, in months - an excellent measure of guideline structure and offense severity, and a misleading proxy for punishment experienced.** The disparity analyses coming in later modules depend on your holding that distinction; a gap in recommendations and a gap in prison-time-served are different findings with different explanations.\n\n---\n**Full module reference list**\n\nMinnesota Sentencing Guidelines Commission. (2024a). *Minnesota sentencing guidelines and commentary: Effective August 1, 2024*. https://mn.gov/sentencing-guidelines/assets/2024_Minn_Sentencing_Guidelines_Commentary_tcm30-639154.pdf\n\nMinnesota Sentencing Guidelines Commission. (2025). *Minnesota sentencing guidelines and commentary: Effective August 1, 2025* [Standard Grid, § 4.A]. https://mn.gov/sentencing-guidelines/assets/2025_Standard_Grid_4A_Minn_Sentencing_Guidelines_Commentary_tcm30-700144.pdf\n\nMinnesota Sentencing Guidelines Commission. (2026). *2026 report to the legislature*. https://mn.gov/sentencing-guidelines/assets/2026-Minn-Sentencing-Guidelines-Comm-Report-to-the-Legislature_tcm30-719777.pdf\n\nStay of imposition or execution of sentence. § 609.135, Minn. Stat. (2024). https://www.revisor.mn.gov/statutes/cite/609.135\n\nSupervised release. § 244.05, Minn. Stat. (2024). https://www.revisor.mn.gov/statutes/cite/244.05\n\nMinnesota Sentencing Guidelines Commission. § 244.09, Minn. Stat. (2024). https://www.revisor.mn.gov/statutes/cite/244.09\n\nTerms of imprisonment; supervised release. § 244.101, Minn. Stat. (2024). https://www.revisor.mn.gov/statutes/cite/244.101"
+    }
+  ]
+}

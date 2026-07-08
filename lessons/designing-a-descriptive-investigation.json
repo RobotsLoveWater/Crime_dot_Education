@@ -1,0 +1,161 @@
+{
+  "id": "designing-a-descriptive-investigation",
+  "title": "Designing a Descriptive Investigation",
+  "description": "The course changes hands. You pose your own answerable question, pre-specify a filter plan before touching the data, run it while checking N at every node, and submit a write-up whose methods section is not a paragraph you compose but a filter history anyone can replay. This module teaches the discipline that separates an investigation from a fishing trip - and shows why, on this platform, reproducibility is not an aspiration but a button.",
+  "author": "unmanaged",
+  "order": 14,
+  "objectives": [
+    "Distinguish answerable descriptive questions from causal, motivational, or out-of-data questions using three explicit tests",
+    "Explain how undisciplined filtering produces spurious findings - the garden of forking paths and HARKing - and why pre-specification is the accepted remedy",
+    "Write a complete five-field pre-specification plan: question, ordered filter chain, focus column, summary statistic, and a minimum-N decision rule",
+    "Execute a pre-specified plan while recording N at every node, and correctly apply the amend-and-log rule when the data defeat the plan",
+    "Explain why a serialized filter history constitutes a reproducible methods section, and demonstrate it by replaying a published chain exactly"
+  ],
+  "steps": [
+    {
+      "type": "read",
+      "title": "Before you start: open two tabs",
+      "body": "**Keep this lesson open in its own browser tab.** Open the Explorer in a **second tab** and mirror every step as you go. This module ends differently from every other module in the course: the final deliverable is not a checkpoint state we hand you, but an investigation *you* design. The checkpoint near the end verifies only that you can replay someone else's methods section exactly - because if you cannot replay a chain, you cannot expect anyone to replay yours.\n\nEverything in this module is method. There is no new Minnesota law here, no new column, no new statistic. What is new is the *order of operations*: for the first time, the question comes from you, and the plan comes before the data."
+    },
+    {
+      "type": "read",
+      "title": "You are now the last stage of the funnel",
+      "body": "Across this course, the criminal justice funnel has been our map. Police classify events at the wide end (Module 4). Prosecutors translate conduct into offense codes. Judges pronounce the sentences recorded in `time` (Module 7). Post-sentence institutions carry the consequences forward. At the narrow end sit the scholars - the people who take the residue of all those decisions and try to say something true about it.\n\nThat is now you. Not metaphorically: the ~294,000 records in this dataset are the funnel's residue, and the moment you pose a question of them, you occupy the same seat as the researchers cited throughout this course, with the same obligations.\n\nThe central obligation is one this course has circled since Module 2 but never named formally: the distinction between **exploratory** and **confirmatory** analysis. Exploration - wandering the data, trying filters, noticing oddities - is legitimate and valuable; the statistician John Tukey built a whole methodology around it (Tukey, 1977). But exploration generates *candidates for questions*, not answers. The moment you present an explored pattern as if it were a tested finding, you have crossed a line that this module exists to draw brightly.\n\nSo the module has a simple shape: first we define what an answerable question looks like; then we confront why unplanned analysis goes wrong; then you write a plan, run it, and hand in a methods section that is not prose at all.\n\n---\n**References (this page)**\n\nTukey, J. W. (1977). *Exploratory data analysis*. Addison-Wesley."
+    },
+    {
+      "type": "read",
+      "title": "What makes a question answerable",
+      "body": "Not every interesting question is a researchable one. Methods textbooks in criminology draw this line early: an empirical research question must be answerable by observation - by data that exist or can be collected - rather than by appeal to values, motives, or speculation (Bachman & Paternoster, 2017).\n\nFor this platform, that general standard becomes three concrete tests. A question is answerable here only if it passes all three:\n\n**Test 1 - Is it descriptive?** The question must ask *what is*, not *why it is* or *whether it should be*. \"What is the median pronounced sentence for second-degree burglary?\" passes. \"Why are drug sentences so long?\" fails - *why* questions demand causal evidence this dataset cannot supply (Module 13). \"Are these sentences fair?\" fails differently: it is a normative question, and no filter chain can compute an answer to it.\n\n**Test 2 - Is it in the data?** Every term in the question must map to a column and a value that actually exist. A question about \"violent crime\" must be translated into specific offense codes before it is answerable (Module 4). A question about plea bargaining fails outright - the dataset does not observe it (Module 7). A question about re-offending fails - the records end at sentencing.\n\n**Test 3 - Will N survive?** The question must plausibly leave enough cases at the final node to summarize honestly. You learned in Module 10 what happens when it does not. A question that is descriptive, in the data, and lands on four cases is answerable only in the degenerate sense: the honest answer is \"N is too small to say.\"\n\nDescriptive questions are sometimes treated as the junior partner of causal ones - as if description were what you do before the real research starts. That reputation is undeserved. Careful description is a scientific contribution in its own right, and much of what we know about how legal systems actually behave rests on it (Gerring, 2012).\n\n---\n**References (this page)**\n\nBachman, R., & Paternoster, R. (2017). *Statistics for criminology and criminal justice* (4th ed.). SAGE.\n\nGerring, J. (2012). Mere description. *British Journal of Political Science, 42*(4), 721-746."
+    },
+    {
+      "type": "question",
+      "title": "Pick the answerable question",
+      "body": "Four students propose investigations. Applying the three tests, which question is answerable on this platform as written?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Why are drug sentences in Minnesota so much harsher than they should be?",
+          "Did judges in small counties intend to punish burglary more severely than judges in large counties?",
+          "What is the median pronounced sentence length (`time`) for second-degree burglary, and how does it compare to the burglary offense family as a whole?",
+          "Does a felony sentence reduce the chance that a person commits another crime?"
+        ],
+        "correct": 2
+      }
+    },
+    {
+      "type": "read",
+      "title": "The garden of forking paths",
+      "body": "Here is the failure mode this module exists to prevent. It rarely looks like cheating. It looks like curiosity.\n\nA student opens the Explorer with a vague interest - say, sentencing in rural counties. She tries a filter. Nothing striking. She tries another year, another offense family, a different statistic. Twenty minutes and fifteen filter states later, one combination produces a dramatic gap. *That* becomes her paper - written up as if it were the question she had all along.\n\nStatisticians call the underlying problem **the garden of forking paths**: when an analysis involves many small choices - which filter, which years, which statistic - the data themselves quietly steer those choices, and the analyst can arrive at a striking result without ever consciously deciding to go looking for one (Gelman & Loken, 2014). The result is real in the trivial sense that the numbers are correctly computed. It is untrustworthy in the important sense: given that many forks, *some* path was always going to end somewhere dramatic. You met the arithmetic version of this in Module 10 - small cells guarantee extreme values somewhere - and the forking-paths problem is its behavioral twin.\n\nTwo named practices make it worse. **Undisclosed flexibility** is trying many analytic variations and reporting only the one that worked; simulation studies show this can make essentially any claim look supported (Simmons, Nelson, & Simonsohn, 2011). **HARKing** - Hypothesizing After the Results are Known - is presenting a pattern you stumbled on as though you had predicted it in advance (Kerr, 1998).\n\nThe remedy the research community has converged on is **pre-registration**: committing your question and analysis plan to the record *before* running the analysis, so the plan constrains the forks instead of the data steering them (Nosek, Ebersole, DeHaven, & Mellor, 2018). Pre-registration does not forbid exploring. It forbids *disguising* exploration as confirmation. Explore freely - then, when something interests you, stop, write the plan, and start over clean.\n\n---\n**References (this page)**\n\nGelman, A., & Loken, E. (2014). The statistical crisis in science. *American Scientist, 102*(6), 460-465.\n\nKerr, N. L. (1998). HARKing: Hypothesizing after the results are known. *Personality and Social Psychology Review, 2*(3), 196-217.\n\nNosek, B. A., Ebersole, C. R., DeHaven, A. C., & Mellor, D. T. (2018). The preregistration revolution. *Proceedings of the National Academy of Sciences, 115*(11), 2600-2606.\n\nSimmons, J. P., Nelson, L. D., & Simonsohn, U. (2011). False-positive psychology: Undisclosed flexibility in data collection and analysis allows presenting anything as significant. *Psychological Science, 22*(11), 1359-1366."
+    },
+    {
+      "type": "question",
+      "title": "Name the practice",
+      "body": "A student runs fifteen different crosstabs across three offense families and four counties, finds one combination with a striking gap, and opens the write-up with: \"We predicted that sentences in this county would differ sharply for this offense.\" Which practice does this describe?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Pre-registration",
+          "HARKing - hypothesizing after the results are known",
+          "Replication",
+          "Triangulation"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "read",
+      "title": "The five-field plan",
+      "body": "Your pre-specification plan is a short document you complete **before applying a single filter** in your investigation. It has exactly five fields. On this platform it functions as your pre-registration (Nosek et al., 2018), and your submitted filter history will be checked against it.\n\n**Field 1 - The question.** One sentence, passing all three tests from earlier in this module.\n\n**Field 2 - The filter chain, in order.** Every filter you intend to apply, listed as column-value pairs in the exact sequence you will apply them. Order matters: the Explorer serializes your filters as an ordered chain, and the chain *is* what a grader or classmate will replay.\n\n**Field 3 - The focus column.** The single column your question is about - for most sentence-length questions, `time`.\n\n**Field 4 - The summary statistic.** Named in advance: median, mean, count, share, or a crosstab. Choosing the statistic after seeing the results is a fork (Gelman & Loken, 2014); recall from Module 10 why the median resists outliers and when that matters.\n\n**Field 5 - The minimum-N decision rule.** A number and a consequence, written down now. For example: \"If N at the final node falls below 30, I will report the count and decline to report a summary statistic\" or \"...I will widen the year range to the full 2001-2019 window and log the change.\" This field exists because you cannot be trusted - none of us can - to invent a fair threshold *after* seeing an exciting result sitting at N = 11.\n\nA plan this short may feel like bureaucracy. It is the opposite: it is the entire difference between your write-up saying *\"here is what I found\"* and saying *\"here is what I went looking for, and here is what was there.\"* Only the second is an investigation.\n\n---\n**References (this page)**\n\nGelman, A., & Loken, E. (2014). The statistical crisis in science. *American Scientist, 102*(6), 460-465.\n\nNosek, B. A., Ebersole, C. R., DeHaven, A. C., & Mellor, D. T. (2018). The preregistration revolution. *Proceedings of the National Academy of Sciences, 115*(11), 2600-2606."
+    },
+    {
+      "type": "read",
+      "title": "A worked example: the plan on paper",
+      "body": "Before you write your own plan, watch one execute. Here is a complete five-field plan for a deliberately modest question:\n\n**Field 1 - Question:** What is the median pronounced sentence length for second-degree burglary, and how does it compare to the burglary offense family as a whole?\n\n**Field 2 - Filter chain, in order:** (1) `moc1` = B (burglary family); (2) `moc2` = 2 (second degree).\n\n**Field 3 - Focus column:** `time`.\n\n**Field 4 - Statistic:** median, read at two nodes - after filter 1 (the family) and after filter 2 (the degree).\n\n**Field 5 - Minimum-N rule:** If N at any node falls below 100, stop and report the count only. (For this question the rule is almost certain never to trigger - which is itself worth noticing. A good plan states the rule even when it expects not to need it.)\n\nNote what the plan does *not* contain: no prediction about which median will be higher, no story about burglary, no conclusion-in-waiting. A descriptive plan commits to a procedure, not to a result.\n\nNow we run it - and the running has a discipline of its own: **you record N at every node.** The unfiltered dataset is node zero. Each applied filter creates a new node. At each one, before you look at anything else, you write down the case count. Module 2 taught you to check N before trusting a statistic; Module 10 taught you why. This module adds the final piece: the *record* of those checks is part of your methods, not scratch work. A reader who sees N at every node can see exactly where your population narrowed and by how much - the same attrition logic as the funnel itself."
+    },
+    {
+      "type": "explore",
+      "title": "Run the plan: node 1",
+      "body": "In your Explorer tab, start from a clean state (use **Clear** if you have filters applied - Module 1). Apply the first filter from the plan: `moc1` = B.\n\n**Record the N now**, before touching anything else. This is node 1: all burglary-family cases, 2001-2019. Then open the descriptive statistics for `time` and record the family-wide median.",
+      "state": ["f.moc1.eq.B"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "explore",
+      "title": "Run the plan: node 2",
+      "body": "Now apply the second filter on top of the first: `moc2` = 2. This is node 2: second-degree burglary only.\n\n**Record the N again.** It should exceed 8,000 - a comfortable margin above the plan's minimum-N rule, which you note and move past. Then record the median of `time` at this node and set it beside the family-wide median from node 1. The comparison in Field 1 is now answered, and every number in it has a case count standing next to it.\n\nYour filter history now shows two filters in order: `moc1` = B, then `moc2` = 2. Look at it. That short chain, plus your two recorded Ns, plus the named statistic, is the *entire* methods section of this investigation. Nothing about it is a summary of what you did - it is, literally, what you did.",
+      "state": ["f.moc1.eq.B", "f.moc2.eq.2"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "Why every node?",
+      "body": "The procedure requires recording N at *every* node, not just the final one. What is the best justification?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "The platform cannot compute statistics unless N is recorded at each step",
+          "It makes the write-up longer, which graders reward",
+          "A collapse in case counts is detected at the exact node where it happens, so the minimum-N rule can be applied before any statistic is interpreted - and a reader can see precisely where and how much the population narrowed",
+          "N only needs to be recorded at the final node; intermediate counts are scratch work"
+        ],
+        "correct": 2
+      }
+    },
+    {
+      "type": "read",
+      "title": "The filter history is the methods section",
+      "body": "In published research, the methods section is prose: the author *describes* what was done, and the reader must trust the description. The gap between description and deed is where much scientific trouble lives. The reproducibility standard in computational research is meant to close that gap: at minimum, a reader should be able to take the same data and the same code and regenerate the same results (Peng, 2011).\n\nThis platform meets that standard by construction, and it is worth pausing to see why. Your filter history is not a *description* of your analysis - it is the analysis, serialized. Each filter you apply becomes a token in an ordered chain; the chain plus the fixed 2001-2019 dataset determines every number on your screen. There is no stored answer key behind the Explorer (Module 0): every statistic is computed live from the current filter state. Consequently:\n\n- **Anyone who replays your chain gets your numbers.** Not similar numbers - identical ones. A classmate, your instructor, a skeptic.\n- **Your results cannot quietly drift from your methods**, because they are computed *from* your methods. A prose methods section can omit the fifth filter you'd rather not mention. A serialized chain cannot.\n- **Disagreement becomes precise.** If a classmate gets a different median, exactly one of three things is true: a different chain, a different focus column, or a different statistic. The dispute is checkable in under a minute.\n\nThis is why your submission for this module includes the filter history itself, not a paragraph about it. You will still write interpretive prose - what the numbers mean is yours to argue - but the *what-was-done* layer of your paper is machine-checkable, and will be machine-checked.\n\n---\n**References (this page)**\n\nPeng, R. D. (2011). Reproducible research in computational science. *Science, 334*(6060), 1226-1227."
+    },
+    {
+      "type": "question",
+      "title": "What makes it reproducible",
+      "body": "On this platform, what makes your finding reproducible in the strict sense?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "The statistic is large enough that small differences would not matter",
+          "A screenshot of the results is attached to the write-up",
+          "The correct answers are stored in an answer key that graders consult",
+          "Anyone replaying the same serialized filter chain against the same fixed dataset recomputes identical values, because all statistics are computed live from the filter state"
+        ],
+        "correct": 3
+      }
+    },
+    {
+      "type": "read",
+      "title": "Two guardrails before you draft",
+      "body": "Your question is yours - within two standing rules.\n\n**Guardrail 1: demographic variables carry Module 11 and 12 obligations.** If any filter or crosstab in your plan touches a demographic column - race, sex, age - your write-up is bound by the disparity/discrimination distinction (Blumstein, Cohen, Martin, & Tonry, 1983; Module 12). You may document a *disparity*: a measured difference between groups. You may not conclude *discrimination*: differential treatment of like cases, which this descriptive dataset cannot establish (Module 13). Your interpretation section must use the disparity vocabulary, acknowledge the unmeasured-confounder problem, and note that every comparison is conditional on who reached sentencing at all. Plans with demographic variables are welcome - the sentencing-gap literature began with exactly such descriptions - but they are graded against these obligations explicitly.\n\n**Guardrail 2: when the data defeat the plan, amend and log - never improvise silently.** Suppose your final node lands at N = 6. Your pre-logged minimum-N rule now governs: report the count and decline the statistic, or execute the widening move you specified in Field 5. Either way, **the deviation is documented, not hidden.** Professional reporting standards are blunt on this point: the credibility of an analysis depends on disclosing what was actually done, including departures from the plan (Wilkinson & Task Force on Statistical Inference, 1999). An amended plan with a logged deviation is honest work and is graded as such. A results section that silently swapped in a different question is the forking-paths failure wearing a finished paper's clothes.\n\nThe refusal option deserves emphasis, because students underuse it: *\"N = 6; no summary statistic is reported\"* is a legitimate, complete, full-credit finding. Module 10 made the case; this module makes it policy.\n\n---\n**References (this page)**\n\nBlumstein, A., Cohen, J., Martin, S. E., & Tonry, M. H. (Eds.). (1983). *Research on sentencing: The search for reform* (Vol. 1). National Academy Press.\n\nWilkinson, L., & Task Force on Statistical Inference. (1999). Statistical methods in psychology journals: Guidelines and explanations. *American Psychologist, 54*(8), 594-604."
+    },
+    {
+      "type": "question",
+      "title": "N = 6 at the final node",
+      "body": "Your pre-specified chain runs clean until the last filter, where N drops to 6. Your Field 5 rule says: below 30, report the count and decline the summary statistic. What do you do?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Report the median anyway - the plan was pre-specified, so the statistic is trustworthy",
+          "Quietly remove the last filter, find a bigger N, and present the revised chain as the original plan",
+          "Follow the pre-logged rule: report N = 6, decline the summary statistic, and if you widen any filter to salvage a comparison, log the amendment visibly in the write-up",
+          "Abandon the write-up - an investigation that hits small N has failed"
+        ],
+        "correct": 2
+      }
+    },
+    {
+      "type": "read",
+      "title": "The deliverable, and how it is graded",
+      "body": "Your submission has four parts:\n\n**1. The plan** (five fields), filed before you run the investigation.\n**2. The filter history**, exported from the Explorer - your machine-checkable methods section.\n**3. The N log**: case counts at node zero and every node after, with any Field 5 rule application noted.\n**4. The write-up** (roughly 500-800 words): the question, the finding stated with its N, an interpretation section that stays inside descriptive bounds, and a limitations paragraph that names at least one thing this dataset cannot tell you about your question (Module 13).\n\nGrading operates in two layers, and it is worth understanding why.\n\n**Layer 1 - process fidelity (machine-checkable, pass/fail per item).** The platform compares your submitted filter history against your filed plan: chain matches or every deviation is logged; N recorded at every node and matching the live computed values; Field 5 rule stated and obeyed; statistic reported matches the statistic named in Field 4. None of this requires your instructor's judgment, because none of it is a matter of judgment - the chain either replays or it does not.\n\n**Layer 2 - scholarly quality (educator-graded rubric).** Question quality (specific, answerable, non-trivial); interpretation discipline (descriptive claims only; disparity vocabulary where Guardrail 1 applies; no causal language); limitations (accurate, specific to the question, not boilerplate); clarity of prose.\n\nNotice the division of labor. The machine grades what you *did*; your instructor grades what you *made of it*. A perfectly executed plan with a dull question and a sloppy interpretation earns full marks on Layer 1 and poor marks on Layer 2 - and vice versa is impossible, because Layer 2 is not read until Layer 1 passes. Rigor is the entry ticket, not the achievement."
+    },
+    {
+      "type": "checkpoint",
+      "title": "Checkpoint: replay a methods section",
+      "body": "One skill remains to be verified before you are turned loose: that you can take someone else's serialized methods section and reproduce it exactly - because that is what you will be asking others to do with yours.\n\nStarting from a clean Explorer state, replay the worked example's chain precisely as filed: apply `moc1` = B, then `moc2` = 2, in that order, with `time` as your focus column. Your filter history should show exactly those two filters in that sequence, and your N and median should match the values you recorded at node 2 earlier - identically, not approximately. That identity is the whole point.\n\nWhen the checkpoint passes, you have demonstrated the last competency this course requires of you before your own investigation: you can replay a chain. Now write a plan worth replaying.",
+      "expect_state": ["f.moc1.eq.B", "f.moc2.eq.2"]
+    },
+    {
+      "type": "read",
+      "title": "Where this leaves you",
+      "body": "A closing word on behalf of the kind of work you are about to do.\n\nDescriptive research gets called \"mere description,\" as though it were the warm-up act for causal inference. The label is wrong twice over. First, description done badly is what most public misunderstanding of criminal justice data consists of - benchmarks misapplied (Module 13), small cells over-read (Module 10), disparities announced as discrimination (Module 12). Doing it *well* is therefore not modest; it is corrective. Second, description done well - a precise question, a committed plan, an honest N at every node, a chain anyone can replay - is a genuine scholarly contribution, and the discipline has been slowly re-learning to say so (Gerring, 2012).\n\nYou now hold the complete toolkit this course has to give: you know what these records are and are not (Module 0), how the machine that produced them works (Units I-II), how to read patterns without over-reading them (Unit III), and where the hard interpretive limits sit (Unit IV). Module 14 hands you the last thing: a procedure for asking your own question without fooling yourself.\n\nFile the plan. Run the chain. Check N at every node. Log what changed. Then say only what the data said - and say it in a form anyone can check.\n\n---\n**Full module reference list**\n\nBachman, R., & Paternoster, R. (2017). *Statistics for criminology and criminal justice* (4th ed.). SAGE.\n\nBlumstein, A., Cohen, J., Martin, S. E., & Tonry, M. H. (Eds.). (1983). *Research on sentencing: The search for reform* (Vol. 1). National Academy Press.\n\nGelman, A., & Loken, E. (2014). The statistical crisis in science. *American Scientist, 102*(6), 460-465.\n\nGerring, J. (2012). Mere description. *British Journal of Political Science, 42*(4), 721-746.\n\nKerr, N. L. (1998). HARKing: Hypothesizing after the results are known. *Personality and Social Psychology Review, 2*(3), 196-217.\n\nNosek, B. A., Ebersole, C. R., DeHaven, A. C., & Mellor, D. T. (2018). The preregistration revolution. *Proceedings of the National Academy of Sciences, 115*(11), 2600-2606.\n\nPeng, R. D. (2011). Reproducible research in computational science. *Science, 334*(6060), 1226-1227.\n\nSimmons, J. P., Nelson, L. D., & Simonsohn, U. (2011). False-positive psychology: Undisclosed flexibility in data collection and analysis allows presenting anything as significant. *Psychological Science, 22*(11), 1359-1366.\n\nTukey, J. W. (1977). *Exploratory data analysis*. Addison-Wesley.\n\nWilkinson, L., & Task Force on Statistical Inference. (1999). Statistical methods in psychology journals: Guidelines and explanations. *American Psychologist, 54*(8), 594-604."
+    }
+  ]
+}
