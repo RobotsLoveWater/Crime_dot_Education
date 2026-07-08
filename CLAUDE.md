@@ -112,6 +112,8 @@ uv run flask --app app run     # add --debug for reload
 | `STYLEGUIDE.md` | **Design authority** for all UI work: tokens (light+dark), typography, layout, components, htmx conventions, a11y checklist. Read it before touching `templates/` or `static/`. |
 | `BASE_DATAFRAME_OPTIMIZATION.md` | **Design/scope authority** for the runtime memory/latency optimization of the data layer (load-once / categorical-shrink / cross-worker share of the base DataFrame). Measured numbers, the immutability safety argument, the `float64` constraint, expected impact. Read before touching how `_execute`/`Data.load` build the base. **Levers A–D all built on `base-df-optimization` (Phases 0–4).** |
 | `OPTIMIZATION_PROMPTS.md` | Phased build order (Phases 0–4) for the base DataFrame optimization above, house-style like the other `*_PROMPTS.md`. **All phases done (categorical + load-once + Parquet + `--preload`).** |
+| `VISUALIZATION_EXPANSION.md` | **Design/scope authority** for the Visualize workbench: a new top-level tab with an extensive chart vocabulary (pie, treemap, waterfall, choropleth, scatter/bubble, correlation matrix) + map-as-filter, all over the current filtered slice. Verified data facts (geo encodings, numeric columns), the substrate-reuse argument, the confounding/`float64`/immutability constraints, risks. Read before touching the viz work. **Planned — `visualization_expansion` branch; not built yet.** |
+| `VISUALIZATION_EXPANSION_PROMPTS.md` | Phased build order (16 phases, 0–15, across 5 tiers) for the visualization expansion, each with an effort · risk rating and a **recommended model** (Sonnet rarely / Opus with escalating effort incl. ultra / Fable only for the vital P11 cache-compat linchpin). House-style like the other `*_PROMPTS.md`. **Nothing built yet.** |
 | `static/css/tokens.css`, `static/css/base.css` | Phase 0 token system: all design tokens (both themes, exact `STYLEGUIDE.md` tables — plus `--overlay` for drawer/dialog backdrops) and reset/typography/focus/reduced-motion. Loaded first; theme switches via `data-theme` on `<html>` (FOUC-guard inline script in `layout.html` — which also sets a `js` class gating JS-only CSS — toggle in `static/js/theme.js`, persisted to `localStorage.theme`, fires a `themechange` event). |
 | `static/css/components.css`, `static/css/views.css` | Phase 1 shell styles per the styleguide's file organization: `components.css` = buttons/badges/chips/toasts/dialog/alerts/empty-state/loading; `views.css` = top bar, workbench grid, sidebar + tablet drawer, breakpoints, **phone shell (data-state bar, bottom nav, sticky-first-column tables, bottom-sheet dock — Phase 7)**. The retired `style.css` is gone (Phase 7); its still-live base rules (`.container`, bare `h1`/`h2`/`h3`/`p`) moved here + into `base.css`. |
 | `static/js/app.js` | Phase 1 shell behaviors (vanilla, no build step): toast auto-dismiss + `HX-Trigger`/`htmx:responseError` toast paths, `[data-confirm]` dialog interception, sidebar drawer with focus trap (Phase 7: opened by **any** `[aria-controls="sidebar"]` trigger — the tablet ☰ or the phone data-state bar — focus returns to the opener), htmx-bound global progress bar, `[data-loading]` submit feedback ("Computing statistics…"). Phase 3 added the **searchable picker**: a `[data-picker]` wrapper around a native `<select>` gets a filtering combobox (arrows/Enter/Esc); the hidden select keeps carrying the form value (and is the no-JS fallback). |
@@ -666,6 +668,35 @@ source of truth. If a tool or host ever needs a `requirements.txt`, generate one
 
 `.venv/` stays git-ignored; `uv.lock` and `.python-version` are committed.
 
+## In progress: visualization expansion (`visualization_expansion` branch)
+
+A new top-level **Visualize** workbench tab plus map-as-filter, giving the Explorer an extensive
+chart vocabulary over the current filtered slice. Branched off `main` (which already includes the
+base-DataFrame optimization). **Planned across 5 tiers / 16 phases — nothing built yet.** Governed by
+two docs: **`VISUALIZATION_EXPANSION.md`** (design/scope authority — the why + the resolved decisions)
+and **`VISUALIZATION_EXPANSION_PROMPTS.md`** (the phased build order, each phase rated effort · risk
+with a recommended model). Read both before starting.
+
+**The plan:** (Tier 1) `mode` descriptive stat + a shared measure/aggregate helper + the Visualize
+tab shell (shared-renderer/`wants_fragment()`/fragment pattern, nav, sidebar sync); (Tier 2) **pie**,
+**treemap**, **waterfall** (over `sentyear`) chart types + a reusable **"Other"-cutoff slider**;
+(Tier 3, the centerpiece) **choropleth** at county / judicial-district / region with small-N
+**texture** and **map-click → filter** on both the Visualize tab and the Filter view; (Tier 4)
+aggregated-lattice **scatter/bubble** + a numeric-subset **correlation matrix**; (Tier 5) QA + docs.
+
+**Key resolved facts** (verified against `cache/raw.parquet`): geography is native — `county`
+(`category`, 87 names, needs a TopoJSON alias table), `district` (`float64` 1–10), `region`
+(`category`, 4 metro-classification values `Greater MN`/`Hennepin`/`Oth Metro`/`Ramsey`); the
+county→district/region crosswalks **derive from the data** (`groupby`), so only one MN-counties
+TopoJSON is vendored. New descriptive math is small: `mode` (tie → first + "+N more") in
+`get_column_info`, and Pearson correlations (numeric subset, fresh per request, never disk-cached).
+**Hard constraints inherited:** map-click compiles to ordinary filter tokens (byte-identical
+`cache/data/` dirs), `float64` stays `float64`, base DataFrame immutable, no runtime CDN (vendor
+`chartjs-chart-geo` / `chartjs-chart-treemap` / `patternomaly` + TopoJSON), both themes, charts
+render on `htmx:afterSettle` + `resize()`. **Riskiest assumption:** honest defaults (measure
+flexibility + small-N texture) are enough to keep choropleths from misreading as court-harshness when
+they mostly reflect offense mix — the grid-pinning trap in map form (the confounding nudge is parked).
+
 ## Done: base DataFrame optimization (runtime memory/latency)
 
 **All four levers built** on the `base-df-optimization` branch (Phases 0–4 of
@@ -710,4 +741,3 @@ re-typed), and the base DataFrame is **never mutated in place** today (no `inpla
 - `github` → `github.com/RobotsLoveWater/Crime_dot_Education.git` (public) — the **canonical
   remote**; push here. Auth is via the `gh` CLI over HTTPS (no SSH key is configured on this
   machine — the `git@github.com:` SSH URL will fail).
-- `origin` → GitLab (`gitlab.com/sidallen-scsu/cde.git`) — legacy mirror, not used for pushing.
