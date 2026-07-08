@@ -1,0 +1,175 @@
+{
+  "id": "what-the-data-cant-tell-you",
+  "title": "What the Data Can't Tell You — and Who Can",
+  "description": "The honest ceiling of this course. Why a gap that survives your filters is still an association and not an explanation; how researchers go further with regression, matching, and stronger designs; how to classify a disparity claim you meet in the news; and a final exercise: a real published claim about Minnesota incarceration that this dataset cannot fully check — and why knowing that is the skill.",
+  "author": "unmanaged",
+  "order": 13,
+  "objectives": [
+    "State the three limits that cap what descriptive sentencing data can establish: unobserved confounders, association versus causation, and code-versus-conduct granularity",
+    "Explain, in plain language, what regression and matching add to the filter-as-control procedure from Module 9 — and what limitation all three share",
+    "Classify a published disparity claim by its evidence type: population benchmark, raw gap, adjusted gap, or causal design",
+    "Explain why every analysis in this course is conditional on who reached sentencing",
+    "Render a precise verdict on a real incarceration-rate claim: what this dataset can document, what it cannot reproduce, and what it cannot adjudicate"
+  ],
+  "steps": [
+    {
+      "type": "read",
+      "title": "Before you start: open two tabs",
+      "body": "**Keep this lesson open in its own browser tab.** Open the Explorer in a **second tab** — near the end of this module you will run one final analysis of your own, and it is the strangest one in the course: you will check a real, published claim against the data and discover that the honest answer is *neither true nor false*.\n\nThis module is shorter on clicking and longer on thinking. It is the closing argument for everything since Module 1."
+    },
+    {
+      "type": "read",
+      "title": "The honest ceiling",
+      "body": "Across Modules 9, 11, and 12 you learned a repeatable procedure: find a raw gap, then filter — hold offense family constant, hold severity constant, hold criminal history constant — and watch the gap shrink, grow, or persist. Whatever number survived your last filter is called a **residual gap**.\n\nHere is the ceiling: **the residual is where description ends.** Three limits cap what it can tell you.\n\n**1. You can only hold constant what is in the columns.** This dataset does not record plea negotiations, the quality of defense counsel, the details of what actually happened during the offense, which judge heard the case, or the charging decisions prosecutors made before sentencing. Any of these could differ systematically between the groups you compared. Researchers call these **unobserved confounders**, and they are the central methodological problem of sentencing research (Baumer, 2013). Decisions made earlier in a case — charging, detention, plea offers — shape the sentence and can carry disparity forward invisibly (Kutateladze et al., 2014; Kurlychek & Johnson, 2019).\n\n**2. Association is not causation.** This is the adage from Module 1, now given its formal home. A gap that survives your filters shows that two things move together *in this data*. It contains no mechanism — no account of *why*. Establishing a cause requires more than an association: it requires ruling out the other explanations, which observational data alone cannot do (Bachman & Schutt, 2020; Rohrer, 2018).\n\n**3. \"Same offense\" means same code, not same conduct.** Recall Module 4: the MOC is a state coding system, not a description of what happened. Two cases sharing an offense code can describe very different real-world conduct — administrative data record the *conviction offense*, not the full behavior behind it (Baumer, 2013; U.S. Sentencing Commission, 2018).\n\n---\n**References (this page)**\n\nBachman, R. D., & Schutt, R. K. (2020). *Fundamentals of research in criminology and criminal justice* (5th ed.). SAGE Publications.\n\nBaumer, E. P. (2013). Reassessing and redirecting research on race and sentencing. *Justice Quarterly, 30*(2), 231–261. https://doi.org/10.1080/07418825.2012.682602\n\nKurlychek, M. C., & Johnson, B. D. (2019). Cumulative disadvantage in the American criminal justice system. *Annual Review of Criminology, 2*, 291–319. https://doi.org/10.1146/annurev-criminol-011518-024815\n\nKutateladze, B. L., Andiloro, N. R., Johnson, B. D., & Spohn, C. C. (2014). Cumulative disadvantage: Examining racial and ethnic disparity in prosecution and sentencing. *Criminology, 52*(3), 514–551. https://doi.org/10.1111/1745-9125.12047\n\nRohrer, J. M. (2018). Thinking clearly about correlations and causation: Graphical causal models for observational data. *Advances in Methods and Practices in Psychological Science, 1*(1), 27–42. https://doi.org/10.1177/2515245917745629\n\nU.S. Sentencing Commission. (2018). *Guidelines manual* (Ch. 1, Pt. A). United States Sentencing Commission."
+    },
+    {
+      "type": "question",
+      "title": "Check: what the residual is",
+      "body": "After filtering to one offense family, one severity band, and one criminal-history score, you find that a sentencing gap between two groups remains. What is the most defensible statement of what you have found?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Proof that the remaining gap is caused by group membership",
+          "An association that survived the controls available in this dataset — its cause is not established",
+          "Evidence that no unmeasured factor could explain the gap",
+          "A result that formal statistics would treat as causal"
+        ],
+        "correct": 1,
+        "explanation": "The residual is an association conditional on the variables you could hold constant. Unobserved confounders — plea bargaining, counsel quality, conduct detail, judge identity — remain possible explanations, and observational data cannot rule them out (Baumer, 2013; Bachman & Schutt, 2020)."
+      }
+    },
+    {
+      "type": "read",
+      "title": "How researchers go further",
+      "body": "What you did with filters, researchers do with models. Three ideas — concepts only, no math.\n\n**Regression** is the filter procedure generalized. Instead of drilling down one path at a time, a regression model holds *many* variables constant *simultaneously* and estimates each variable's independent association with the outcome — the effect of one variable \"holding all other factors fixed\" (Bachman & Schutt, 2020; Wooldridge, 2019). It has a second advantage you already felt in Module 10: filtering *discards* cases, and enough filters trigger the small-N alarm. Stratifying a dataset into subgroups becomes unworkable once several variables must be held constant at once; regression uses every case (Rohrer, 2018).\n\n**Matching** is an intuition you already have. To compare fairly, find *pairs* of cases identical on severity, history, and offense family that differ only on the variable of interest — then compare within pairs. Formal matching methods automate that pairing across thousands of cases (Austin, 2011; Rosenbaum & Rubin, 1983).\n\n**The design ladder.** Here is the humbling part: regression and matching share your filters' limitation — they control only for *observed* variables (Angrist & Pischke, 2009). The strongest designs change the situation itself. Example: in many courts, cases are assigned to judges essentially at random. Since a defendant cannot choose a harsh or lenient judge, differences in outcomes across judges start to look like a genuine experiment — and researchers have used exactly this design to study what sentences *cause* (Kling, 2006; Harding et al., 2019).\n\nThe takeaway: **\"controlling for\" is a family of techniques with a shared weakness, not a magic phrase.** When you see it in a headline, your first question is now automatic: *controlling for what — and what could not be controlled?*\n\n---\n**References (this page)**\n\nAngrist, J. D., & Pischke, J.-S. (2009). *Mostly harmless econometrics: An empiricist's companion*. Princeton University Press.\n\nAustin, P. C. (2011). An introduction to propensity score methods for reducing the effects of confounding in observational studies. *Multivariate Behavioral Research, 46*(3), 399–424. https://doi.org/10.1080/00273171.2011.568786\n\nBachman, R. D., & Schutt, R. K. (2020). *Fundamentals of research in criminology and criminal justice* (5th ed.). SAGE Publications.\n\nHarding, D. J., Morenoff, J. D., Nguyen, A. P., Bushway, S. D., & Wyse, J. J. B. (2019). A natural experiment study of the effects of imprisonment on violence in the community. *Nature Human Behaviour, 3*(7), 671–677. https://doi.org/10.1038/s41562-019-0604-8\n\nKling, J. R. (2006). Incarceration length, employment, and earnings. *American Economic Review, 96*(3), 863–876. https://doi.org/10.1257/aer.96.3.863\n\nRohrer, J. M. (2018). Thinking clearly about correlations and causation: Graphical causal models for observational data. *Advances in Methods and Practices in Psychological Science, 1*(1), 27–42. https://doi.org/10.1177/2515245917745629\n\nRosenbaum, P. R., & Rubin, D. B. (1983). The central role of the propensity score in observational studies for causal effects. *Biometrika, 70*(1), 41–55. https://doi.org/10.1093/biomet/70.1.41\n\nWooldridge, J. M. (2019). *Introductory econometrics: A modern approach* (7th ed.). Cengage."
+    },
+    {
+      "type": "question",
+      "title": "Check: regression versus your filters",
+      "body": "Module 10 taught you the small-N alarm: chain enough filters and your subgroup shrinks until its statistics become unstable. Which statement best describes how regression relates to that problem?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Regression avoids the problem by holding variables constant statistically while still using every case",
+          "Regression solves the problem by deleting the smallest subgroups automatically",
+          "Regression has the same problem because it also discards cases with each added control",
+          "Regression makes the problem worse because models require larger samples than filters do"
+        ],
+        "correct": 0,
+        "explanation": "Filtering compares subgroups by discarding everything outside them; regression adjusts for many variables simultaneously without subsetting, which is why it scales where stratification fails (Rohrer, 2018; Wooldridge, 2019). What it does not fix: like your filters, it only adjusts for what was measured."
+      }
+    },
+    {
+      "type": "read",
+      "title": "A Minnesota example of going further",
+      "body": "This is not hypothetical, and it happened on this dataset's home turf. Richard Frase, a University of Minnesota law professor, asked why Minnesota's prison population shows such large racial disproportionality. He did what this Explorer cannot: he assembled data from *multiple* funnel stages — arrest, conviction, sentencing, prison — and compared disparity at each stage. His finding: disparities are substantially greater in prison sentences and prison populations than at arrest and conviction, and the primary reason is the heavy weight the sentencing guidelines give to defendants' **prior conviction records** — the criminal history score you have been filtering on since Module 2 (Frase, 2009; see also Frase & Roberts, 2019).\n\nNotice what kind of answer that is. It is not \"judges are biased\" or \"the system is fair\" — it is a *mechanism*, located at a specific rule, testable and debatable. That is what going beyond description buys you.\n\n---\n**References (this page)**\n\nFrase, R. S. (2009). What explains persistent racial disproportionality in Minnesota's prison and jail populations? *Crime and Justice, 38*, 201–280. https://doi.org/10.1086/599199\n\nFrase, R. S., & Roberts, J. V. (2019). *Paying for the past: The case against prior record sentence enhancements*. Oxford University Press."
+    },
+    {
+      "type": "read",
+      "title": "Reading a disparity claim in the wild",
+      "body": "You now have everything needed to read a sentencing-disparity claim in the news the way a researcher does. Every such claim sits on one rung of an **evidence ladder**, defined by what it holds constant:\n\n**Rung 1 — Population benchmark.** A group's share of the prison or sentenced population is compared to its share of the general population. Nothing is held constant; every funnel stage is bundled together (Blumstein, 1993; Garland et al., 2008).\n\n**Rung 2 — Raw descriptive gap.** An unadjusted comparison of outcomes between groups — the naive crosstab that opened Module 12.\n\n**Rung 3 — Adjusted gap.** The gap after controlling for legally relevant factors like offense and criminal history — your filter procedure, or its formal versions from earlier in this module. Unadjusted and adjusted disparities are different quantities and carry different weight (Baumer, 2013).\n\n**Rung 4 — Causal design.** Natural experiments and similar designs. Rare in journalism; when present, usually a cited study.\n\nThe ladder matters because of a distinction this course has leaned on since Module 12, and which the research literature treats as load-bearing: **disparity** is a documented difference between groups; **discrimination** is differential treatment *because of* group membership. Descriptive data can document disparity at any rung; establishing discrimination requires, at minimum, the upper rungs — and even then, care (Blumstein et al., 1983; Mitchell, 2005; Spohn, 2000).\n\nYour diagnostic questions for any claim: *What did it hold constant? And what population is it conditional on?*\n\n---\n**References (this page)**\n\nBaumer, E. P. (2013). Reassessing and redirecting research on race and sentencing. *Justice Quarterly, 30*(2), 231–261. https://doi.org/10.1080/07418825.2012.682602\n\nBlumstein, A. (1993). Racial disproportionality of U.S. prison populations revisited. *University of Colorado Law Review, 64*(3), 743–760.\n\nBlumstein, A., Cohen, J., Martin, S. E., & Tonry, M. H. (Eds.). (1983). *Research on sentencing: The search for reform* (Vol. 1). National Academy Press.\n\nGarland, B., Spohn, C., & Wodahl, E. J. (2008). Racial disproportionality in the American prison population: Using the Blumstein method to address the critical race and justice issues of the 21st century. *Justice Policy Journal, 5*(2), 1–42.\n\nMitchell, O. (2005). A meta-analysis of race and sentencing research: Explaining the inconsistencies. *Journal of Quantitative Criminology, 21*(4), 439–466. https://doi.org/10.1007/s10940-005-7362-7\n\nSpohn, C. (2000). Thirty years of sentencing reform: The quest for a racially neutral sentencing process. In *Criminal justice 2000* (Vol. 3, pp. 427–501). National Institute of Justice."
+    },
+    {
+      "type": "question",
+      "title": "Check: place the claim on the ladder",
+      "body": "A news article reports: \"Even after accounting for offense severity and criminal history, defendants from Group A received sentences averaging four months longer than comparable defendants from Group B.\" Which rung is this?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Rung 1 — population benchmark",
+          "Rung 2 — raw descriptive gap",
+          "Rung 3 — adjusted gap",
+          "Rung 4 — causal design"
+        ],
+        "correct": 2,
+        "explanation": "\"Accounting for offense severity and criminal history\" is the language of statistical adjustment — Rung 3. It is stronger than a raw gap but still limited to observed variables; it is not a causal design (Baumer, 2013)."
+      }
+    },
+    {
+      "type": "read",
+      "title": "The funnel, one last time",
+      "body": "One limit remains, and it is the deepest. Every one of the roughly 294,000 rows in this dataset survived a sequence of decisions before it became a row: someone was arrested, then charged, then convicted. The criminal justice system is a funnel — cases drop out at every stage (Walker, 2015).\n\nThat means every analysis you have run in this course is **conditional on who reached sentencing**. This is what researchers call **selection**: the cases you can see are not a random sample of all criminal conduct, or even of all arrests, and conditioning your analysis on a late funnel stage can distort the comparisons made there (Bushway et al., 2007; Klepper et al., 1983). Disparity can be *created* upstream (in who gets arrested or charged), *amplified* across stages (Kutateladze et al., 2014), or even *hidden* by the time cases reach sentencing.\n\nThe dataset is a photograph of the funnel's narrow end. It is a sharp, detailed photograph — but nothing in the frame tells you what was cropped out.\n\n---\n**References (this page)**\n\nBushway, S., Johnson, B. D., & Slocum, L. A. (2007). Is the magic still there? The use of the Heckman two-step correction for selection bias in criminology. *Journal of Quantitative Criminology, 23*(2), 151–178. https://doi.org/10.1007/s10940-007-9024-4\n\nKlepper, S., Nagin, D., & Tierney, L. (1983). Discrimination in the criminal justice system: A critical appraisal of the literature and suggestions for future research. In A. Blumstein, J. Cohen, S. E. Martin, & M. H. Tonry (Eds.), *Research on sentencing: The search for reform* (Vol. 2, pp. 55–128). National Academy Press.\n\nKutateladze, B. L., Andiloro, N. R., Johnson, B. D., & Spohn, C. C. (2014). Cumulative disadvantage: Examining racial and ethnic disparity in prosecution and sentencing. *Criminology, 52*(3), 514–551. https://doi.org/10.1111/1745-9125.12047\n\nWalker, S. (2015). *Sense and nonsense about crime, drugs, and communities* (8th ed.). Cengage Learning."
+    },
+    {
+      "type": "read",
+      "title": "The final exercise: a real claim",
+      "body": "Here is a claim published by the Prison Policy Initiative, a research and advocacy organization whose figures are widely quoted in news coverage of Minnesota:\n\n> \"Black people in Minnesota are incarcerated at a rate 9.1 times higher than white people\" (Prison Policy Initiative, n.d.).\n\n\n\nYour task across the next several steps: determine, as precisely as you can, what this dataset can and cannot say about that claim.\n\nStart by noticing what kind of number 9.1 is. It is not a share (\"X% of prisoners\"). It is a **rate ratio**: the incarceration rate per capita for one group, divided by the rate per capita for another. Dividing by population size makes groups of different sizes comparable — which *feels* like a statistical control. Keep that feeling in mind. It is about to be examined.\n\n---\n**References (this page)**\n\nPrison Policy Initiative. (n.d.). *Minnesota profile*. https://www.prisonpolicy.org/profiles/MN.html"
+    },
+    {
+      "type": "question",
+      "title": "Autopsy step 1: classify the claim",
+      "body": "Place the 9.1× claim on the evidence ladder. Think carefully — this one is designed to be tempting.",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Rung 3 — adjusted gap, because dividing by population size is a statistical control",
+          "Rung 1 — population benchmark; the per-capita rate is careful arithmetic, but nothing about the cases is held constant",
+          "Rung 4 — causal design, because it compares two groups directly",
+          "Rung 2 — raw descriptive gap, because it compares sentence lengths without controls"
+        ],
+        "correct": 1,
+        "explanation": "This is the module's central trap. There are two kinds of 'dividing' that feel identical and are not. Dividing by population size makes the groups comparable in *size* — but it holds nothing constant about offense, severity, or criminal history, which is what the disparity-versus-discrimination distinction requires (Blumstein et al., 1983; Garland et al., 2008). A rate ratio is the careful version of Rung 1, not a step onto Rung 3. (It is also not Rung 2: the claim is about incarceration rates, not sentence lengths.)"
+      }
+    },
+    {
+      "type": "explore",
+      "title": "Autopsy step 2: compute the nearest analogue",
+      "body": "Now go to your Explorer tab and compute the closest thing this dataset can produce: the **racial composition of felony sentencing events**. With no filters applied, open the summary for the race variable and read the counts and shares for each category.\n\n\n\nTwo things to notice while you look:\n\n1. Whatever numbers you find, none of them is 9.1 — and none of them *can be*. Ask yourself why before the next step.\n2. What you are counting is **sentencing events between 2001 and 2019** — occasions on which a sentence was pronounced. The claim counts **people in prison on a given day**. Hold that difference; it is graded shortly.",
+      "state": [],
+      "focus": { "view": "info", "column": "race" }
+    },
+    {
+      "type": "question",
+      "title": "Autopsy step 3: what is missing?",
+      "body": "To *reproduce* the 9.1× rate ratio, you would need to compute: (Black prisoners ÷ Black population) ÷ (White prisoners ÷ White population). Which ingredient does this dataset structurally lack?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "The race of sentenced defendants",
+          "Both the general-population denominators and a count of who is in prison on a given day",
+          "The offense severity of each case",
+          "The criminal history score of each defendant"
+        ],
+        "correct": 1,
+        "explanation": "The dataset contains race, severity, and history — the ingredients it lacks are the ones the ratio is built from. There is no population denominator: no count of Black or White Minnesotans lives in a sentencing dataset. And there is no prison headcount: this dataset records sentencing events — a *flow* — while a prison population is a *stock* of people present on one day, shaped by sentence lengths, prison-versus-probation decisions, and accumulation across years, including years outside 2001–2019."
+      }
+    },
+    {
+      "type": "question",
+      "title": "Autopsy step 4: what did the claim not do?",
+      "body": "Set aside the missing ingredients. Suppose someone handed you the population and prison-headcount data and you reproduced the 9.1 exactly. Which of the following would the reproduced number still NOT account for?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Differences in group population size",
+          "Differences between the groups in offense type, severity, and criminal history — and everything upstream of sentencing",
+          "The number of counties in Minnesota",
+          "Whether the ratio was computed with division"
+        ],
+        "correct": 1,
+        "explanation": "This is the two-kinds-of-dividing distinction, stated as a verdict. Population size is the one thing the ratio DOES account for. What it does not touch: the legally relevant case factors this dataset could adjust for (offense, severity, history), the unobserved factors no dataset here contains (charging, pleas, counsel), and the funnel stages upstream of sentencing where disparity can originate (Bushway et al., 2007; Kutateladze et al., 2014; Frase, 2009)."
+      }
+    },
+    {
+      "type": "question",
+      "title": "Autopsy step 5: the verdict",
+      "body": "Final question of the course's interpretive arc. Which verdict on the 9.1× claim is the most precise and defensible?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "TRUE — the sentencing data confirm the claim",
+          "FALSE — the sentencing data contradict the claim",
+          "This dataset can document racial disproportionality among sentenced felony cases, but it cannot reproduce an incarceration rate ratio (no population denominator; events are not a prison headcount) and cannot adjudicate what produces the ratio (nothing in the claim is adjusted for offense or history, and disparity may originate upstream of sentencing)",
+          "The claim cannot be evaluated by anyone, because incarceration data are unreliable"
+        ],
+        "correct": 2,
+        "explanation": "Neither 'true' nor 'false' is available from this dataset — and 'unknowable by anyone' is equally wrong, because researchers with the right data CAN evaluate it (Frase did). The correct verdict states exactly what the data document, what they cannot reproduce, and what they cannot adjudicate. This is the same discipline as Module 11's refuse-to-report answer: precision about the boundary IS the correct answer (Blumstein et al., 1983; Baumer, 2013; Bushway et al., 2007)."
+      }
+    },
+    {
+      "type": "read",
+      "title": "— and who can",
+      "body": "So who *can* answer the question the 9.1× figure raises?\n\nResearchers who assemble what this Explorer lacks. Frase (2009) is the template: he obtained population data and prison-stock data, decomposed Minnesota's disproportionality stage by stage across the funnel, and located a mechanism — the guidelines' weighting of criminal history. Others climb higher on the design ladder, using natural experiments like random judge assignment to move from association toward cause (Kling, 2006; Harding et al., 2019). The question is answerable. It is just not answerable *here* — and now you can say precisely why.\n\nModule 1 opened with a promise: this data can show you patterns; it cannot tell you why. Fifteen weeks later, that sentence has content. You know what the patterns are conditional on (the funnel), what the columns can and cannot hold constant (observed versus unobserved), what a surviving gap is (an association), and what it takes to go further (better data, stronger designs). You also know how to read a claim in the news: find its rung, find its denominator, find what it held constant.\n\nIn Module 14, you become the investigator: you will pose your own question — an *answerable* one — and the skill you just practiced, recognizing an unanswerable question, is exactly what will keep yours honest.\n\n---\n**References (this page)**\n\nFrase, R. S. (2009). What explains persistent racial disproportionality in Minnesota's prison and jail populations? *Crime and Justice, 38*, 201–280. https://doi.org/10.1086/599199\n\nHarding, D. J., Morenoff, J. D., Nguyen, A. P., Bushway, S. D., & Wyse, J. J. B. (2019). A natural experiment study of the effects of imprisonment on violence in the community. *Nature Human Behaviour, 3*(7), 671–677. https://doi.org/10.1038/s41562-019-0604-8\n\nKling, J. R. (2006). Incarceration length, employment, and earnings. *American Economic Review, 96*(3), 863–876. https://doi.org/10.1257/aer.96.3.863"
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+{
+  "id": "small-numbers-big-mistakes",
+  "title": "Small Numbers, Big Mistakes",
+  "description": "Why the check-N habit from Module 2 is not a courtesy but a law of arithmetic. Four fireworks felonies, eighteen arson-by-wildfire cases, and one small county demonstrate how small cells produce statistics that swing wildly on nothing but noise - and what honest analysts do when small N is all they have.",
+  "author": "unmanaged",
+  "order": 10,
+  "objectives": [
+    "Explain why small samples are systematically more extreme and variable than large ones, and name the cognitive error of expecting otherwise",
+    "State the square-root-of-N precision principle and use it to explain why small units dominate both the best and worst ends of any ranking",
+    "Demonstrate that an identical filter applied to adjacent years can return wildly different means when N is small, and correctly attribute the swing to sampling noise rather than real change",
+    "Apply five rules for reporting small-N statistics, including the refusal to summarize when N is very small",
+    "Name three formal tools statisticians use to test whether a small-N pattern is meaningful, and state in plain language the question each one answers"
+  ],
+  "steps": [
+    {
+      "type": "read",
+      "title": "Before you start: open two tabs",
+      "body": "**Keep this lesson open in its own browser tab.** Open the Explorer in a **second tab** and mirror every step yourself as you go - this module ends with a checkpoint that asks you to rebuild a filter state unassisted.\n\nIn Module 2 you learned a habit: **check N before trusting any statistic.** You practiced it on a memorably tiny cell - the handful of weapons felonies committed with fireworks. At the time, that was offered as a rule of thumb, the way a driving instructor says *check your mirrors* before explaining why.\n\nThis module explains why. The check-N habit is not politeness toward the data. It rests on one of the oldest results in statistics, it is violated constantly by smart people, and by the end of this module you will be able to watch it fail in real time: the same filter, applied to consecutive years of Minnesota sentencing data, returning averages so different they look like different states - when nothing changed at all."
+    },
+    {
+      "type": "read",
+      "title": "The rule becomes a theory",
+      "body": "Here is a bet most people would take. A rare offense is sentenced about 30 times statewide over two decades - roughly one or two cases per year. You compute the average sentence for one year: 20 months. What is next year's average likely to be?\n\nMost people reason: *the offense didn't change, the law didn't change, so the average should be about 20 months, give or take.* That reasoning feels safe. It is wrong - and wrong in a predictable direction.\n\nPsychologists Amos Tversky and Daniel Kahneman (1971) documented this error and gave it a deliberately ironic name: **belief in the law of small numbers.** The (real) law of *large* numbers says that as a sample grows very large, its average settles down toward a stable value. The (imaginary) law of *small* numbers is the intuition that small samples should behave the same way - that any sample, even of two or three cases, ought to be a miniature portrait of the whole. Strikingly, Tversky and Kahneman found this intuition alive and well among professional research psychologists, people trained in statistics.\n\nThe truth runs the other way. Small samples are not miniature portraits; they are **systematically more extreme** than the population they come from. A year with two sentences has nowhere to hide an unusual case - one long sentence *is* half the average. Small cells do not merely know less than large ones. They actively mislead, and they mislead toward the extremes.\n\nHold that phrase - *toward the extremes* - because you are about to watch it happen to four fireworks cases.\n\n**References**\n\nTversky, A., & Kahneman, D. (1971). Belief in the law of small numbers. *Psychological Bulletin, 76*(2), 105-110. https://doi.org/10.1037/h0031322"
+    },
+    {
+      "type": "explore",
+      "title": "Rebuild the fireworks cell",
+      "body": "In your own tab, filter to weapons offenses committed with fireworks: `moc1 = W`, then `moc4 = 8`. Run descriptive statistics on `time`.\n\nRecord three numbers before moving on: **N**, the **mean**, and the **median**. You should find exactly **four** cases - the same rare cell you met in Module 2 (three for possession of illegal fireworks, one for altering a serial number).",
+      "state": ["f.moc1.eq.W", "f.moc4.eq.8"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "read",
+      "title": "Four cases and a phantom average",
+      "body": "You should be looking at four sentences: two at 12.03 months and two at 60 months.\n\nThe Explorer reports a mean of **36.015 months** and a median of **36.015 months**. Stop and apply what Module 2 taught you. When the mean and the median agree, the distribution is symmetric - no long tail dragging the mean away from the middle. Symmetric, balanced, well-behaved. Nothing to see here.\n\nExcept look at the actual cases. Two sentences near one year. Two sentences at five years. **Not a single case anywhere near 36 months.** The 'typical' fireworks sentence of three years was handed down to no one, ever. The distribution is *bimodal* - two separated clusters - and both summary statistics are pointing, in perfect agreement, at the empty space between them.\n\nThis is not a contradiction of Module 2; it is a boundary condition on it. The mean-versus-median comparison is a shape diagnostic that needs enough cases to have a shape. At N = 4, the two statistics can agree exactly and still describe a distribution that does not exist. The sensitivity of the mean to individual extreme values - present in any dataset - becomes decisive when each case carries so much weight (Bachman & Paternoster, 2017).\n\nThe general principle, worth stating plainly because every statistics textbook states some version of it: **in a mean of N cases, each case contributes exactly 1/N of the answer.** At N = 4,000, one unusual sentence is a rounding error. At N = 4, one unusual sentence is a quarter of the statistic.\n\n**References**\n\nBachman, R. D., & Paternoster, R. (2017). *Statistics for criminology and criminal justice* (4th ed.). SAGE Publications."
+    },
+    {
+      "type": "question",
+      "title": "The agreement trap",
+      "body": "In the fireworks cell, the mean and median both equal 36.015 months. Based on Module 2, a student concludes: 'Mean equals median, so this distribution is symmetric and well-behaved, and 36 months is a typical sentence.' What is wrong with this conclusion?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Nothing - when mean and median agree, the distribution is symmetric and the value is typical",
+          "The student should have used the mode instead, which is more reliable at small N",
+          "At very small N, mean and median can agree exactly while describing a value that no actual case is near; here the cases form two separated clusters and no case sits anywhere near 36 months",
+          "The mean was computed incorrectly; with two pairs of values the mean is undefined"
+        ],
+        "correct": 2
+      }
+    },
+    {
+      "type": "read",
+      "title": "The fifth case",
+      "body": "Now run a thought experiment the Explorer cannot run for you - the kind researchers call a *perturbation*: poke the statistic and see how hard it moves.\n\nSuppose one more fireworks felony had been sentenced in the window - a fifth case. The four real sentences sum to 144.06 months.\n\n- A fifth case at **60 months** (matching the existing high pair) moves the mean from 36.015 to **40.81 months** - a jump of about **13%**.\n- A hypothetical fifth case at **120 months** moves the mean to **52.81 months** - a jump of about **47%**.\n\nOne case. Nearly half the statistic. The 36.015 figure that looked so centered and stable is in fact one sentencing decision away from telling a different story - and nothing on the statistics panel warns you of this. The fragility is invisible until you perturb it.\n\nThis is the 1/N principle doing exactly what the arithmetic says it must. It is also why this module will keep repeating one instruction until it is reflex: **the N is part of the statistic.** A mean of 36.015 is not a finding. A mean of 36.015 *at N = 4* is a finding - and a very weak one."
+    },
+    {
+      "type": "question",
+      "title": "Leverage check",
+      "body": "Why does adding one case move the fireworks mean so dramatically, when adding one case to the full dataset (roughly 294,000 records) would not visibly move the statewide mean at all?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Fireworks offenses are inherently more variable than other offenses",
+          "Each case in a mean carries a weight of 1/N, so one case is a quarter of a four-case mean but a vanishing fraction of a 294,000-case mean",
+          "The statewide mean is protected by the median, which absorbs new cases",
+          "Small filters cause the Explorer to compute statistics differently"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "read",
+      "title": "The most dangerous equation",
+      "body": "The fireworks cell showed you small-N fragility one case at a time. There is a general law underneath it, and it is older than the United States.\n\nIn 1730, Abraham de Moivre worked out how the reliability of an average depends on sample size. The precision of a mean does not improve in proportion to N - it improves only with the **square root** of N. To make an average twice as stable, you need *four times* as much data. To make it ten times as stable, you need a *hundred times* as much.\n\nThe statistician Howard Wainer (2007) called this 'the most dangerous equation' - dangerous not because it is hard, but because ignorance of it keeps producing the same expensive mistake, century after century. His signature example: in the 1990s, American foundations spent over a billion dollars breaking large schools into small ones, partly because small schools were dramatically overrepresented among the *highest-performing* schools. They were. Small schools were also dramatically overrepresented among the *lowest-performing* schools - a fact nobody checked. Both facts have the same cause and it has nothing to do with education: small units have unstable averages, so they dominate **both tails** of any ranking, purely as a mechanical artifact.\n\nThe same trap has a famous public-health version: the U.S. counties with the highest kidney-cancer rates are mostly small rural counties - and so are the counties with the *lowest* rates (Wainer, 2007). Statisticians Andrew Gelman and Phillip Price (1999) proved the general result: any map or ranking of raw small-area estimates is systematically misleading, because the small areas swing to the extremes.\n\nNow translate to this dataset. 'Schools' and 'counties' become *filter cells*: a rare offense code, a single county, a single year, a thin demographic subgroup. Any time you rank cells - which offense draws the longest average sentence? which county sentences most harshly? - **the smallest cells will crowd both ends of your list**, and the ranking will reward and punish them for nothing but their size. Remember this in Module 11, when the cells you are comparing carry real interpretive stakes.\n\n**References**\n\nGelman, A., & Price, P. N. (1999). All maps of parameter estimates are misleading. *Statistics in Medicine, 18*(23), 3221-3234. https://doi.org/10.1002/(SICI)1097-0258(19991215)18:23<3221::AID-SIM312>3.0.CO;2-M\n\nWainer, H. (2007). The most dangerous equation. *American Scientist, 95*(3), 249-256. https://doi.org/10.1511/2007.65.1026"
+    },
+    {
+      "type": "explore",
+      "title": "A rare offense: arson by wildfire",
+      "body": "Clear your filters. Now filter to arson (`moc1 = F`), then to wildfire fires and sets (`moc2 = A`). Run descriptive statistics on `time`.\n\nYou should see **N = 18** - eighteen cases across nineteen years of data, slightly less than one per year. Pooled across all those years, the cell is just stable enough to summarize: mean about **15.35 months**, median **12.03 months**, standard deviation about **6 months**. This is the cell we will stress-test next - by slicing it one year at a time.",
+      "state": ["f.moc1.eq.F", "f.moc2.eq.A"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "read",
+      "title": "Same filter, different year, different world",
+      "body": "Keep the arson filter in place and try to add a year - filter `sentyear` to a single calendar year and read the mean of `time`.\n\nSomething revealing happens: for most years, **the Explorer refuses to give you a mean at all.** In fourteen of the nineteen years this cell holds only one or two cases, and a mean of one number is just that number - the Explorer declines to dress it up as an average. Only **two** years, 2004 and 2016, contain enough distinct sentences for a mean to even appear. In 2004 (four cases) the 'average arson sentence' reads **15.0 months**; in 2016 (three cases) it reads **22.3 months**.\n\nHold everything constant - the offense, the statute, the guidelines grid, the state of Minnesota - and change only the calendar year, and the 'average wildfire-arson sentence' either jumps by half or evaporates into 'not enough data.' If you saw *Wildfire arson sentences climb 50%* in a headline, you might reach for a story: a new judge, a tougher fire season, a legislative crackdown. There is none. Each year's 'average' is one, two, or three individual human sentencing decisions wearing the costume of a statistic. The movement is **sampling noise** - the law of small numbers from earlier in this module, performing live. That the Explorer won't even *compute* most of these yearly means is not a defect; it is the software refusing to lie."
+    },
+    {
+      "type": "question",
+      "title": "What changed?",
+      "body": "Between 2004 and 2016 - the only two years for which the Explorer will even compute a mean - the average sentence for arson by wildfire moved from 15.0 to 22.3 months. What changed in Minnesota sentencing law or practice to explain this swing?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "The legislature increased penalties for arson offenses between those years",
+          "Judges grew systematically harsher toward fire-setting in response to public pressure",
+          "Nothing - with only one to a few cases per year, the 'average' is a couple of individual sentences, and the swing is sampling noise",
+          "The Sentencing Guidelines Commission reclassified wildfire arson to a higher severity level"
+        ],
+        "correct": 2
+      }
+    },
+    {
+      "type": "explore",
+      "title": "The control condition: 2nd-degree burglary",
+      "body": "Now run the opposite experiment on a big cell. Clear your filters, then filter to burglary (`moc1 = B`), second degree (`moc2 = 2`). This cell holds **over 8,000 cases** - hundreds per year.\n\nStep through several years - 2004, 2010, 2016 - reading the mean of `time` for each. Every year returns a mean (there is plenty of data), and the year-to-year movement is trivial: about **25.4**, **26.1**, and **26.4 months**. Well under a 10% wobble; the mean barely flinches.\n\nSame operation, same state, same guidelines, same courts. The rare cell couldn't even produce a yearly average; this one is rock-steady. The *only* structural difference between the two is N - and because arson and burglary are both property-family offenses, you cannot even attribute the contrast to comparing wildly different kinds of crime. This pairing is the whole argument of the module compressed into two filters.",
+      "state": ["f.moc1.eq.B", "f.moc2.eq.2"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "The paired experiment",
+      "body": "The arson cell (N = 18) and the burglary cell (N > 8,000) were run through the identical year-by-year operation. Arson's thin years produced means that swung or vanished entirely; burglary's moved less than 10%. What accounts for the difference?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Burglary sentencing is governed by stricter guidelines that leave judges less discretion",
+          "Sample size alone: precision improves with the square root of N, so an 18-case cell has unstable annual means while an 8,000-case cell has stable ones",
+          "Arson is a more emotionally charged offense, producing more inconsistent judicial behavior",
+          "The burglary data contains imputed values that artificially smooth the means"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "explore",
+      "title": "One county, 148 cases",
+      "body": "Small cells are not only made by rare offenses. You can manufacture one out of the most common offenses in the state - just add geography.\n\nClear your filters and filter to **Lincoln County** alone (`county = Lincoln`), no other conditions. Lincoln County, in southwestern Minnesota, recorded **148 felony sentences across the entire nineteen-year window** - fewer than eight per year, for *all offenses combined*. Now step through adjacent years and watch the county's annual mean of `time`. Across 2001, 2002, and 2003 it reads about **33 months, then 15, then 56** - a near-fourfold swing between neighboring years, in a county averaging fewer than eight cases a year.\n\nOne caution, because the mechanism here is genuinely different and the difference matters. In the arson cell, every case was the same offense, so any year-to-year movement was *pure* sampling noise - the same quantity, measured twice, disagreeing with itself. In Lincoln County the annual swing has **two sources tangled together**: small N, *and* a reshuffling offense mix. A year holding one criminal-sexual-conduct sentence and a year holding six drug-possession sentences differ in composition, not just in sample. Both problems are real; they are not the same problem. When you meet a small geographic cell in the wild, ask which one you are looking at - usually it is both.\n\nThis is not a quirk of Minnesota. Criminologists Michael Maltz and Joseph Targonski (2002) examined county-level crime data nationally and concluded that thin county cells are so unstable and gap-ridden that they should not be used for policy analysis at all. Small places are where the both-tails artifact from the most-dangerous-equation section lives: rank Minnesota's 87 counties by average sentence length, and the emptiest counties will monopolize both ends of the list, every time, for no judicial reason whatsoever.\n\n**References**\n\nMaltz, M. D., & Targonski, J. (2002). A note on the use of county-level UCR data. *Journal of Quantitative Criminology, 18*(3), 297-318. https://doi.org/10.1023/A:1016060020848",
+      "state": ["f.county.eq.Lincoln"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "read",
+      "title": "When small N is all you have",
+      "body": "It would be convenient if the lesson ended with *never analyze small cells*. It cannot. Rare offenses are real. Small counties sentence real people. A brand-new statute produces a small cell in its first years by definition. Homicide - the offense criminologists study most - is statistically rare almost everywhere. If small N disqualified analysis, entire fields would fall silent. The criminologist Michael Maltz (1994) argued that the answer to inconvenient data is not to abstain but to *look harder at the actual cases* - to treat statistics as a magnifying glass on the data rather than a substitute for it.\n\nSo the professional stance is not avoidance; it is management. Five rules:\n\n**1. Report N beside every statistic, without exception.** The N is not metadata or a footnote; it is part of the statistic. 'Mean = 36.015' and 'Mean = 36.015, N = 4' are different claims, and only the second is honest. Formal reporting standards in the social sciences require sample sizes to accompany every reported estimate, for exactly this reason (Wilkinson & Task Force on Statistical Inference, 1999).\n\n**2. Below a small threshold - roughly N < 10 - prefer the case list to the summary.** At N = 4, the honest product is a description of four cases. Module 2 warned you that at small N, statistics dissolve into anecdotes. Invert that into a method: *when the data are anecdotes, report them as anecdotes.* Four sentences, listed, tell the truth; their mean tells a story about a phantom 36-month sentence. (This threshold rule is this course's extension of the transparency principle in the reporting standards above - a recommended practice, not a verbatim published guideline.)\n\n**3. Pool deliberately, and say what it costs.** The Explorer's full 2001-2019 window is itself a pooling decision: eighteen arson cases are analyzable *as a nineteen-year pool* even though no single year is. You can pool across years, across adjacent counties, across sibling offense codes. Statisticians call the general strategy 'borrowing strength' (Rao & Molina, 2015). But name the trade every time: pooling buys stability at the price of specificity. The nineteen-year pooled arson mean is stable - and it can no longer tell you anything about any particular year.\n\n**4. Prefer medians and ranges to means.** The median resists outliers - drag the largest sentence in a cell to triple its value and the median does not move, while the mean lurches (Bachman & Paternoster, 2017). But concede the fine print: at very small N the median is unstable too, as the fireworks cell proved, where mean and median failed *together*. Robust statistics raise the floor; they do not remove it.\n\n**5. Frame the conclusion as case description, not population estimate.** 'These four fireworks sentences averaged 36 months' is defensible - it describes what happened. 'Fireworks offenses are sentenced at 36 months in Minnesota' is not - it estimates a stable rate the data cannot support. The difference is one of grammar carrying an entire epistemology: the first sentence claims the past; the second claims the future.\n\n**References**\n\nBachman, R. D., & Paternoster, R. (2017). *Statistics for criminology and criminal justice* (4th ed.). SAGE Publications.\n\nMaltz, M. D. (1994). Deviating from the mean: The declining significance of significance. *Journal of Research in Crime and Delinquency, 31*(4), 434-463. https://doi.org/10.1177/0022427894031004005\n\nRao, J. N. K., & Molina, I. (2015). *Small area estimation* (2nd ed.). John Wiley & Sons. https://doi.org/10.1002/9781118735855\n\nWilkinson, L., & Task Force on Statistical Inference. (1999). Statistical methods in psychology journals: Guidelines and explanations. *American Psychologist, 54*(8), 594-604. https://doi.org/10.1037/0003-066X.54.8.594"
+    },
+    {
+      "type": "question",
+      "title": "The reporting decision",
+      "body": "Three filter states return the following: (A) N = 2,041, mean = 21.4 months. (B) N = 41, mean = 19.8 months. (C) N = 3, mean = 44.0 months. A report must summarize each. Which set of reporting moves follows the five rules?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Report all three means identically - a mean is a mean regardless of N",
+          "A: report the mean with N. B: report median and mean, both with N, with a caution about the thin cell. C: decline the summary statistic and list the three cases instead",
+          "Refuse to report anything for B and C, since only large samples are valid",
+          "Report C's mean most prominently, since 44.0 months is the most striking finding"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "read",
+      "title": "How statisticians formalize the doubt",
+      "body": "Everything so far has been a trained eye and a rule of thumb. You should know - as a tour, not a toolkit - that statisticians have formal instruments for the same doubt. You will not compute any of these in this course. You only need to know they exist and what question each answers, so that 'check N first' has a professional counterpart you can name.\n\n**The confidence interval** answers: *how far might this estimate reasonably be from the truth?* Instead of one number, it reports a range - and the **width** of the range is the honesty (Cumming, 2012). A large cell yields a narrow interval: the mean is pinned down. The fireworks cell would yield an interval so wide it is almost useless - and that uselessness *is the finding*. A confidence interval that spans from 'probation-length' to 'a decade' is the mathematics saying out loud what this module taught you to see: four cases cannot pin down an average. Reporting standards in the social sciences now urge interval estimates for exactly this reason - they force the uncertainty into view (Wilkinson & Task Force on Statistical Inference, 1999).\n\n**The permutation test** answers: *could chance alone have produced this pattern?* The logic is almost mischievously simple (Good, 1994). Take the arson cases and their year labels. Shuffle the labels - randomly reassign which sentence 'happened' in which year - and recompute the year-to-year swing. Do it ten thousand times. If shuffled, meaningless assignments routinely produce swings as large as the real one, then the real swing carries no information: it is what noise looks like. If the real swing dwarfs almost every shuffled one, something may actually be there. No formulas, no bell curves - just the question 'is this distinguishable from shuffling?' made mechanical.\n\n**Exact tests** answer: *what about tiny crosstabs?* When a cross-tabulation has cells with counts like 2 and 3, the standard approximations behind most tests break down. Fisher's exact test (Fisher, 1935) computes the probabilities exactly rather than approximately, and remains the standard tool for very small tables (Agresti, 2013). If you go on in statistics, this is the first tool you will be handed for fireworks-sized cells.\n\nOne closing connection. All three instruments are formalizations of the same instinct this module drilled: *small N means wide uncertainty, and wide uncertainty must be stated, not hidden.* The check-N habit is the informal edge of a formal discipline.\n\n**References**\n\nAgresti, A. (2013). *Categorical data analysis* (3rd ed.). John Wiley & Sons.\n\nCumming, G. (2012). *Understanding the new statistics: Effect sizes, confidence intervals, and meta-analysis*. Routledge.\n\nFisher, R. A. (1935). The logic of inductive inference. *Journal of the Royal Statistical Society, 98*(1), 39-82. https://doi.org/10.2307/2342435\n\nGood, P. I. (1994). *Permutation tests: A practical guide to resampling methods for testing hypotheses*. Springer-Verlag. https://doi.org/10.1007/978-1-4757-2346-5\n\nWilkinson, L., & Task Force on Statistical Inference. (1999). Statistical methods in psychology journals: Guidelines and explanations. *American Psychologist, 54*(8), 594-604. https://doi.org/10.1037/0003-066X.54.8.594"
+    },
+    {
+      "type": "question",
+      "title": "Name the tool",
+      "body": "You suspect the arson cell's year-to-year swing is nothing but noise. Which formal tool directly answers the question 'could random chance alone produce a swing this large?' - and what is its core move?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "The confidence interval - it reports the range of plausible values for a single estimate",
+          "Fisher's exact test - it computes exact probabilities for small cross-tabulation cells",
+          "The permutation test - it shuffles the year labels thousands of times to see whether meaningless reassignments produce swings as large as the real one",
+          "The standard deviation - it measures how spread out the sentences are within one year"
+        ],
+        "correct": 2
+      }
+    },
+    {
+      "type": "read",
+      "title": "Close: the refusal is a skill",
+      "body": "Take stock of what you can now do. You can explain *why* small samples mislead (they are systematically extreme - the law of small numbers). You can state the law underneath it (precision grows only with the square root of N). You can predict where small cells will appear in any ranking (both ends). You watched a rare-offense cell so thin the software wouldn't even compute its yearly averages, a 148-case county lurch from 33 to 15 to 56 months across three adjacent years, and an 8,000-case cell hold rock-steady - with nothing but sample size separating them. And you have five rules for the cases where small N is all there is - including the most counterintuitive rule in this course so far: sometimes the correct, gradeable, professional answer is to **decline to report a statistic**.\n\nThat refusal is not evasion. It is a skill, and in this module you practiced it in the lowest-stakes territory imaginable - fireworks, wildfires, one small county. Module 11 raises the stakes: you will apply this entire toolkit to sentencing gaps between demographic groups, where a thin cell does not just produce a silly number - it produces a silly number that *looks like evidence about people*. The N-check you built here is the guardrail you will stand behind there.\n\nOne last habit before the checkpoint: from this module forward, no statistic you report in this course - in a lab answer, a discussion post, or your capstone - appears without its N. Ever."
+    },
+    {
+      "type": "checkpoint",
+      "title": "Checkpoint: rebuild the volatility demonstration",
+      "body": "In your own tab, starting from a cleared state, rebuild the geographic volatility cell unassisted: filter `county = Lincoln` and run descriptive statistics on `time`. Your filter history should show that single filter, and your N should read **148** - the small cell whose yearly mean lurched from 33 to 15 to 56 months across three adjacent years for no reason but its size.\n\nThe sandbox on the left is already filtered there, so you can check your work against it.",
+      "expect_state": ["f.county.eq.Lincoln"]
+    }
+  ]
+}

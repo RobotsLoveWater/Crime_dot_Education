@@ -1,0 +1,283 @@
+{
+  "id": "the-grid-how-a-sentence-becomes-a-number",
+  "title": "The Grid: How a Sentence Becomes a Number",
+  "description": "Minnesota built the nation's first presumptive sentencing grid in 1980. This module teaches how the grid turns a conviction into a number of months — and how to read the severity column, which turns out to be four coding systems stacked in one field. The lab reconstructs two grid cells and shows that the grid itself is visible in the standard deviation.",
+  "author": "unmanaged",
+  "order": 5,
+  "objectives": [
+    "Explain how the sentencing grid converts offense severity and criminal history into a presumptive sentence.",
+    "Decode all four code families in the severity column (Standard Grid 1–11, Sex Offender Grid A–H, Drug Offender Grid 51–59, and off-grid 'Murder 1') and identify which grid a record belongs to.",
+    "Explain why the severity column contains multiple coding regimes, using the 2002, 2006, and 2016 guideline changes.",
+    "Demonstrate, by reconstructing two grid cells, that within-cell variation in the presumptive sentence is near zero while between-cell variation is large — variance as composition."
+  ],
+  "steps": [
+    {
+      "type": "read",
+      "title": "The Promise",
+      "body": "Before 1980, a Minnesota judge sentencing a felony had enormous discretion, and the parole board — not the judge — largely decided how long a person actually stayed in prison. Two people convicted of the same offense, with the same record, could leave two courtrooms with very different futures. Reformers called this *sentencing disparity*, and by the late 1970s it had become the central complaint against American sentencing (Parent, 1988).\n\nMinnesota's answer made history. In 1978 the Legislature created the Minnesota Sentencing Guidelines Commission (Minn. Stat. § 244.09), and on May 1, 1980, Minnesota became the first state in the nation to implement *presumptive* sentencing guidelines — rules a judge is expected to follow, not merely consult (Frase, 2005). The statute states the goal directly: sentencing should be \"neutral with respect to the race, gender, social, or economic status of convicted felons\" (Minn. Stat. § 244.09, subd. 5).\n\nThe machine that delivers on this promise is a grid. Every felony sentence in this dataset — all ~294,000 of them — passed through it, around it, or was explicitly excluded from it. This module is about how that machine works, and how to recognize its fingerprints in the data.\n\n---\n\n**References (this page)**\n\nFrase, R. S. (2005). Sentencing guidelines in Minnesota, 1978–2003. *Crime and Justice, 32*, 131–219. https://doi.org/10.1086/655354\n\nParent, D. G. (1988). *Structuring criminal sentences: The evolution of Minnesota's sentencing guidelines.* Butterworth Legal Publishers.\n\nMinn. Stat. § 244.09. https://www.revisor.mn.gov/statutes/cite/244.09"
+    },
+    {
+      "type": "read",
+      "title": "The Machine Itself",
+      "body": "The grid is a lookup table with two axes.\n\n**Rows: offense severity.** Every felony (with exceptions you will meet shortly) is assigned a severity level by the Commission. The level attaches to the *conviction offense* — the offense the person was actually convicted of, not what they were originally charged with (Minn. Sentencing Guidelines § 2.A.1).\n\n**Columns: criminal history score.** A point total built mostly from prior felony convictions, running from 0 to \"6 or more\" (§ 4.A).\n\nFind the row, find the column, and the cell where they intersect contains the **presumptive sentence** — presumptive meaning \"presumed correct for the typical case.\" Each cell actually answers two questions at once:\n\n1. **Disposition — prison or probation?** A stair-step boundary called the *dispositional line* crosses the grid. Cells on one side presume an executed prison term; cells on the other presume a *stayed* sentence — probation, with the prison term held in reserve. (Module 7 covered what \"stayed\" does to the `time` variable.)\n\n2. **Duration — how many months?** Prison cells contain a fixed number of months, plus a range the judge can use without formally departing. By statute, that range runs **15 percent below to 20 percent above** the fixed duration (Minn. Stat. § 244.09, subd. 5(2)). Note the asymmetry — the law allows more room upward than downward.\n\nA judge who wants to go outside the cell must find \"substantial and compelling circumstances\" and put the reasons in writing (Minn. Stat. § 244.10, subd. 2). Departures are the subject of a later module; for now, the key fact is that they are the exception. In the typical case, the cell *is* the sentence.\n\nOne sentence to hold onto for the rest of the module: **`time` is the output of a table lookup.** That single fact predicts almost everything about the shape of this dataset.\n\n---\n\n**References (this page)**\n\nMinnesota Sentencing Guidelines Commission. (2019). *Minnesota sentencing guidelines and commentary* (§§ 2.A.1, 4.A). https://mn.gov/sentencing-guidelines/\n\nMinn. Stat. § 244.09, subd. 5(2); § 244.10, subd. 2."
+    },
+    {
+      "type": "question",
+      "title": "The Lookup",
+      "body": "A person is convicted of a severity level 4 offense and has a criminal history score of 2. Their neighbor is convicted of the *same* offense but has a criminal history score of 5. Under the guidelines, what do we expect?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Identical presumptive sentences — the offense is the same.",
+          "Different presumptive sentences — same row, different columns, different cells.",
+          "The judge chooses freely between the two cells.",
+          "The parole board decides the difference after sentencing."
+        ],
+        "correct": 1,
+        "explanation": "The presumptive sentence comes from the *cell*, and a cell is a row–column pair. Same severity + different history = different cells = different presumptive sentences. The last option describes the pre-1980 world the guidelines replaced. This cell = row × column idea is the load-bearing fact for the lab at the end of this module."
+      }
+    },
+    {
+      "type": "read",
+      "title": "One Column, Four Languages",
+      "body": "If `time` is the output of a lookup, then the severity column is half of the lookup key — arguably the most important field in the dataset. So let's look at it.\n\nOn the next page you will pull up the severity column's distribution yourself. Here is what you will find in it:\n\nNumbers from 1 to 11. Single letters A through H. Two-digit codes in the fifties. And, for 354 records, the literal text \"Murder 1.\"\n\nA reasonable first reaction: *this column is broken.* It is not. It is doing something administrative data does constantly — recording outputs from a system that reorganized itself over time, without translating the old records into the new scheme. The column is not one severity scale. It is **four coding regimes in one field**, and each one is the fingerprint of a real institutional structure. Learning to read it is learning how the sentencing system is actually built.\n\nThe rule to internalize before we decode: **when one column contains codes that look structurally different, suspect that it is recording more than one system.** Never average across them until you know what they are."
+    },
+    {
+      "type": "explore",
+      "title": "See It Yourself",
+      "body": "In the Explorer, with no filters applied, view the distribution of the severity column. Confirm the four families visually: integers (1–11), letters (A–H), the 50-series (51–59), and \"Murder 1.\"\n\nNote which single value dominates the entire column — you will need it later in this module.",
+      "state": [],
+      "focus": { "view": "info", "column": "severity" }
+    },
+    {
+      "type": "read",
+      "title": "Family 1 — The Standard Grid (Codes 1–11)",
+      "body": "The integers are the **Standard Grid**: felonies other than sex and drug offenses, ranked from Severity Level 1 (low) to 11 (high) (Minn. Sentencing Guidelines § 1.B). At the top, level 11 holds intentional second-degree murder and drive-by-shooting murder; near the bottom, level 1 holds offenses like fleeing a peace officer in a motor vehicle (§ 4.A; § 5.A).\n\nBut the grid did not always have eleven rungs. The original 1980 grid had **ten** severity levels (Parent, 1988). Effective **August 1, 2002**, the Commission inserted a new Severity Level 7 into the grid — old levels 7 through 10 became 8 through 11 (MSGC grid-changes timeline).\n\nStop and consider what that means for the data. A record coded \"7\" from 2001 and a record coded \"7\" from 2005 refer to **different rungs of different ladders.** The dataset does not carry a flag saying which scheme applies; the only way to know is the offense date. This is your first encounter in this module with a theme from the classification unit: a code is meaningless without knowing *which edition of the codebook* produced it.\n\n---\n\n**References (this page)**\n\nMinnesota Sentencing Guidelines Commission. (2019). *Minnesota sentencing guidelines and commentary* (§§ 1.B, 4.A, 5.A).\n\nParent, D. G. (1988). *Structuring criminal sentences.* Butterworth Legal Publishers."
+    },
+    {
+      "type": "question",
+      "title": "The Moving Ladder",
+      "body": "A record from 2001 shows severity level 9. A record from 2010 shows severity level 9. Based on this page, what is the safest statement?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Both offenses are equally serious — same number, same meaning.",
+          "The 2010 offense is more serious.",
+          "The codes may refer to different rungs, because the grid was renumbered in 2002 when a new level 7 was inserted.",
+          "One of the records must be a data-entry error."
+        ],
+        "correct": 2,
+        "explanation": "The 2002 insertion shifted old levels 7–10 up to 8–11. A pre-2002 '9' and a post-2002 '9' are readings from two different ladders. Neither record is an error — the *column* changed meaning underneath them."
+      }
+    },
+    {
+      "type": "read",
+      "title": "Family 2 — The Sex Offender Grid (Codes A–H)",
+      "body": "In 2006, responding to legislative pressure for longer sex-offense sentences, the Commission did something structural: it removed criminal sexual conduct and related offenses from the Standard Grid entirely and built them **their own grid**, effective for offenses committed on or after **August 1, 2006** (MSGC Sex Offenses report; Guidelines § 4.B). To keep the two grids from being confused, the new grid ranks severity by **letter**: A at the top, H at the bottom.\n\n- **Level A:** first-degree criminal sexual conduct — presumptive commitments start at 144 months even with zero criminal history (§ 4.B).\n- **Level H:** failure to register as a predatory offender — a compliance offense, and by far the highest-volume entry on this grid.\n\nCheck that against the data: H is the most common letter in the severity column (4,770 records), exactly what a high-volume, low-severity offense predicts. The letter frequencies are a fingerprint of the sex-offense caseload — many registration violations, comparatively few first-degree cases.\n\n**Now the trap.** Your severity column contains 2,501 records coded with the single letter **\"D.\"** If you are thinking about drug offenses — Minnesota's drug grid famously uses \"D\" codes — you might file these as drug cases. They are not. A *bare* letter D is Sex Offender Grid level D. The drug grid's labels are D1 through D9 — always a letter *plus* a digit — and, as you are about to see, they do not even appear as letters in this dataset. Same symbol, two grids, opposite meanings. Classification systems do not coordinate their naming conventions for your convenience.\n\n*(A note for anyone consulting current sources: effective September 15, 2021, the Commission expanded this grid to nine levels, A–I. That change postdates every record in this dataset — during our entire 2001–2019 window, the sex grid ran A through H.)*\n\n---\n\n**References (this page)**\n\nMinnesota Sentencing Guidelines Commission. (2019). *Minnesota sentencing guidelines and commentary* (§ 4.B, Sex Offender Grid).\n\nMinnesota Sentencing Guidelines Commission. (2022). *Sex offenses: Report on sentencing practices 2020–2021* (Sex Offender Grid effective date, offenses on/after Aug. 1, 2006)."
+    },
+    {
+      "type": "question",
+      "title": "The D-Trap",
+      "body": "You filter the dataset to `severity = D` and get 2,501 records. What are you looking at?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Drug offenses — D is the drug grid's letter.",
+          "Sex offenses at level D of the Sex Offender Grid.",
+          "A mix of drug and sex offenses sharing one code.",
+          "Unclassifiable records."
+        ],
+        "correct": 1,
+        "explanation": "The drug grid's codes are letter-plus-digit (D1–D9), and in this dataset they are stored numerically anyway (next page). A bare 'D' belongs to the sex grid's A–H ladder. If you got this wrong, you just experienced the exact failure mode this module exists to prevent — and you experienced it *before* it could contaminate an analysis. That is the point."
+      }
+    },
+    {
+      "type": "read",
+      "title": "Family 3 — The Drug Offender Grid (Codes 51–59)",
+      "body": "For thirty-six years, drug felonies lived on the Standard Grid alongside burglary and assault. The **2016 Drug Sentencing Reform Act** (2016 Minn. Laws ch. 160) ended that: for offenses committed on or after **August 1, 2016**, controlled-substance crimes moved onto their own **Drug Offender Grid**, with nine severity levels running from D1 (low) to D9 (high) (Guidelines § 4.C). Fifth-degree controlled substance crime — simple possession, Minn. Stat. § 152.025 — sits at **D2**. Fourth-degree sits at D4. The reform also lowered first- and second-degree drug severity by one level, a deliberate de-escalation aimed at reserving prison for higher-level offenders.\n\nBut here is the thing: the published labels D1–D9 **never appear in your severity column.** What appears instead is the 50-series: 51, 52, 53 … 59. Nine codes. Nine drug levels. The natural hypothesis is an internal encoding of 50 + level: 51 = D1, 52 = D2, and so on.\n\nA hypothesis about a coding scheme should be tested, not trusted — and this one has been. Cross-tabulating the 50-series codes against offense type in this dataset shows that **99.97% of 5X-coded records are drug offense records** (author verification against live data). The frequency pattern seals it: code 52 alone accounts for 8,711 of the roughly 12,000 fifty-series records — about 72% — and D2 is fifth-degree possession, which MSGC reporting identifies as the highest-volume drug felony in the state, the majority of all drug sentences from 2001 to 2010 (MSGC 2010 Drug Report). The most common drug crime is the most common drug code. Everything lines up.\n\nNotice what just happened, because it is the methodological heart of this course: **no public codebook told us what 51–59 means.** We recovered the meaning by triangulating the guidelines (nine levels, 2016 effective date), the statutes (which offenses sit at which level), and the data itself (offense-type composition, timing, frequency signature). When documentation runs out, structure is evidence.\n\nAnd notice the timeline consequence. The 50-series can only appear for offenses committed after August 1, 2016 — roughly the last three years of a nineteen-year dataset. About 12,000 records out of 294,000. The drug grid is a *recent annex* to the machine, and the data shows it.\n\n---\n\n**References (this page)**\n\n2016 Minn. Laws ch. 160 (Drug Sentencing Reform Act).\n\nMinnesota Sentencing Guidelines Commission. (2019). *Minnesota sentencing guidelines and commentary* (§ 4.C, Drug Offender Grid; § 5.A).\n\nMinn. Stat. § 152.025 (fifth-degree controlled substance crime).\n\nMinnesota Sentencing Guidelines Commission. (2011). *2010 drug offender report.*\n\nAuthor verification: 5X-code × offense-type cross-tabulation, MAST dataset (99.97% drug offenses)."
+    },
+    {
+      "type": "question",
+      "title": "Structure as Evidence",
+      "body": "Which single piece of evidence, on its own, is *weakest* for concluding that codes 51–59 encode drug grid levels D1–D9?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "99.97% of 5X-coded records are drug offenses.",
+          "There are exactly nine 5X codes and exactly nine drug severity levels.",
+          "5X codes appear only for offenses after August 1, 2016, the drug grid's effective date.",
+          "Code 52 dominates the 5X family, and D2 is the state's highest-volume drug felony."
+        ],
+        "correct": 1,
+        "explanation": "The nine-to-nine count match is suggestive but could be coincidence — plenty of coding schemes have nine values. The other three each tie the codes to *content*, *timing*, and *composition* respectively; they are independent checks that all point the same way. Good verification stacks multiple weak-to-strong tests rather than resting on one."
+      }
+    },
+    {
+      "type": "read",
+      "title": "Family 4 — The Case the Grid Refuses to Score",
+      "body": "Three hundred fifty-four records in this dataset carry no severity number at all — just the text **\"Murder 1.\"**\n\nFirst-degree murder in Minnesota carries a **mandatory life sentence** (Minn. Stat. § 609.185). There is no lookup to perform: no severity row, no history column, no cell, no months. The Guidelines say so in as many words: \"A severity level has not been assigned to first-degree murder because by law the punishment is a mandatory life sentence\" (Guidelines § 2.A.3 cmt.). A small set of the most serious sex offenses is excluded the same way (Minn. Stat. § 609.3455, subd. 2; Guidelines § 4.B n.2).\n\nSo the string \"Murder 1\" is not sloppy data entry. It is the dataset telling you, in the only way a severity field can, that *this case never entered the machine.* A grid outputs months; a mandatory life term has no month value; therefore the record cannot hold a number.\n\nCatch the asymmetry, because students miss it every year: **second-degree** murder sits *on* the grid — at the very top, level 11 — while **first-degree** murder is off it entirely. The most serious homicide is the one the grid does not touch. The grid governs the vast middle of felony sentencing; the extremes are governed by statute directly. Every classification system has an outside, and the outside is usually where the stakes are highest.\n\nOne practical warning follows. In this dataset the `time` field for these 354 records is not a usable duration — about 200 are blank and the rest store large placeholder values — so they must be excluded before you compute any average, or a mandatory-life case will silently inflate a mean (the zero-check from Module 7).\n\n---\n\n**References (this page)**\n\nMinn. Stat. § 609.185; § 609.3455, subd. 2.\n\nMinnesota Sentencing Guidelines Commission. (2019). *Minnesota sentencing guidelines and commentary* (§ 2.A.3 cmt.; § 4.A; § 4.B)."
+    },
+    {
+      "type": "question",
+      "title": "Reading the Refusal",
+      "body": "Why is first-degree murder stored as the string \"Murder 1\" rather than, say, severity level 12?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "The Commission never got around to ranking it.",
+          "It carries a mandatory life sentence set by statute, so the guidelines grid — which outputs months — does not apply to it.",
+          "Murder cases are sealed and their severity is confidential.",
+          "It is a data-entry error affecting 354 records."
+        ],
+        "correct": 1,
+        "explanation": "The Guidelines explicitly decline to assign it a severity level because the punishment is fixed by law (§ 2.A.3 cmt.). The record is off-grid by design. (Trivia for the curious: MSGC *worksheets* use a placeholder 'level 12' for administrative purposes — but that is a filing convention, not a grid row, and it is not what this dataset stores.)"
+      }
+    },
+    {
+      "type": "read",
+      "title": "Why the Mess Exists — and How to Test a Story About It",
+      "body": "Put the four families on a timeline and the column stops looking like chaos:\n\n- **2001–2002:** one grid, ten levels. Everything — drugs, sex offenses, assaults — is a number.\n- **Aug. 1, 2002:** the grid grows to eleven levels; the numbers are renumbered.\n- **Aug. 1, 2006:** sex offenses exit to their own lettered grid (A–H).\n- **Aug. 1, 2016:** drug offenses exit to their own grid (stored as 51–59).\n- **Throughout:** first-degree murder never enters at all (\"Murder 1\").\n\nYour severity column is a **geological cross-section** of a system that reorganized itself twice during the observation window. Nobody went back and re-labeled the old strata. This is the funnel lesson from the classification unit at full force: the same underlying conduct gets *translated* into different codes depending on when it passed through the court stage. The conduct did not change. The filing cabinet did.\n\nThat story makes a sharp, checkable prediction. Look back at the distribution: severity level 2 dominates the entire column at 28.7% — 84,511 records. Why? The hypothesis: before August 2016, the state's highest-volume felony — fifth-degree drug possession — was ranked at the *low numeric levels of the Standard Grid*, inflating them. After August 2016, those cases exit to the 50-series. If that is right, level 2's annual volume should **drop sharply after 2016**, with the 50-series rising to absorb the difference — a conservation law for cases.\n\nDo not take the story's word for it.\n\n---\n\n**References (this page)**\n\nTimeline entries: sources as cited on the four family pages above."
+    },
+    {
+      "type": "explore",
+      "title": "The Migration",
+      "body": "Filter to severity level 2 and examine its volume by year. Then filter to the 50-series codes and do the same. You are looking for a hinge at 2016–2017: level 2 deflating, the 50-series appearing from nothing.\n\nWhat you are watching is not crime changing. It is classification changing.",
+      "state": ["f.severity.eq.2"],
+      "focus": { "view": "info", "column": "sentyear" }
+    },
+    {
+      "type": "read",
+      "title": "Lab Setup — The Grid Is Visible in the Standard Deviation",
+      "body": "Now the payoff. Modules 2 and 10 introduced the idea that a standard deviation is not just noise — it has *composition*. Some of the spread in any column comes from genuinely different cases being pooled together, and some from variation within like cases. This dataset offers one of the cleanest demonstrations of that idea you will ever see, because we know — from law, not from statistics — exactly how sentences are generated: a table lookup.\n\nThink about what a lookup implies. If every typical case in a cell receives the cell's presumptive sentence, then *within one cell*, the presumptive sentence should barely vary at all. The standard deviation should collapse toward zero. Between cells, meanwhile, the means should jump — that jump *is* the grid's structure.\n\nOne precision matters before you touch the filters: **a cell is severity AND criminal history.** Filtering on severity alone pools all seven history columns — and the presumptive sentence rises steadily across those columns, so a severity-only filter produces a *large* standard deviation. That is not a failed demonstration; it is the wrong unit of analysis. The grid's determinism only becomes visible at the resolution the grid actually operates at: the cell.\n\nTwo honest caveats, so you are not surprised by what you see:\n\n1. If you summarize *pronounced* sentences rather than presumptive ones, the within-cell spread will be small but not zero — the −15%/+20% range and departures scatter real sentences around the cell value. (That residual scatter is a preview of the departures module.)\n2. Pooling 2001–2019 pools multiple guideline editions; a cell's presumptive value was re-tuned over the years. The small variance that remains is itself evidence that the grid *moved*.\n\n---\n\n**References (this page)**\n\nMinn. Stat. § 244.09, subd. 5(2) (presumptive range).\n\nMinnesota Sentencing Guidelines Commission. (2019). *Minnesota sentencing guidelines and commentary* (§ 4.A)."
+    },
+    {
+      "type": "explore",
+      "title": "Lab — Reconstruct Two Cells",
+      "body": "**Part 1.** Filter to Standard Grid records only (numeric severity), severity level **8**, criminal history score **0**. Record the count, mean, and standard deviation of `time`.\n\n**Part 2.** Revert. Filter to severity **8**, criminal history **3**. Record the same three numbers.\n\n**Part 3.** Compare: within each cell, how big is the standard deviation relative to the mean? Between the cells, how far apart are the means?\n\n(These two cells sit on the same row of the Standard Grid and differ only in criminal history, so the comparison is clean: one axis moves, the other is held fixed.)",
+      "state": ["f.severity.eq.8", "f.history.eq.0"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "The Comparison, Part 1 (live-graded)",
+      "body": "What is the standard deviation of `time` inside Cell A — severity level 8, criminal history score 0? (Read it off the statistics panel and enter it to two decimals.)",
+      "require_answer": true,
+      "state": ["f.severity.eq.8", "f.history.eq.0"],
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "std", "column": "time" },
+        "tolerance": 0.1
+      }
+    },
+    {
+      "type": "question",
+      "title": "The Comparison, Part 2 (live-graded)",
+      "body": "Now Cell B — severity level 8, criminal history score 3. What is the **mean** of `time` in Cell B? (Set it beside Cell A's mean: the gap between them is the grid's structure — how far the presumptive sentence jumps when only criminal history changes.)",
+      "require_answer": true,
+      "state": ["f.severity.eq.8", "f.history.eq.3"],
+      "answer": {
+        "type": "numeric",
+        "compute": { "stat": "mean", "column": "time" },
+        "tolerance": 0.1
+      }
+    },
+    {
+      "type": "question",
+      "title": "The Comparison, Part 3",
+      "body": "The within-cell standard deviations are far smaller than the gap between the cell means. What is the best interpretation?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Judges in these cells are unusually consistent people.",
+          "The variance of sentences is mostly *composition* — which cell a case falls in — because the grid assigns nearly the same sentence to every typical case within a cell.",
+          "The dataset has too little data inside each cell to show variation.",
+          "Sentences are random, and the pattern is coincidence."
+        ],
+        "correct": 1,
+        "explanation": "You are seeing a law, not a coincidence. The grid fixes the within-cell value (up to the statutory range and departures), so nearly all the variation in sentences across the dataset lives *between* cells. The grid is not hiding in the data — at this resolution, the grid *is* the variance."
+      }
+    },
+    {
+      "type": "read",
+      "title": "What the Severity Code Cannot Tell You",
+      "body": "You can now read the machine's most important input. Worth being precise about what you have and have not learned about any given case.\n\nThe severity code records **which grid and which rung** — a bureaucratic address. It does not record the facts: not what happened, not the harm done, not whether the case was violent or desperate or ambiguous. Two records at severity level 6 may describe events that a victim, a defendant, and a juror would consider profoundly different; the code deems them \"equally serious\" by definition (Guidelines § 1.B), because that is what a classification *is* — a decision to treat different things as the same for a purpose.\n\nAnd remember which cases the column refuses to describe at all. The 354 records reading \"Murder 1\" are the most serious cases in the dataset, and they are precisely the ones with no number. The machine's silence is itself information.\n\nNext module, we put the second key in the lock: the criminal history score — where the *past* gets quantified.\n\n---\n\n**References (this page)**\n\nMinnesota Sentencing Guidelines Commission. (2019). *Minnesota sentencing guidelines and commentary* (§ 1.B)."
+    },
+    {
+      "type": "question",
+      "title": "Checkpoint 1 — Four Families",
+      "body": "Match the code family to its home. Which of the following pairings is INCORRECT?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Codes 1–11 → the Standard Grid.",
+          "Codes A–H → the Sex Offender Grid.",
+          "Codes 51–59 → the Drug Offender Grid.",
+          "\"Murder 1\" → the top row of the Standard Grid."
+        ],
+        "correct": 3,
+        "explanation": "First-degree murder is not on any grid — it carries a mandatory life sentence and the Guidelines explicitly assign it no severity level. The top row of the Standard Grid (level 11) belongs to second-degree intentional murder. The other three pairings are correct."
+      }
+    },
+    {
+      "type": "question",
+      "title": "Checkpoint 2 — The Bare D",
+      "body": "A record is coded severity \"D.\" Which grid does it belong to, and what mistake does this code invite?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "The Drug Offender Grid; the mistake is treating it as a sex offense.",
+          "The Sex Offender Grid; the mistake is treating it as a drug offense because the drug grid's published labels also use the letter D.",
+          "The Standard Grid; the mistake is treating it as a letter grade.",
+          "No grid; the mistake is treating it as valid data."
+        ],
+        "correct": 1,
+        "explanation": "A bare letter D is Sex Offender Grid level D. The drug grid's labels are D1–D9 (letter plus digit), and in this dataset drug levels are stored as 51–59 anyway. The shared symbol across two grids is exactly the kind of naming collision that classification systems produce."
+      }
+    },
+    {
+      "type": "question",
+      "title": "Checkpoint 3 — The Collapsing Standard Deviation",
+      "body": "Why should the standard deviation of the presumptive sentence be near zero *within* a single grid cell?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Because sentences are rounded to the nearest month.",
+          "Because the cell fixes the presumptive sentence for every typical case in it, so variation lives between cells, not within them.",
+          "Because small samples always have small standard deviations.",
+          "Because judges are required to report identical numbers."
+        ],
+        "correct": 1,
+        "explanation": "The grid is a lookup: one cell, one presumptive value (plus the statutory range and departures). Nearly all variation in presumptive sentences across the dataset is therefore *between-cell* — composition. Note that option C is false in general, and Module 10 showed why small samples are actually more volatile, not less."
+      }
+    },
+    {
+      "type": "question",
+      "title": "Checkpoint 4 — Verifying a Coding Scheme",
+      "body": "No public codebook documents what the 50-series codes mean. Which pair of dataset checks did the most work in verifying that 5X = drug grid levels?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Offense-type composition (99.97% of 5X records are drug offenses) and effective-date timing (5X appears only after August 1, 2016).",
+          "Alphabetical ordering and column position.",
+          "The number of records and the number of counties.",
+          "The mean sentence length and the modal sentence length."
+        ],
+        "correct": 0,
+        "explanation": "Content and timing are the two independent checks that tie the codes to the drug grid: the records are drug offenses, and they appear exactly when the drug grid took effect. The frequency signature (52's dominance matching fifth-degree possession's volume) is a strong third. When documentation runs out, structure is evidence."
+      }
+    },
+    {
+      "type": "read",
+      "title": "Full Module Reference List",
+      "body": "Frase, R. S. (2005). Sentencing guidelines in Minnesota, 1978–2003. *Crime and Justice, 32*, 131–219. https://doi.org/10.1086/655354\n\nMinn. Stat. § 152.025. Controlled substance crime in the fifth degree. https://www.revisor.mn.gov/statutes/cite/152.025\n\nMinn. Stat. § 244.09. Minnesota Sentencing Guidelines Commission. https://www.revisor.mn.gov/statutes/cite/244.09\n\nMinn. Stat. § 244.10. Presumptive sentence; departures.\n\nMinn. Stat. § 609.185. Murder in the first degree. https://www.revisor.mn.gov/statutes/cite/609.185\n\nMinn. Stat. § 609.3455. Dangerous sex offenders; life sentences.\n\nMinnesota Sentencing Guidelines Commission. (2011). *2010 drug offender report.*\n\nMinnesota Sentencing Guidelines Commission. (2019). *Minnesota sentencing guidelines and commentary* (effective August 1, 2019). https://mn.gov/sentencing-guidelines/\n\nMinnesota Sentencing Guidelines Commission. (2022). *Sex offenses: Sentencing practices, 2020–2021.*\n\nMinnesota Sentencing Guidelines Commission. (2024). *2023 sentencing practices: Annual summary statistics for felony cases.*\n\nParent, D. G. (1988). *Structuring criminal sentences: The evolution of Minnesota's sentencing guidelines.* Butterworth Legal Publishers.\n\n2016 Minn. Laws ch. 160 (Drug Sentencing Reform Act)."
+    },
+    {
+      "type": "checkpoint",
+      "title": "Checkpoint 5 — Prove You Can Read the Column",
+      "body": "Filter the dataset to severity level H. Confirm the record count matches the figure from the Sex Offender Grid page, and consider why this level dominates the letter codes before you check your answer against the explanation on that page: level H is failure to register as a predatory offender — a high-volume compliance offense, not a high-severity one.\n\nYour filter history should show the single severity filter applied.",
+      "state": ["f.severity.eq.H"],
+      "expect_state": ["f.severity.eq.H"],
+      "focus": { "view": "info", "column": "severity" }
+    }
+  ]
+}
