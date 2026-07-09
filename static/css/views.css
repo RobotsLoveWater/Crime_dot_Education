@@ -529,6 +529,44 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Geographic map input (Phase 11) ---------- */
+/* The map is a JS-only pointer shortcut for the value list / input beside it — the list
+   stays the complete (and no-JS / screen-reader) path. Beside the categorical picker at
+   desktop width, stacked below it otherwise. */
+@media (min-width: 1024px) {
+  .filter-geo-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: stretch;
+  }
+  .filter-geo-split .value-picker,
+  .filter-geo-split .filter-map {
+    margin-bottom: var(--space-4); /* keep the pair's bottom edge aligned */
+  }
+}
+.filter-map {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.filter-map-hint {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+/* Chart.js responsive sizing needs a positioned, fixed-height box (like .viz-map-box);
+   MN is elongated N–S, so give it room. */
+.filter-map-box {
+  position: relative;
+  height: 400px;
+}
+@media (max-width: 767px) {
+  .filter-map-box { height: 300px; }
+}
+
 /* ---------- MOC stepper (Phase 4) ---------- */
 .moc-stepper {
   list-style: none;
@@ -625,6 +663,330 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
 .moc-option-reset td {
   color: var(--color-text-muted);
 }
+
+/* ---------- Visualize workbench (Phase 3 shell) ---------- */
+/* builder (left) + canvas (right); stacks under 768px */
+.visualize-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+.visualize-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.visualize-canvas {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* vertically centers the empty-state; a result fills instead */
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1); /* --shadow-1 is none in dark; the border carries elevation */
+}
+@media (max-width: 767px) {
+  .visualize-layout { grid-template-columns: 1fr; }
+}
+
+/* a rendered chart + its companion value table fill the canvas width */
+.viz-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.viz-result .chart-card { margin-bottom: 0; }
+.chart-subhead {
+  font-weight: 400;
+  font-size: var(--fs-md);
+  color: var(--color-text-muted);
+}
+/* pies read best roughly square; the box is positioned for Chart.js responsive sizing */
+.viz-pie-box {
+  height: 360px;
+  margin-top: var(--space-3);
+}
+/* the treemap fills a wider, rectangular box; the plugin sizes to the container */
+.viz-treemap-box {
+  height: 440px;
+  margin-top: var(--space-3);
+}
+@media (max-width: 767px) {
+  .viz-treemap-box { height: 360px; }
+}
+
+/* the waterfall is wide and rectangular; floating bars need vertical room to read */
+.viz-waterfall-box {
+  height: 420px;
+  margin-top: var(--space-3);
+}
+@media (max-width: 767px) {
+  .viz-waterfall-box { height: 340px; }
+}
+.viz-waterfall-controls {
+  margin-top: var(--space-4);
+}
+.wf-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.wf-toggle input {
+  accent-color: var(--color-accent); /* themes the checkbox in both light and dark */
+  cursor: pointer;
+}
+/* direction cues share the up/down tokens with the bars, so the note key, the table
+   Change column, and the chart all read the same color language */
+.wf-key { font-weight: 600; }
+.wf-key-up { color: var(--color-success); }
+.wf-key-down { color: var(--color-danger); }
+.wf-delta { font-variant-numeric: tabular-nums; }
+.wf-delta-up { color: var(--color-success); }
+.wf-delta-down { color: var(--color-danger); }
+
+/* scatter / bubble (Phase 12): a wide, roughly square lattice; the box is positioned for
+   Chart.js responsive sizing (like the pie/treemap boxes) */
+.viz-scatter-box {
+  height: 460px;
+  margin-top: var(--space-3);
+}
+@media (max-width: 767px) {
+  .viz-scatter-box { height: 360px; }
+}
+
+/* ---------- Choropleth map (Phase 8) ---------- */
+/* MN is elongated N–S; the plugin fits the geometry to this box (Chart.js responsive sizing
+   needs a positioned box, provided by .chart-box). */
+.viz-map-box {
+  height: 480px;
+  margin-top: var(--space-3);
+}
+@media (max-width: 767px) {
+  .viz-map-box { height: 380px; }
+}
+
+/* legend: the same 0→peak 8-step ramp the crosstab heatmap uses (.heat-1..8), plus a no-data
+   chip. visualize.js reads the swatch colors so map + legend + crosstab stay in lockstep. */
+.viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin-top: var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.viz-legend-caption { font-weight: 600; color: var(--color-text); }
+.viz-legend-scale {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.viz-legend-end { font-variant-numeric: tabular-nums; }
+.viz-legend-ramp {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden; /* clip the swatches to the rounded corners for one continuous bar */
+}
+.viz-legend-ramp > span {
+  width: 26px;
+  height: 14px;
+}
+.viz-legend-nodata {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* the low-N chip is hidden (JS) when the hatch toggle is off — the class sets an explicit
+   display, so the [hidden] attribute needs this higher-specificity rule to actually hide it. */
+.viz-legend-nodata[hidden] { display: none; }
+.viz-legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+.viz-legend-nodata-swatch { background: var(--color-border); }
+/* small-N texture (Phase 10): a hatched swatch marks the "fewer than N cases" chip. The
+   diagonal stripes (muted lines over the surface) mirror the CanvasPattern visualize.js fills
+   thin geographies with — texture, not solid grey, so a thin sample reads as uncertain rather
+   than confidently colored. Both colors are tokens, so both themes work. */
+.viz-legend-lown-swatch {
+  background:
+    repeating-linear-gradient(45deg,
+      var(--color-surface) 0, var(--color-surface) 2px,
+      var(--color-text-muted) 2px, var(--color-text-muted) 3px);
+}
+/* "Low sample" tag in the companion table — the a11y/no-JS echo of the map texture. */
+.viz-lown-tag { margin-left: var(--space-1); vertical-align: middle; white-space: nowrap; }
+/* "Hatch thin samples" toggle row, under the legend. */
+.viz-map-controls { margin-top: var(--space-3); }
+/* "Keep only" mini-form in the companion table (Phase 11): the keyboard / no-JS path to
+   the same filter a map click applies. */
+.viz-keep-cell { text-align: right; white-space: nowrap; }
+.viz-keep-form { margin: 0; display: inline-block; }
+
+/* grain (map level) toggle: county / judicial district / region. Reuses the .segmented
+   component; spaced under the map heading and kept compact (shrinks to its content). */
+.viz-grain {
+  margin: var(--space-3) 0 var(--space-2);
+  width: fit-content;
+  max-width: 100%;
+}
+
+/* ---------- Reusable "Other"-cutoff slider (Phase 4) ---------- */
+.bucket-slider {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 340px;
+  margin-top: var(--space-4);
+}
+.bucket-slider label {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--color-text);
+}
+.bucket-slider output {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.bucket-slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-accent); /* themes track + thumb in both light and dark */
+  cursor: pointer;
+}
+.bucket-slider .field-hint { margin: 0; }
+
+/* ---------- Correlation matrix (Phase 13) ---------- */
+/* Builder: a searchable checkbox multiselect over the numeric columns. Reset the fieldset so
+   it reads like the other .field blocks. */
+.viz-corr-field {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+  min-inline-size: 0; /* let the fieldset shrink inside the builder grid */
+}
+.viz-corr-field legend {
+  padding: 0;
+  font-weight: 500;
+  color: var(--color-text);
+}
+.corr-picker { margin-top: var(--space-2); }
+.corr-picker-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.corr-picker-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.corr-picker-count {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.corr-options {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1);
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 2px;
+}
+.corr-option { margin: 0; }
+.corr-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.corr-check:hover { background: var(--color-accent-subtle); }
+.corr-check input {
+  accent-color: var(--color-accent); /* themes the box in both light and dark */
+  cursor: pointer;
+  flex: none;
+}
+.corr-code {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+
+/* Teaching callout above the matrix: the grid-mechanical pairs, spelled out as text. */
+.corr-callout {
+  margin: var(--space-3) 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-accent-subtle);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+}
+.corr-callout p { margin: 0; }
+.corr-pair { font-weight: 600; white-space: nowrap; }
+
+/* The matrix: reuses .data-table + the .heat-N ramp. Values are centered and tabular; the row
+   header sticks left inside the scroll wrapper (like the crosstab), so a scrolled matrix keeps
+   its labels. The heat shade is the signal, so suppress the row-hover wash — same as .crosstab. */
+.corr-matrix th.num,
+.corr-matrix td.num { text-align: center; }
+.corr-matrix td.corr-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 3.25rem;
+}
+.corr-matrix tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-surface);
+  box-shadow: inset -1px 0 0 var(--color-border);
+  text-align: left;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.corr-matrix thead th.corr-corner {
+  left: 0;
+  z-index: 2;
+  box-shadow: inset -1px -1px 0 var(--color-border);
+}
+.corr-matrix tbody tr:hover { background: transparent; }
+/* Negative cells: the "−" in the number carries direction, but a single-hue ramp can't, so add
+   a non-color cue (a dotted underline) so sign is legible even scanning shades alone. */
+.corr-matrix td.corr-neg {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+/* Near-mechanical marker: the ● dot beside the value (in currentColor, so it flips to
+   --color-on-accent on the dark high steps like the text). The callout + tooltip carry the why. */
+.corr-flag {
+  margin-left: 0.2em;
+  font-size: 0.7em;
+  vertical-align: super;
+  line-height: 0;
+}
+.corr-flag-key { white-space: nowrap; }
 
 /* ---------- Lessons: catalog + overview (Phase 5) ---------- */
 .lesson-grid {

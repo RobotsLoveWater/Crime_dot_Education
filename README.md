@@ -29,6 +29,13 @@ developed toward a grant, with an emphasis on **education and public disseminati
   value, plus mean / median / std for numeric columns, in several sort orders.
 - **Cross-tabulation tables.** N, mean, median, and std of a dependent variable across two
   grouping columns.
+- **Visualize workbench.** A dedicated chart tab over the current filtered slice: pie, treemap,
+  and waterfall (year-over-year) charts; a county / judicial-district / region **choropleth** map
+  (with small-sample geographies shown as texture, not a confident color); an aggregated
+  scatter/bubble view; and a correlation matrix across a chosen set of numeric columns.
+  **Map-as-filter:** clicking a map shape — on the Visualize tab or in the Filter view — applies
+  the exact filter typing it would, so exploring geography and filtering by it are the same
+  action.
 - **Guided learning modules.** Author-written lessons ("preset data views with commentary")
   made of `read` / `explore` / `question` / `checkpoint` steps, run beside a live read-only view
   of the data they describe. `explore` steps reconstruct a specific filtered dataset; `question`
@@ -113,7 +120,8 @@ limitations (see [`ROADMAP.md`](ROADMAP.md) and [`CLAUDE.md`](CLAUDE.md) for the
   environment variable — but there is no rate-limiting or account lockout, no HTTPS enforcement,
   and the `edu-` **educator role is self-selectable at sign-up** (a classroom-trust convenience,
   not a public-internet trust boundary). Harden further before any deployment with real data.
-- **Charts are in the web UI** (Chart.js distributions and grouped-bar crosstab companions), but
+- **Charts are in the web UI** — Chart.js distributions, grouped-bar crosstab companions, and the
+  **Visualize tab's** pie/treemap/waterfall/choropleth/scatter/correlation-matrix vocabulary — but
   the CLI's Seaborn figure export has not been reintroduced (its dependencies remain).
 - Some engine operations remain **stubbed** — AND / OR-across-different-columns filters (the `a`
   and `d` action codes) are not implemented.

@@ -37,6 +37,7 @@ import account
 import classroom
 import lessons
 import analytics
+import geo
 
 from data import Data
 
@@ -87,6 +88,17 @@ except Exception as _base_exc:  # noqa: BLE001 — never let a missing base bloc
         'Base DataFrame not preloaded at import (%s); falling back to lazy per-request load.',
         _base_exc,
     )
+else:
+    # Geo foundation startup assertion (VISUALIZATION_EXPANSION.md §4 / _PROMPTS.md Phase 7):
+    # once the base is loaded, EVERY dataset county must map to exactly one map feature, or
+    # a choropleth would silently drop a county. A mismatch is a real bug (data/geometry
+    # drift), so — unlike a merely-missing base above — let it propagate and fail startup
+    # loudly. Warming the crosswalk here also verifies its groupby succeeds. This runs only
+    # when the base actually loaded; a base-less dev machine skips it (it can't build a map
+    # anyway) rather than crashing the landing page.
+    geo.assert_county_coverage(cache.county_values())
+    cache._county_crosswalk()
+    app.logger.info('MN county->feature join verified for all 87 counties; crosswalk warmed.')
 
 # sort orders for the statistics value table: internal key -> student-facing label
 SORT_OPTIONS = [
@@ -641,16 +653,57 @@ def build_column_browser(data):
             for name in sorted(groups, key=lambda n: (rank.get(n, len(rank)), n))]
 
 
-def build_chart(column_info, top=20):
-    # distribution chart payload: top-N values by case count plus an "Other" bucket;
-    # the value table below the chart carries every value
-    by_count = sorted(column_info['each'], key=lambda e: e['num'], reverse=True)
+# Hard caps on individually-drawn slices/bars for the reusable "Other"-cutoff control
+# (VISUALIZATION_EXPANSION.md Phase 4). The bar tolerates a longer tail than a pie before
+# "Other" takes over, but neither ever draws the full 161-value long tail (STYLEGUIDE:
+# "no 161 slices"). Defaults are the no-JS/initial cutoff; the slider re-slices the head.
+BAR_DEFAULT_CUTOFF, BAR_HARD_CAP = 20, 20
+PIE_DEFAULT_CUTOFF, PIE_HARD_CAP = 8, 12
+# The treemap caps the number of individually-drawn PARENT groups (the top-level nesting);
+# the slider re-slices that head client-side and the tail folds into "Other". A treemap
+# tolerates more top-level groups than a pie before it gets unreadable, but never the full
+# 161-value long tail. Children (the second column) render in full under each shown parent.
+TREEMAP_DEFAULT_CUTOFF, TREEMAP_HARD_CAP = 10, 30
+
+
+def bucket_payload(each, default_cutoff, hard_cap):
+    # Package a column's value counts as a top-N + "Other" chart payload the reusable
+    # slider (static/js/otherbucket.js) can re-slice entirely client-side. Only the top
+    # `hard_cap` values ship as individually-drawable marks; everything past the cap is
+    # folded into a residual (tailCount + tailValues) so "Other" stays exact at any cutoff
+    # without a refetch. Also emits a server-side default bucketing
+    # (labels/counts/other/otherValues) for the no-JS fallback and the template chart-note.
+    by_count = sorted(each, key=lambda e: e['num'], reverse=True)
+    capped, tail = by_count[:hard_cap], by_count[hard_cap:]
+    values = [{'label': display_value(e['value']), 'count': e['num']} for e in capped]
+    tail_count = sum(e['num'] for e in tail)
+
+    slider_max = len(values)
+    slider_min = min(3, slider_max)
+    cutoff = max(slider_min, min(default_cutoff, slider_max))
+
+    head, rest = values[:cutoff], values[cutoff:]
     return {
-        'labels': [display_value(e['value']) for e in by_count[:top]],
-        'counts': [e['num'] for e in by_count[:top]],
-        'other': sum(e['num'] for e in by_count[top:]),
-        'otherValues': len(by_count) - min(len(by_count), top)
+        'values': values,               # capped head, client-sliceable
+        'tailCount': tail_count,         # summed counts beyond the cap
+        'tailValues': len(tail),         # distinct values beyond the cap
+        'total': sum(e['num'] for e in by_count),  # all non-missing cases (share base)
+        'cutoff': cutoff,
+        'sliderMin': slider_min,
+        'sliderMax': slider_max,
+        # server-rendered default bucketing (no-JS + chart-note)
+        'labels': [v['label'] for v in head],
+        'counts': [v['count'] for v in head],
+        'other': tail_count + sum(v['count'] for v in rest),
+        'otherValues': len(rest) + len(tail),
     }
+
+
+def build_chart(column_info, default_cutoff=BAR_DEFAULT_CUTOFF, hard_cap=BAR_HARD_CAP):
+    # distribution bar payload (Explore + lesson data): top-N values by case count plus an
+    # "Other" bucket, now carrying the reusable-slider fields so the bar's cutoff is
+    # draggable. The value table below the chart still carries every value.
+    return bucket_payload(column_info['each'], default_cutoff, hard_cap)
 
 
 def render_explore(column=None, sorting='occurrence'):
@@ -981,6 +1034,76 @@ def numeric_value_error(values):
     return None
 
 
+def safe_return_target(raw):
+    # A post-apply redirect override (the `next` form field a Visualize map-click / "Keep
+    # only" apply sends so the drill-down lands back on the map) must stay on this site:
+    # accept only an absolute local path — no scheme, no host, no protocol-relative '//',
+    # and no backslashes (some browsers normalize '/\' to '//', reopening the redirect).
+    if not raw or not raw.startswith('/') or raw.startswith('//') or '\\' in raw:
+        return None
+    parsed = urllib.parse.urlparse(raw)
+    if parsed.scheme or parsed.netloc:
+        return None
+    return raw
+
+
+# ---- Geographic map input (Phase 11) ----
+# The three geography columns get a map INPUT beside their value picker: clicking a shape
+# toggles the SAME checkbox (county/region) or fills the SAME numeric input (district) a
+# hand-picked filter uses — the map never builds its own token, so the applied filter (and
+# therefore the cache/data/ dir) is byte-identical to the list/typed path by construction.
+# JS-only enhancement: the value list / input stays the complete no-JS and screen-reader
+# path, with the same names and per-value counts as text.
+GEO_FILTER_GRAINS = ('county', 'district', 'region')  # column name == choropleth grain id
+
+
+def build_filter_map(column, info):
+    # Payload for the Filter view's map input. `values` is keyed by MAP FEATURE key (the
+    # TopoJSON county name, or the dissolved group key for district/region) and carries the
+    # DATASET value the click must toggle/fill — for the alias counties ("LeSueur",
+    # "Lac Qui Parle") the two spellings differ, and a district's value is the float-string
+    # its token encodes ("4.0"). Only values present in the current slice are clickable,
+    # exactly mirroring the checkbox list / input the map drives (an absent value has no
+    # checkbox, so its shape is inert — same reach by map or by list).
+    grain = column
+    dissolve, group_labels = None, None
+    if grain != 'county':
+        dissolve, group_labels = build_geo_dissolve(grain)
+
+    values = {}
+    for row in info['each']:
+        if grain == 'county':
+            key = geo.resolve_county(row['value'])
+            if key is None:                # unreconciled county (coverage asserted) — inert
+                continue
+            label = display_value(row['value'])
+        else:
+            key = _grain_key(row['value'], grain)
+            label = group_labels.get(key) or _grain_label(row['value'], grain)
+        # _grain_key is the dataset value as the form encodes it: the county/region string
+        # verbatim, the district float as "4.0" — identical to the checkbox value attribute
+        # / what a hand-typed "4.0" submits (pinned by test_map_filter_equivalence.py).
+        values[key] = {'value': _grain_key(row['value'], grain),
+                       'label': label,
+                       'count': row['num']}
+
+    grain_noun, grain_plural = CHOROPLETH_GRAIN_NOUNS[grain]
+    return {
+        'column': column,
+        'grain': grain,
+        # 'multi' toggles checkboxes in the categorical list; 'single' fills the numeric
+        # value input (district's filter form) and forces the comparison to "equal to".
+        'mode': 'single' if info['numeric'] else 'multi',
+        'grainLabel': grain_noun,
+        'grainLabelPlural': grain_plural,
+        'topoUrl': url_for('static', filename=geo.TOPOJSON_STATIC),
+        'object': geo.TOPOJSON_OBJECT,
+        'dissolve': dissolve,          # {feature: group key} for district/region; None county
+        'groupLabels': group_labels,   # {group key: label} so sliceless groups still name themselves
+        'values': values,
+    }
+
+
 def render_filter(column=None, error=None):
     # Shared renderer for the filter workbench (same pattern as render_explore /
     # render_compare): full page normally, just the view fragment on htmx requests.
@@ -1006,6 +1129,10 @@ def render_filter(column=None, error=None):
             'header': CODEBOOK.codebook[column],
             'missing': missing,
         })
+        # geography columns get the map input beside the value picker (Phase 11); skipped
+        # when the slice is empty / valueless — those states short-circuit before the form
+        if column in GEO_FILTER_GRAINS and data['entries'] > 0 and info['each']:
+            context['filter_map'] = build_filter_map(column, info)
         partial = 'partials/filter_column.html'
     else:
         partial = 'partials/filter_landing.html'
@@ -1064,8 +1191,12 @@ def explore_filter_column(column):
         remaining = get_data(session)['entries']
         flash('Filter applied — {:,} cases remain.'.format(remaining), 'success')
         # land back on the view we came from (not a bare redirect home): the same filter
-        # column view, now showing updated chips, refreshed counts, or the zero-case state
-        return redirect(url_for('explore_filter_column', column=column))
+        # column view, now showing updated chips, refreshed counts, or the zero-case state.
+        # A Visualize map-click / "Keep only" apply (Phase 11) rides this same handler —
+        # same validation, same make_history entry, same cache dir — and passes a validated
+        # local `next` so its redirect returns to the map and the drill-down loop continues.
+        target = safe_return_target(request.form.get('next'))
+        return redirect(target or url_for('explore_filter_column', column=column))
 
     return render_filter(column)
 
@@ -1362,6 +1493,882 @@ def download():
         return crosstab_csv(measure, rows, cols)
     else:
         return not_logged_in()
+
+
+# ---------------------------------------------------------------------------
+# Visualize workbench (VISUALIZATION_EXPANSION.md): a blank-canvas chart builder
+# over the current data state. Phase 3 is the shell — the route family, the
+# fragment plumbing, the sidebar sync, and an empty builder. Chart families
+# (pie / treemap / waterfall / choropleth / scatter / correlation) plug their
+# render in across Tiers 2–4; until a type is built the canvas shows a "coming
+# soon" placeholder, but its selection is already URL-encoded so hard refresh and
+# lesson deep links work from day one. Nothing here computes off the active
+# history yet (that starts with the real charts).
+# ---------------------------------------------------------------------------
+
+# The chart-type registry. `status` gates the canvas: 'coming' shows the placeholder,
+# flipped to 'ready' as each tier lands. Order = builder display order.
+VIZ_CHART_TYPES = [
+    {'id': 'pie',         'label': 'Pie',                'status': 'ready',
+     'blurb': 'Share of cases across one categorical column.'},
+    {'id': 'treemap',     'label': 'Treemap',            'status': 'ready',
+     'blurb': 'Two columns nested as proportional areas.'},
+    {'id': 'waterfall',   'label': 'Waterfall',          'status': 'ready',
+     'blurb': 'Year-over-year change in a count, mean, or median across sentencing years.'},
+    {'id': 'choropleth',  'label': 'Map (choropleth)',   'status': 'ready',
+     'blurb': 'Minnesota counties shaded by case count, mean, median, or mode.'},
+    {'id': 'scatter',     'label': 'Scatter / bubble',   'status': 'ready',
+     'blurb': 'Two numeric columns as an aggregated lattice; case count sizes the dots.'},
+    {'id': 'correlation', 'label': 'Correlation matrix', 'status': 'ready',
+     'blurb': 'Pearson correlations across a numeric subset, drawn as a heatmap.'},
+]
+
+# Aggregate picker options: student-facing labels over Phase 1's Data.VALID_AGGREGATES.
+VIZ_AGGREGATE_OPTIONS = [
+    ('count', 'Count of cases'),
+    ('mean', 'Mean'),
+    ('median', 'Median'),
+    ('mode', 'Mode'),
+]
+
+# The get_table stat key each treemap aggregate reads (count sizes by the cell N directly).
+# 'mode' is intentionally absent: get_table computes no mode, and sizing a part-of-whole
+# area by a modal value is nonsensical (VISUALIZATION_EXPANSION.md §6.1's carve-out).
+TREEMAP_STAT_KEY = {'mean': 'mean', 'median': 'mdn'}
+
+# The waterfall walks a numeric aggregate across sentencing years, so its group column is
+# fixed (unlike pie/treemap, which chart a user-picked column) — the 2016 Drug Sentencing
+# Reform break is the marquee series. Only the *column* is fixed; build_waterfall reads
+# whatever year range the current slice actually contains, so nothing is hardcoded.
+WATERFALL_GROUP = 'sentyear'
+
+# The aggregates a waterfall can walk. 'mode' is intentionally excluded (like the treemap):
+# a year-over-year change in a modal value doesn't read as a running total and its deltas
+# don't sum meaningfully. count/mean/median each produce a coherent delta chain.
+WATERFALL_AGGREGATES = ('count', 'mean', 'median')
+
+# The choropleth (Phase 8) shades MN counties by a per-county aggregate over the active slice.
+# Unlike the treemap/waterfall it DOES allow 'mode' — a modal numeric value per county is a
+# coherent point statistic (it's not a running total or a part-of-whole), so all four
+# aggregates in VIZ_AGGREGATE_OPTIONS are valid: count needs no measure, mean/median/mode
+# summarize a numeric measure. Phase 8 is county grain only; the district/region grain toggle
+# lands in Phase 9 (the geometry dissolves from the same county TopoJSON via cache's crosswalk).
+CHOROPLETH_AGGREGATES = ('count', 'mean', 'median', 'mode')
+# The choropleth reuses the crosstab heatmap's discrete ramp: an 8-step 0→peak scale, colored
+# from the same .heat-1..8 CSS tokens (build_crosstab / STYLEGUIDE "Heatmap cells"), so a county
+# and a crosstab cell of equal value read the same shade.
+CHOROPLETH_HEAT_STEPS = 8
+
+# Small-N texture (Phase 10). A geography with only a handful of cases is a thin sample: its
+# aggregate (a mean/median/mode, or even a raw count read as a "hotspot") is dominated by one or
+# two atypical cases and shouldn't read as a confident color. Below this many cases a shape is
+# filled with a hatch TEXTURE instead — not grey (that's "no data") and not a ramp color — and
+# its tooltip states the suppression + the N. Thin groups are ALSO excluded from the ramp's peak
+# so a single noisy small sample can't set the color scale for the reliable ones; they are never
+# dropped or greyed (that would hide the uncertainty rather than flag it). One documented
+# threshold, in the same named-constant spirit as analytics.STUCK_ATTEMPTS — a small-cell
+# reliability floor (10 is a common suppression cutoff in public reporting), not a formal power
+# calculation (this is the population of sentences, not a sample).
+CHOROPLETH_MIN_N = 10
+
+# --- Choropleth grain (Phase 9): county | judicial district | region -----------------
+# The three-level grain switch. `county` uses the native county TopoJSON; `district` and
+# `region` DISSOLVE that same geometry at runtime (client-side, via cache's county->district/
+# region crosswalk) — there is NO district/region geometry file. Switching grain switches the
+# GROUP COLUMN the per-group aggregate reads (county/district/region), so each shape's value is
+# the categorical aggregate over that column directly — never a sum or mean of county values.
+CHOROPLETH_GRAINS = [
+    {'id': 'county',   'label': 'County'},
+    {'id': 'district', 'label': 'Judicial district'},
+    {'id': 'region',   'label': 'Region'},
+]
+CHOROPLETH_GRAIN_IDS = {g['id'] for g in CHOROPLETH_GRAINS}
+# The dataset column each grain groups by (and, in Phase 11, the map-click filter targets).
+CHOROPLETH_GRAIN_COLUMN = {'county': cache.COUNTY_COLUMN, 'district': 'district', 'region': 'region'}
+# Singular / plural nouns for headings + the companion table, per grain.
+CHOROPLETH_GRAIN_NOUNS = {
+    'county':   ('County', 'counties'),
+    'district': ('Judicial District', 'judicial districts'),
+    'region':   ('Region', 'regions'),
+}
+# Friendly display overrides for cryptic categorical group values (region's "Oth Metro").
+REGION_LABELS = {'Oth Metro': 'Other Metro'}
+
+
+def _grain_key(value, grain):
+    # Canonical string key for a grain group value — shared by the by-feature map, the dissolve
+    # map, and (Phase 11) the filter token. `district` is float64, so its key is "4.0" — exactly
+    # what f.district.eq.4.0 encodes; region/county keys are the string value.
+    if grain == 'district':
+        return str(float(value))
+    return str(value)
+
+
+def _grain_label(value, grain):
+    # Human label for a grain group: a district float reads "Judicial District 4"; region's
+    # cryptic "Oth Metro" reads "Other Metro"; anything else keeps its display spelling.
+    if grain == 'district':
+        return 'Judicial District %d' % int(round(float(value)))
+    if grain == 'region':
+        return REGION_LABELS.get(str(value), str(value))
+    return display_value(value)
+
+
+def build_geo_dissolve(grain):
+    # The dissolve map for a merged grain (district/region): {county feature name: group key}
+    # — how the client merges county shapes into one feature per group — plus
+    # {group key: display label} naming every group in the grain. ONE implementation shared
+    # by the choropleth payload and the Filter view's map input (Phase 11), so the two map
+    # surfaces can never disagree about which counties form a district or region. Group keys
+    # come from _grain_key, so a district's key is the exact string its filter token carries
+    # ("4.0" — see the map-click equivalence in test_map_filter_equivalence.py).
+    crosswalk = cache._county_crosswalk()[grain]   # {county name: district/region value}
+    dissolve = {}          # {county feature name: group key}
+    group_labels = {}      # {group key: display label} — ALL groups in the grain
+    for county, group_val in crosswalk.items():
+        feature = geo.resolve_county(county)
+        if feature is None:                        # coverage asserted at startup
+            continue
+        key = _grain_key(group_val, grain)
+        dissolve[feature] = key
+        group_labels[key] = _grain_label(group_val, grain)
+    return dissolve, group_labels
+
+
+def _viz_column_ok(data, column, errors):
+    # Same validation Explore uses before charting a column; appends a user-facing message
+    # to `errors` and returns False when the column can't be charted.
+    if column not in data['column_list'] or not CODEBOOK.codebook.get(column):
+        errors.append("That column doesn't exist — pick one from the column browser.")
+        return False
+    if column in data['excluded']:
+        errors.append('That column is excluded from analysis — it identifies individual '
+                      'people or cases.')
+        return False
+    return True
+
+
+def resolve_treemap_measure(measure, aggregate, data, errors):
+    # Resolve a treemap's (measure, aggregate) into the get_table measure column.
+    # count -> None (size areas by case count); mean/median -> a numeric measure column.
+    # Appends a message + returns (None, False) when the pair is incoherent for a treemap.
+    if aggregate == 'count':
+        return None, True                       # measure is irrelevant to a plain count
+    if aggregate not in TREEMAP_STAT_KEY:
+        errors.append('The treemap sizes areas by count, mean, or median — mode isn’t '
+                      'available for it.')
+        return None, False
+    if measure == '#' or measure not in data['numeric'] \
+            or measure in data['excluded'] or not CODEBOOK.codebook.get(measure):
+        errors.append('Mean and median need a numeric measure — pick one from the '
+                      'Measure list.')
+        return None, False
+    return measure, True
+
+
+def build_treemap(sheet, aggregate, measure_col, x_col, y_col):
+    # Reshape data.get_table's nested sheet[x][y] = {N, mean, mdn, std} (the SAME crosstab
+    # the Compare view draws) into a nested top-N-parents + "Other" treemap payload plus a
+    # flat companion table. Leaf area = the chosen aggregate per cell: count -> N;
+    # mean/median -> the cell statistic (get_table emits 'N/A' when the measure is all-NaN,
+    # which we drop). Parents are ordered by case count (N) so the slider's "top N groups"
+    # reads intuitively; the tail folds into "Other". For count the areas are a true
+    # part-of-whole — each parent = its crosstab row total, and every shown value reconciles
+    # with the Compare crosstab exactly.
+    stat_key = TREEMAP_STAT_KEY.get(aggregate)
+
+    def cell_value(cell):
+        if aggregate == 'count':
+            return float(cell['N'])
+        try:
+            return float(cell[stat_key])
+        except (TypeError, ValueError):
+            return None                          # 'N/A' -> no area to draw
+
+    parents = []
+    for x in sheet:
+        if x != x:                               # drop NaN row key (missing this column)
+            continue
+        children = []
+        for y in sheet[x]:
+            if y != y:                           # drop NaN column key
+                continue
+            cell = sheet[x][y]
+            n = int(cell['N'])
+            value = cell_value(cell)
+            if n <= 0 or value is None or value <= 0:
+                continue                         # nothing to draw for this cell
+            children.append({'label': display_value(y), 'value': value, 'n': n})
+        if not children:
+            continue
+        children.sort(key=lambda c: c['value'], reverse=True)
+        parents.append({'label': display_value(x),
+                        'value': sum(c['value'] for c in children),
+                        'n': sum(c['n'] for c in children),
+                        'children': children})
+
+    parents.sort(key=lambda p: p['n'], reverse=True)
+
+    # cap the individually-drawn parent groups; the slider re-slices this head client-side
+    # (static/js/visualize.js) and folds everything past the cutoff — plus the tail beyond
+    # the hard cap — into "Other", with no refetch.
+    capped = parents[:TREEMAP_HARD_CAP]
+    tail = parents[TREEMAP_HARD_CAP:]
+    slider_max = len(capped)
+    slider_min = min(3, slider_max)
+    cutoff = max(slider_min, min(TREEMAP_DEFAULT_CUTOFF, slider_max))
+
+    payload = {
+        'parents': capped,
+        'tailValue': sum(p['value'] for p in tail),   # summed leaf value beyond the cap
+        'tailN': sum(p['n'] for p in tail),
+        'tailGroups': len(tail),                       # distinct parents beyond the cap
+        'aggregate': aggregate,
+        'total': sum(p['value'] for p in parents),
+        'totalN': sum(p['n'] for p in parents),
+        'cutoff': cutoff, 'sliderMin': slider_min, 'sliderMax': slider_max,
+        'xLabel': CODEBOOK.codebook[x_col], 'yLabel': CODEBOOK.codebook[y_col],
+        'measureLabel': 'cases' if aggregate == 'count' else CODEBOOK.codebook[measure_col],
+    }
+
+    # flat companion table: every drawn cell, largest value first (the no-JS/a11y fallback)
+    rows = [{'x': p['label'], 'y': c['label'], 'value': c['value'], 'n': c['n']}
+            for p in parents for c in p['children']]
+    rows.sort(key=lambda r: r['value'], reverse=True)
+
+    return payload, rows
+
+
+# Scatter / bubble (Phase 12). Two NUMERIC columns aggregated to a lattice: one bubble per
+# (x, y) cell that has cases, positioned at those numeric coordinates and sized by the cell's
+# count. NEVER one mark per row — 294k points overplot into noise (the design doc's whole point).
+# The lattice IS data.get_table(None, x, y) — the SAME cell counts a Compare crosstab shows — so a
+# bubble's size reconciles with the crosstab exactly. Because get_table is O(|x_unique| * |y_unique|)
+# nested filters, a pair of high-cardinality numerics (e.g. two ~200-value columns) is both slow to
+# build and unreadable once drawn, so the builder rejects a lattice whose cell budget exceeds this
+# cap with a "filter first / pick lower-cardinality columns" message — the honest guard, in the same
+# named-threshold spirit as CHOROPLETH_MIN_N (a readability/perf floor, not a statistical one).
+SCATTER_MAX_CELLS = 10000
+
+# --- Correlation matrix (Phase 13) -----------------------------------------------------
+# A Pearson correlation heatmap over a user-picked NUMERIC subset, computed fresh over the
+# active slice and NEVER disk-cached (like the crosstab). The subset is bounded: below 2
+# columns there is no pair to correlate, and past 8 the k×k grid stops being readable and
+# stops teaching (VISUALIZATION_EXPANSION.md §6.5 — "a user-picked subset of 2–8 numeric
+# columns", never auto-plot all ~48 numerics).
+CORRELATION_MIN_COLS = 2
+CORRELATION_MAX_COLS = 8
+# The shade reuses Compare's discrete 8-step .heat-N ramp, but scaled to |r| on the ABSOLUTE
+# 0→1 scale (not the matrix peak): correlation already has a fixed, interpretable range, so a
+# cell's shade means the same thing in every matrix. Sign can't ride a single-hue ramp, so the
+# always-rendered signed number carries direction (STYLEGUIDE "Heatmap cells").
+CORRELATION_HEAT_STEPS = 8
+# The teachable artifact (VISUALIZATION_EXPANSION.md §6.5): an OFF-diagonal pair at or above
+# this |r| is flagged "near-mechanical". Minnesota's presumptive sentence is READ OFF the
+# guidelines grid (offense severity × criminal-history score), so the grid's own outputs
+# (presumptive time, its lower/upper range, grid-cell time) are near-duplicates BY CONSTRUCTION
+# — a relationship the grid builds in, not one the data reveals. Empirically these pairs sit at
+# |r| ≈ 0.90–1.00 in this dataset, so 0.90 cleanly separates the grid arithmetic from ordinary
+# strong-but-real correlations. One documented threshold, in the named-constant spirit of
+# analytics.STUCK_ATTEMPTS / CHOROPLETH_MIN_N.
+CORRELATION_MECHANICAL_THRESHOLD = 0.90
+
+
+def _fmt_corr(r):
+    # A Pearson r for display: 2 decimals, a real minus sign for negatives (matching the
+    # waterfall's "−"). Color carries magnitude only, so this signed number is the sole
+    # carrier of direction — the sign must always be visible.
+    v = round(r, 2)
+    if v == 0:            # collapse -0.0 → 0.00 (no spurious minus on a ~zero correlation)
+        return '0.00'
+    if v < 0:
+        return '−' + '{:.2f}'.format(abs(v))
+    return '{:.2f}'.format(v)
+
+
+def resolve_correlation_columns(cols, data, errors):
+    # Validate the user-picked numeric subset for the correlation matrix: keep only documented,
+    # non-excluded, numeric (float64) columns, de-duplicated in pick order, and enforce the
+    # 2..8 bound. Appends a user-facing message + returns [] when the pick can't drive a matrix.
+    seen = []
+    for c in cols or []:
+        if c in seen:
+            continue
+        # the checkbox UI only offers documented numeric columns; a stray non-numeric pick can
+        # only come from a hand-crafted URL, so drop it silently and let the count checks below
+        # produce the actionable message.
+        if c not in data['numeric'] or c in data['excluded'] or not CODEBOOK.codebook.get(c):
+            continue
+        seen.append(c)
+    if len(seen) < CORRELATION_MIN_COLS:
+        errors.append('Pick at least %d numeric columns to correlate — choose them from the '
+                      'list.' % CORRELATION_MIN_COLS)
+        return []
+    if len(seen) > CORRELATION_MAX_COLS:
+        errors.append('Pick at most %d numeric columns — a correlation matrix stays readable up '
+                      'to %d. Deselect a few.' % (CORRELATION_MAX_COLS, CORRELATION_MAX_COLS))
+        return []
+    return seen
+
+
+def build_correlation(frame, columns):
+    # Pearson correlation matrix over a user-picked numeric subset (2..8 columns), computed
+    # FRESH over the active slice and NEVER disk-cached — like the crosstab. DataFrame.corr is
+    # pairwise-complete (each cell uses the rows where BOTH columns are present); the co-present
+    # count rides along per cell for the tooltip so a thin pair reads as such.
+    #
+    # Shade = |r| on the ABSOLUTE 0→1 scale mapped to the .heat-N ramp (step 0 = unshaded); the
+    # signed number carries direction. Off-diagonal cells at |r| ≥ CORRELATION_MECHANICAL_THRESHOLD
+    # are flagged as near-mechanical (the guidelines grid showing through) — annotated, not hidden.
+    #
+    # Read-only over the shared base: selecting columns + .corr()/.notna() return NEW objects and
+    # never mutate frame.df (guarded by test_base_immutability.py's representative corr read).
+    df = frame.df
+    corr = df[columns].corr()                          # pairwise-complete Pearson, k×k
+    # pairwise sample size (rows where BOTH columns are non-null), as an integer k×k matrix
+    present = df[columns].notna().astype('int64')
+    pair_n = present.T.dot(present)
+
+    labels = [CODEBOOK.codebook[c] for c in columns]
+    k = len(columns)
+    threshold = CORRELATION_MECHANICAL_THRESHOLD
+
+    grid = []
+    mechanical_pairs = []
+    for i in range(k):
+        line = []
+        for j in range(k):
+            raw = corr.iloc[i, j]
+            r = None if (raw is None or raw != raw) else float(raw)   # raw != raw catches NaN
+            diag = (i == j)
+            n = int(pair_n.iloc[i, j])
+            if r is None:
+                # a constant column (zero variance) or a pair with < 2 shared cases → r undefined
+                cell = {'r': None, 'display': '—', 'heat': 0, 'sign': 'na',
+                        'diag': diag, 'mechanical': False, 'n': n}
+            else:
+                a = abs(r)
+                step = min(CORRELATION_HEAT_STEPS, round(CORRELATION_HEAT_STEPS * a))
+                # key the sign off the ROUNDED value so a cell that displays "0.00" (a ~zero
+                # correlation) never gets the negative underline — display and sign stay in step.
+                rounded = round(r, 2)
+                sign = 'neg' if rounded < 0 else ('pos' if rounded > 0 else 'zero')
+                mechanical = (not diag) and a >= threshold
+                cell = {'r': r, 'display': _fmt_corr(r), 'heat': step, 'sign': sign,
+                        'diag': diag, 'mechanical': mechanical, 'n': n}
+                if mechanical and i < j:                # collect each unordered pair once
+                    mechanical_pairs.append({'a': labels[i], 'b': labels[j],
+                                             'aCode': columns[i], 'bCode': columns[j],
+                                             'display': cell['display'], 'r': r})
+            line.append(cell)
+        grid.append(line)
+
+    mechanical_pairs.sort(key=lambda p: abs(p['r']), reverse=True)
+    return {
+        'codes': list(columns),
+        'labels': labels,
+        'grid': grid,
+        'k': k,
+        'sliceN': len(df),
+        'mechanicalThreshold': threshold,
+        'mechanicalDisplay': '{:.2f}'.format(threshold),
+        'mechanicalCount': len(mechanical_pairs),
+        'mechanicalPairs': mechanical_pairs,
+        'anyNegative': any(c['sign'] == 'neg' for line in grid for c in line),
+    }
+
+
+def build_scatter(sheet, x_col, y_col):
+    # Reshape data.get_table's nested sheet[x][y] = {'N': count} (d_col=None -> count only) into
+    # an aggregated-lattice bubble payload: one point per (x, y) cell with cases, at the numeric
+    # coordinates (x, y), sized by N client-side (static/js/visualize.js: bubble area ∝ count).
+    # Both axes are numeric (float64), so the sheet keys ARE the plot coordinates; NaN keys (a
+    # case missing a value in either column) are dropped. The same point list, largest cell first,
+    # doubles as the companion value table (the a11y / no-JS fallback) — no raw rows anywhere.
+    points = []
+    max_n = 0
+    total_n = 0
+    for x in sheet:
+        if x != x:                               # drop NaN x-key (missing this column)
+            continue
+        for y in sheet[x]:
+            if y != y:                           # drop NaN y-key
+                continue
+            n = int(sheet[x][y]['N'])
+            if n <= 0:
+                continue
+            points.append({'x': float(x), 'y': float(y), 'n': n})
+            total_n += n
+            if n > max_n:
+                max_n = n
+    # largest cell first: the chart draws big bubbles under smaller ones (so small cells stay
+    # visible), and the companion table leads with the heaviest combinations.
+    points.sort(key=lambda p: p['n'], reverse=True)
+
+    payload = {
+        'points': points,
+        'maxN': max_n,
+        'totalN': total_n,
+        'cellCount': len(points),
+        'xLabel': CODEBOOK.codebook[x_col], 'yLabel': CODEBOOK.codebook[y_col],
+        'xCode': x_col, 'yCode': y_col,
+    }
+    # the point list IS the companion table (same objects); the template formats x/y for display
+    return payload, points
+
+
+def resolve_waterfall_measure(measure, aggregate, data, errors):
+    # Resolve a waterfall's (measure, aggregate) into the numeric column aggregate_by_group
+    # reads. count -> None (walk the case count per year); mean/median -> a numeric measure
+    # column. Appends a message + returns (None, False) when the pair can't drive a waterfall.
+    if aggregate == 'count':
+        return None, True                       # measure is irrelevant to a plain count
+    if aggregate not in WATERFALL_AGGREGATES:
+        errors.append('A waterfall walks the change in a count, mean, or median — mode '
+                      'isn’t available for it.')
+        return None, False
+    if measure == '#' or measure not in data['numeric'] \
+            or measure in data['excluded'] or not CODEBOOK.codebook.get(measure):
+        errors.append('Mean and median need a numeric measure — pick one from the '
+                      'Measure list.')
+        return None, False
+    return measure, True
+
+
+def _fmt_measure(value, is_count):
+    # A year's aggregate value for display: counts as thousands-separated integers,
+    # mean/median rounded to 2 places (%g trims a trailing .0).
+    if is_count:
+        return '{:,}'.format(int(round(value)))
+    return '{:g}'.format(round(value, 2))
+
+
+def _fmt_delta(delta, is_count):
+    # A signed change for display (leading +/−; ± for exactly zero). Same rounding as
+    # _fmt_measure so the table's Change column reads consistently with its Value column.
+    sign = '+' if delta > 0 else ('−' if delta < 0 else '±')
+    return sign + _fmt_measure(abs(delta), is_count)
+
+
+def build_waterfall(series, aggregate, measure_col):
+    # Turn a {sentyear: value} aggregate (from Data.aggregate_by_group over the ACTIVE slice)
+    # into a year-over-year floating-bar waterfall payload. The first year is an anchor bar
+    # (0 -> its value); every later year is a floating bar from the prior year's value to its
+    # own, so a bar's top sits at that year's true aggregate (the running total) and the
+    # deltas sum to (last - first). Rising/falling/flat drives the token color in
+    # static/js/visualize.js. Years and values come from the data — no hardcoded range.
+    is_count = (aggregate == 'count')
+
+    # sort by year, dropping missing-year keys (k == k is False for NaN) and any year whose
+    # aggregate is undefined (a numeric measure all-NaN within a year after deep filtering).
+    points = []
+    for year_key in sorted(k for k in series if k == k):
+        value = series[year_key]
+        if value != value:                      # NaN aggregate — no bar to draw this year
+            continue
+        points.append((int(year_key), float(value)))
+
+    steps = []
+    prev = None
+    for year, value in points:
+        if prev is None:                        # anchor bar establishes the starting level
+            direction, delta = 'base', None
+            start, end = 0.0, value
+        else:
+            delta = value - prev
+            start, end = prev, value
+            direction = 'up' if delta > 0 else ('down' if delta < 0 else 'flat')
+        steps.append({
+            'year': str(year),
+            'value': value, 'start': start, 'end': end,
+            'delta': delta, 'direction': direction,
+            'valueDisplay': _fmt_measure(value, is_count),
+            'deltaDisplay': '—' if delta is None else _fmt_delta(delta, is_count),
+        })
+        prev = value
+
+    first = points[0][1] if points else 0.0
+    last = points[-1][1] if points else 0.0
+    net = last - first
+    return {
+        'steps': steps,
+        'aggregate': aggregate,
+        'groupLabel': CODEBOOK.codebook[WATERFALL_GROUP],
+        'measureLabel': 'cases' if is_count else CODEBOOK.codebook[measure_col],
+        'valueHeader': 'Cases' if is_count
+                       else aggregate.capitalize() + ' ' + CODEBOOK.codebook[measure_col],
+        'first': first, 'last': last, 'totalDelta': net,
+        'firstYear': steps[0]['year'] if steps else '',
+        'lastYear': steps[-1]['year'] if steps else '',
+        'firstDisplay': steps[0]['valueDisplay'] if steps else '—',
+        'lastDisplay': steps[-1]['valueDisplay'] if steps else '—',
+        'netDisplay': _fmt_delta(net, is_count) if steps else '—',
+        'netDirection': 'up' if net > 0 else ('down' if net < 0 else 'flat'),
+    }
+
+
+def resolve_choropleth_measure(measure, aggregate, data, errors):
+    # Resolve a choropleth's (measure, aggregate) into the numeric column aggregate_by_group
+    # reads. count -> None (color counties by case count); mean/median/mode -> a numeric
+    # measure column. Appends a message + returns (None, False) when the pair can't drive a map.
+    if aggregate == 'count':
+        return None, True                       # measure is irrelevant to a plain count
+    if aggregate not in CHOROPLETH_AGGREGATES:
+        errors.append('A map colors counties by count, mean, median, or mode — that '
+                      'summary isn’t available.')
+        return None, False
+    if measure == Data.COUNT_MEASURE or measure not in data['numeric'] \
+            or measure in data['excluded'] or not CODEBOOK.codebook.get(measure):
+        errors.append('Mean, median, and mode need a numeric measure — pick one from the '
+                      'Measure list.')
+        return None, False
+    return measure, True
+
+
+def build_choropleth(session, aggregate, measure, measure_col, grain='county'):
+    # Color a Minnesota geography by a per-group aggregate over the ACTIVE slice. Phase 8
+    # shipped the county grain; Phase 9 adds district + region by switching the GROUP COLUMN
+    # (county -> district/region), so each shape's value is the SAME categorical aggregate a
+    # Compare crosstab would show for that column — district/region values are aggregated
+    # directly from the data, never summed from counties (a mean of county means would be
+    # wrong). The district/region GEOMETRY is dissolved client-side from the county TopoJSON
+    # via the crosswalk (there is no district/region geometry file), so this ships the
+    # county->group `dissolve` map and the full group-label set to drive that merge.
+    # Reuses the Phase 1 helper (Data.aggregate_by_group) through _execute — read-only over the
+    # shared base, computed FRESH per request and NEVER disk-cached, like the crosstab.
+    is_count = (aggregate == 'count')
+    group_column = CHOROPLETH_GRAIN_COLUMN[grain]
+
+    # replay history once, then aggregate the SAME filtered frame twice (value + case count) so
+    # a mean/median/mode map still carries N per group for the tooltip and the a11y table.
+    sheet = _execute(session)
+    counts = sheet.aggregate_by_group(group_column, Data.COUNT_MEASURE, 'count')
+    raw_values = counts if is_count \
+        else sheet.aggregate_by_group(group_column, measure, aggregate)
+
+    # For district/region: build the dissolve map ({county feature name: group key}) and the
+    # FULL group-label set from the crosswalk — the client merges county shapes by group key,
+    # and every group must render (even ones with no cases in this slice show as "no data").
+    # County grain has no dissolve: it uses the native TopoJSON geometry as-is.
+    dissolve = None
+    group_labels = None
+    if grain == 'county':
+        unit_total = len(geo.feature_names())
+    else:
+        dissolve, group_labels = build_geo_dissolve(grain)
+        unit_total = len(group_labels)
+
+    # map each aggregated group to its map-feature key + display label. A group absent from the
+    # slice simply isn't a key here, so it renders as "no data" — never silently dropped. For
+    # county grain the feature key is the reconciled TopoJSON name (geo bridges the spellings);
+    # for district/region it's the canonical group key that dissolve/byFeature agree on.
+    by_feature = {}
+    total_n = 0
+    for group_val, value in raw_values.items():
+        if value is None or value != value:     # NaN aggregate (all-NaN measure in a group)
+            continue
+        if grain == 'county':
+            fkey = geo.resolve_county(group_val)
+            if fkey is None:                    # unreconciled county (coverage asserted) — skip
+                continue
+            label = display_value(group_val)
+        else:
+            fkey = _grain_key(group_val, grain)
+            label = group_labels.get(fkey) or _grain_label(group_val, grain)
+        val = float(value)
+        n = int(counts.get(group_val, 0))
+        by_feature[fkey] = {
+            'value': val, 'n': n,
+            'display': _fmt_measure(val, is_count),
+            'label': label,
+            'lowN': n < CHOROPLETH_MIN_N,       # thin sample → rendered as texture, not a shade
+            # the DATASET value a click-to-filter must submit (Phase 11). For counties this
+            # is the dataset spelling ("LeSueur"), which differs from the feature key for the
+            # alias counties; for district/region it's the canonical group key ("4.0"), the
+            # exact string the filter token encodes. Never derive this client-side from the
+            # feature name — that's the silent-divergence trap.
+            'filterValue': _grain_key(group_val, grain),
+        }
+        total_n += n
+
+    # Two ramp peaks, so the client's "hatch thin samples" toggle can recolor without a refetch:
+    #  • `peak` — over RELIABLE groups only (n ≥ CHOROPLETH_MIN_N): the DEFAULT (hatched) view, so
+    #    one 2-case county with a wild mean can't blow out the scale and wash the real signal pale.
+    #    NB: this deliberately relaxes the Phase 8 "map & crosstab share a peak" nicety — per-feature
+    #    *values* still match Compare exactly; only the shade normalization drops the unreliable tail.
+    #  • `peak_full` — over ALL groups with data: the OVERRIDE view (toggle off), where low-N groups
+    #    are shaded like everyone else, so the scale must include them.
+    # If nothing clears the bar, `peak` stays 0 (the whole map is texture / no-data) — the honest read.
+    peak = max((rec['value'] for rec in by_feature.values() if not rec['lowN']), default=0.0)
+    peak_full = max((rec['value'] for rec in by_feature.values()), default=0.0)
+
+    # heat step per group: the SAME 0→peak linear ramp the crosstab heatmap uses (build_crosstab):
+    # step = max(1, round(8 * value / peak)); 0 = unshaded (value ≤ 0). Each group carries BOTH a
+    # reliable-peak step (`heat`; 0 for low-N → the front-end textures them) and a full-peak step
+    # (`heatFull`; low-N included) so the toggle just switches which one the fill reads.
+    for rec in by_feature.values():
+        step = 0
+        if not rec['lowN'] and peak > 0 and rec['value'] > 0:
+            step = max(1, round(CHOROPLETH_HEAT_STEPS * rec['value'] / peak))
+        rec['heat'] = step
+        step_full = 0
+        if peak_full > 0 and rec['value'] > 0:
+            step_full = max(1, round(CHOROPLETH_HEAT_STEPS * rec['value'] / peak_full))
+        rec['heatFull'] = step_full
+
+    low_n_count = sum(1 for rec in by_feature.values() if rec['lowN'])
+
+    agg_label = aggregate.capitalize()
+    measure_label = 'cases' if is_count else CODEBOOK.codebook[measure_col]
+    grain_noun, grain_plural = CHOROPLETH_GRAIN_NOUNS[grain]
+
+    # companion table (a11y / no-JS fallback): every group with data, largest value first.
+    # lowN rides along so the table marks thin samples too — the map textures them, so the
+    # no-JS/screen-reader path must flag them as well rather than present them as reliable.
+    # filterValue feeds each row's "Keep only" form (Phase 11) — the keyboard/no-JS twin of
+    # the map click, posting the same fields to the same apply route.
+    rows = sorted(
+        ({'label': rec['label'], 'value': rec['value'], 'n': rec['n'],
+          'display': rec['display'], 'lowN': rec['lowN'],
+          'filterValue': rec['filterValue']} for rec in by_feature.values()),
+        key=lambda r: (r['value'], r['n']), reverse=True)
+
+    return {
+        'grain': grain,
+        'grainLabel': grain_noun,           # singular noun ("Judicial District")
+        'grainLabelPlural': grain_plural,   # plural noun ("judicial districts")
+        # map-click → filter (Phase 11): the dataset column a click filters, and the
+        # EXISTING filter-apply route the click posts to (comparison=eq + a shape's
+        # filterValue + a local `next` back to this view) — never a bespoke token path.
+        'filterColumn': group_column,
+        'applyUrl': url_for('explore_filter_column', column=group_column),
+        'unitTotal': unit_total,            # total groups in the grain (87 / 10 / 4)
+        'unitsWithData': len(by_feature),   # groups with cases in the slice
+        'minN': CHOROPLETH_MIN_N,           # small-N texture threshold (Phase 10)
+        'lowNCount': low_n_count,           # groups below the threshold (rendered as texture)
+        'aggregate': aggregate,
+        'measureLabel': measure_label,
+        'aggLabel': agg_label,
+        'valueHeader': 'Cases' if is_count else agg_label + ' ' + measure_label,
+        'byFeature': by_feature,       # {feature key: {value, n, display, label, heat, heatFull, lowN}}
+        'dissolve': dissolve,          # {feature name: group key} for district/region; None county
+        'groupLabels': group_labels,   # {group key: label} for district/region; None for county
+        'peak': peak,
+        'peakDisplay': _fmt_measure(peak, is_count) if peak > 0 else '—',
+        'peakFull': peak_full,         # peak incl. low-N groups — the toggle-off (shown) ramp end
+        'peakFullDisplay': _fmt_measure(peak_full, is_count) if peak_full > 0 else '—',
+        'totalN': total_n,
+        'topoUrl': url_for('static', filename=geo.TOPOJSON_STATIC),
+        'object': geo.TOPOJSON_OBJECT,
+        'rows': rows,
+    }
+
+
+def render_visualize(chart=None, form=None, error=None):
+    # Shared renderer for the Visualize workbench (same pattern as render_explore /
+    # render_compare / render_filter): full page normally, just the view fragment on htmx
+    # requests. A chart type flagged 'ready' computes off the active history (Phase 4: pie);
+    # the rest still show the "coming soon" placeholder with their selection URL-encoded.
+    user = account.retrieve(session['userid'])
+    data = get_data(session)
+
+    # reuse Compare's option builders: grouped documented columns + the numeric list
+    axis_groups, numeric = build_compare_options(data)
+    form = form or {}
+    errors = list(error or [])
+
+    column = form.get('column') or None
+    column2 = form.get('column2') or None
+    header = None
+    chart_payload = None    # reusable bucket payload feeding a ready single-column chart (pie)
+    share = None            # pie companion value table (share of shown cases)
+    treemap_payload = None  # nested top-N + "Other" payload feeding the treemap
+    treemap_rows = None     # treemap companion table (every drawn cell)
+    waterfall_payload = None  # year-over-year floating-bar payload feeding the waterfall
+    choropleth_payload = None  # per-county aggregate payload feeding the choropleth map
+    scatter_payload = None  # aggregated-lattice bubble payload feeding the scatter/bubble chart
+    scatter_rows = None     # scatter companion table (every drawn lattice cell)
+    correlation_payload = None  # Pearson correlation matrix payload (numeric subset)
+    selected_cols = form.get('cols') or []  # raw picked numeric columns (echoed to checkboxes)
+
+    if chart and chart.get('status') == 'ready':
+        if chart['id'] == 'pie' and column:
+            if _viz_column_ok(data, column, errors):
+                # share-of-cases only (no measure/aggregate) — the pie is inherently a
+                # part-of-whole mark; mean/median/mode have no place on it (STYLEGUIDE).
+                header = CODEBOOK.codebook[column]
+                info = get_data(session, column, 'occurrence')['column_info']
+                chart_payload = bucket_payload(info['each'], PIE_DEFAULT_CUTOFF, PIE_HARD_CAP)
+                share = sorted(info['each'], key=lambda e: e['num'], reverse=True)
+            else:
+                column = None
+        elif chart['id'] == 'treemap' and column and column2:
+            # two-column nesting = data.get_table (the SAME crosstab Compare draws), sized by
+            # the chosen aggregate. Validate both columns + the measure/aggregate coherence,
+            # then reshape the sheet into a nested payload. Computed fresh (never disk-cached).
+            col_ok = _viz_column_ok(data, column, errors)
+            col2_ok = _viz_column_ok(data, column2, errors)
+            if column == column2:
+                errors.append('Pick two different columns to nest.')
+            measure = form.get('measure') or '#'
+            aggregate = form.get('aggregate') or 'count'
+            measure_col, agg_ok = resolve_treemap_measure(measure, aggregate, data, errors)
+            if col_ok and col2_ok and column != column2 and agg_ok:
+                header = CODEBOOK.codebook[column]
+                sheet = _execute(session).get_table(measure_col, column, column2)
+                treemap_payload, treemap_rows = build_treemap(
+                    sheet, aggregate, measure_col, column, column2)
+            else:
+                if not col_ok:
+                    column = None
+        elif chart['id'] == 'waterfall':
+            # year-over-year change in a numeric aggregate across sentyear (the group column
+            # is fixed; the user picks measure + aggregate). Computed fresh over the active
+            # slice via the Phase 1 helper — read-only, never disk-cached.
+            measure = form.get('measure') or '#'
+            aggregate = form.get('aggregate') or 'count'
+            measure_col, agg_ok = resolve_waterfall_measure(measure, aggregate, data, errors)
+            if WATERFALL_GROUP not in data['column_list']:
+                errors.append('The sentencing-year column isn’t available in this dataset.')
+            elif agg_ok:
+                series = _execute(session).aggregate_by_group(
+                    WATERFALL_GROUP, measure, aggregate)
+                waterfall_payload = build_waterfall(series, aggregate, measure_col)
+                if not waterfall_payload['steps']:
+                    errors.append('No sentencing-year data matches the current data state — '
+                                  'clear a filter and try again.')
+                    waterfall_payload = None
+        elif chart['id'] == 'choropleth':
+            # MN geography shaded by a per-group aggregate over the active slice. The user picks
+            # a grain (county | judicial district | region — Phase 9) plus measure + aggregate;
+            # count works with no measure, so selecting the map renders immediately. Computed
+            # fresh via the Phase 1 helper — read-only, never disk-cached.
+            grain = form.get('grain') or 'county'
+            if grain not in CHOROPLETH_GRAIN_IDS:      # unknown grain → fall back to county
+                grain = 'county'
+            measure = form.get('measure') or Data.COUNT_MEASURE
+            aggregate = form.get('aggregate') or 'count'
+            measure_col, agg_ok = resolve_choropleth_measure(measure, aggregate, data, errors)
+            grain_column = CHOROPLETH_GRAIN_COLUMN[grain]
+            if grain_column not in data['column_list']:
+                errors.append('The map’s geography column isn’t available in this dataset.')
+            elif agg_ok:
+                choropleth_payload = build_choropleth(
+                    session, aggregate, measure, measure_col, grain)
+                if not choropleth_payload['byFeature']:
+                    errors.append('No data matches the current data state at this map level '
+                                  '— clear a filter and try again.')
+                    choropleth_payload = None
+        elif chart['id'] == 'scatter' and column and column2:
+            # two NUMERIC columns aggregated to a lattice: one bubble per (x, y) cell with
+            # cases, sized by that cell's count. Reuses data.get_table (the SAME crosstab
+            # Compare draws, d_col=None -> count only) so bubble sizes reconcile exactly —
+            # never one mark per row. Both axes must be numeric (float64) to have real plot
+            # coordinates; a categorical column (e.g. severity, which mixes '1'..'11' with
+            # 'A'..'H') has no linear position, so it's rejected with a clear message.
+            # Computed fresh, read-only over the shared base, never disk-cached.
+            col_ok = _viz_column_ok(data, column, errors)
+            col2_ok = _viz_column_ok(data, column2, errors)
+            num_ok = True
+            if col_ok and column not in data['numeric']:
+                errors.append('The horizontal axis must be a numeric column — “%s” isn’t '
+                              'numeric. Pick numeric columns for both axes.'
+                              % CODEBOOK.codebook[column])
+                num_ok = False
+            if col2_ok and column2 not in data['numeric']:
+                errors.append('The vertical axis must be a numeric column — “%s” isn’t '
+                              'numeric. Pick numeric columns for both axes.'
+                              % CODEBOOK.codebook[column2])
+                num_ok = False
+            if column == column2:
+                errors.append('Pick two different numeric columns to plot.')
+            if col_ok and col2_ok and num_ok and column != column2:
+                frame = _execute(session)
+                # guard the O(|x_unique| * |y_unique|) get_table build (and an unreadable
+                # cloud) against a pathological high-cardinality pair — filter first instead.
+                nx, ny = frame.distinct_counts(column, column2)
+                if nx * ny > SCATTER_MAX_CELLS:
+                    errors.append('Those columns have too many distinct values to plot as a '
+                                  'lattice ({:,} × {:,} = {:,} cells). Pick lower-cardinality '
+                                  'numeric columns, or apply a filter first to narrow the '
+                                  'values.'.format(nx, ny, nx * ny))
+                else:
+                    header = CODEBOOK.codebook[column]
+                    sheet = frame.get_table(None, column, column2)
+                    scatter_payload, scatter_rows = build_scatter(sheet, column, column2)
+                    if not scatter_payload['points']:
+                        # no (x, y) cell carries a case (the slice is empty, or both columns
+                        # are all-missing here) — an empty chart would read as broken.
+                        errors.append('No cases have a value for both columns in the current '
+                                      'data state — clear a filter and try again.')
+                        scatter_payload, scatter_rows = None, None
+            elif not col_ok:
+                column = None
+        elif chart['id'] == 'correlation':
+            # Pearson correlation matrix over a user-picked numeric subset (2..8 columns).
+            # Computed fresh over the active slice via _execute — read-only over the shared
+            # base, NEVER disk-cached (like the crosstab). The matrix is server-rendered as a
+            # .heat-N table (the a11y / no-JS path IS the table); no canvas.
+            columns = resolve_correlation_columns(selected_cols, data, errors)
+            if columns:
+                correlation_payload = build_correlation(_execute(session), columns)
+
+    context = {
+        'user': user, 'data': data, 'error': errors,
+        'browser': build_column_browser(data), 'excluded_note': EXCLUDED_NOTE,
+        'chart_types': VIZ_CHART_TYPES,
+        'choropleth_grains': CHOROPLETH_GRAINS,   # county / district / region grain toggle
+        'axis_groups': axis_groups, 'numeric_measures': numeric,
+        'aggregate_options': VIZ_AGGREGATE_OPTIONS,
+        'form': form,
+        'chart': chart,                # the selected chart-type dict, or None
+        'column': column,              # validated primary column (for the browser aria-current)
+        'column2': column2,            # second (nesting) column, for the treemap
+        'header': header,              # display name of the primary column, when charted
+        'chart_payload': chart_payload,
+        'share': share,                # pie companion table rows, or None
+        'treemap_payload': treemap_payload,
+        'treemap_rows': treemap_rows,  # treemap companion table rows, or None
+        'waterfall_payload': waterfall_payload,  # year-over-year waterfall payload, or None
+        'choropleth_payload': choropleth_payload,  # per-county choropleth payload, or None
+        'scatter_payload': scatter_payload,  # aggregated-lattice bubble payload, or None
+        'scatter_rows': scatter_rows,        # scatter companion table rows, or None
+        'correlation_payload': correlation_payload,  # Pearson correlation matrix, or None
+        'selected_cols': selected_cols,      # raw picked numeric columns (checkbox state)
+        'correlation_min': CORRELATION_MIN_COLS,
+        'correlation_max': CORRELATION_MAX_COLS,
+    }
+
+    if wants_fragment():
+        return render_template('partials/visualize_view.html', fragment=True, **context)
+    return render_template('visualize.html', **context)
+
+
+@app.route("/visualize")
+def visualize():
+    # One GET route; state lives in the query string (chart + column + measure +
+    # aggregate) so it survives a hard refresh and can be authored into a lesson deep
+    # link. The builder is a GET form — no-JS submits natively and reloads with the
+    # params; with JS, htmx swaps the fragment and pushes the URL. An unknown chart id
+    # falls back to the blank canvas rather than 404ing.
+    if not is_logged_in():
+        return not_logged_in()
+
+    chart_id = request.args.get('chart', '')
+    chart = next((c for c in VIZ_CHART_TYPES if c['id'] == chart_id), None)
+
+    form = {
+        'chart': chart['id'] if chart else '',
+        'column': request.args.get('column', ''),
+        'column2': request.args.get('column2', ''),   # second nesting column (treemap)
+        'measure': request.args.get('measure', '#'),
+        'aggregate': request.args.get('aggregate', 'count'),
+        'grain': request.args.get('grain', 'county'),  # choropleth grain (Phase 9)
+        # correlation matrix (Phase 13): a repeated ?cols= param → the 2..8 numeric subset.
+        # getlist keeps every pick, so the matrix survives a hard refresh and lesson deep links.
+        'cols': request.args.getlist('cols'),
+    }
+    return render_visualize(chart=chart, form=form)
 
 
 @app.route('/load', methods=['GET', 'POST'])

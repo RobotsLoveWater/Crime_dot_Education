@@ -1,0 +1,24 @@
+{# Map input for the geographic columns (Phase 11). The map is an INPUT DEVICE for the
+   form beside it, never a token builder: clicking a shape toggles the same checkbox
+   (county/region) or fills the same numeric value input (district) a hand-picked filter
+   uses, and the existing preview/apply plumbing does the rest — so the applied token and
+   cache directory are identical to the list/typed path by construction. JS-only
+   enhancement (the canvas needs JS): no-JS and screen readers keep the value list /
+   input, which carries the same names and per-value counts as text. #}
+<div class="filter-map js-only" id="filter-map">
+    <p class="filter-map-hint" id="filter-map-hint">
+        {% if filter_map['mode'] == 'single' %}
+        Or select a {{ filter_map['grainLabel']|lower }} on the map — clicking sets the
+        value above to “equal to” that {{ filter_map['grainLabel']|lower }} (click it
+        again to clear).
+        {% else %}
+        Or pick {{ filter_map['grainLabelPlural'] }} on the map — clicking selects or
+        clears the same value in the list.
+        {% endif %}
+    </p>
+    <div class="filter-map-box">
+        <canvas id="filter-map-canvas" role="img"
+                aria-label="Map of Minnesota {{ filter_map['grainLabelPlural'] }} — a visual shortcut for the value list, which carries the same {{ filter_map['grainLabelPlural'] }} and case counts as text"></canvas>
+    </div>
+    <script type="application/json" id="filter-map-data">{{ filter_map|tojson }}</script>
+</div>

@@ -1,0 +1,740 @@
+{# Visualize view (Phase 3 shell): the blank-canvas builder + the render target. Chart
+   families (Tiers 2–4) fill the canvas; for now a valid selection shows a "coming soon"
+   placeholder, and every selection is URL-encoded so it survives a hard refresh. Served as a
+   fragment on htmx requests (fragment=True adds the <title> htmx uses to retitle the page)
+   and included by visualize.html on full loads. #}
+{% if fragment %}<title>Minnesota Sentencing Explorer — Visualize</title>{% endif %}
+
+<header class="view-header">
+    <div class="view-heading">
+        <h1>Visualize</h1>
+        <p class="view-subtitle">Build a chart over your current data state{% if datastate %} —
+            <strong>{{ '{:,}'.format(datastate['entries']) }}</strong> of
+            {{ '{:,}'.format(datastate['total']) }} cases{% endif %}. Pick a chart type, choose
+            columns, and render.</p>
+    </div>
+</header>
+
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    {% for message in error %}<p>{{ message }}</p>{% endfor %}
+</div>
+{% endif %}
+
+<div class="visualize-layout" data-column="{{ column or '' }}">
+    {# GET form: no-JS submits natively (reloads with ?chart=…&column=…); with JS, htmx swaps
+       this same view and pushes the URL. The pickers are native <select>s enhanced by app.js's
+       [data-picker] combobox. #}
+    <form class="visualize-form" method="get" action="{{ url_for('visualize') }}"
+          hx-get="{{ url_for('visualize') }}" hx-target="#visualize-view"
+          hx-swap="innerHTML show:window:top" hx-push-url="true"
+          data-loading="Building chart…">
+
+        {% set picked_chart = form.get('chart') or '' %}
+        <div class="field picker" data-picker>
+            <label for="viz-chart-select">Chart type</label>
+            <select id="viz-chart-select" name="chart" data-viz-chart>
+                <option value="" {% if not picked_chart %}selected{% endif %}>Choose a chart type…</option>
+                {% for ct in chart_types %}
+                <option value="{{ ct['id'] }}" data-blurb="{{ ct['blurb'] }}" data-status="{{ ct['status'] }}"
+                        {% if picked_chart == ct['id'] %}selected{% endif %}>{{ ct['label'] }}</option>
+                {% endfor %}
+            </select>
+            {# server-rendered blurb for the current selection; visualize.js updates it live #}
+            <p class="field-hint" id="viz-chart-blurb"
+               data-default="Each chart type shows your data a different way.">{% if chart %}{{ chart['blurb'] }}{% else %}Each chart type shows your data a different way.{% endif %}</p>
+        </div>
+
+        {# the waterfall's column is fixed to the sentencing year, so it hides the Column
+           pickers (JS via data-viz-fields) and shows only Measure + Aggregate. The scatter
+           reuses these two pickers as its X (Column) and Y (Second column) axes — the label
+           + hint swap to axis language (server-rendered here, kept in step by visualize.js's
+           syncFieldLabels when the chart type changes without a reload). #}
+        {% set is_scatter = chart and chart['id'] == 'scatter' %}
+        <div class="field picker" data-picker data-viz-fields="pie treemap scatter">
+            <label for="viz-column-select" data-viz-label
+                   data-label-default="Column"
+                   data-label-scatter="Horizontal axis (X)">{{ 'Horizontal axis (X)' if is_scatter else 'Column' }}</label>
+            <select id="viz-column-select" name="column">
+                <option value="" {% if not form.get('column') %}selected{% endif %}>Choose a column…</option>
+                {% for group in axis_groups %}
+                <optgroup label="{{ group['name'] }}">
+                    {% for col in group['columns'] %}
+                    <option value="{{ col['code'] }}" {% if form.get('column') == col['code'] %}selected{% endif %}>{{ col['desc'] }} ({{ col['code'] }})</option>
+                    {% endfor %}
+                </optgroup>
+                {% endfor %}
+            </select>
+            <p class="field-hint" data-viz-hint
+               data-hint-default="The main column the chart is built around. You can also pick one from the column list in the sidebar."
+               data-hint-scatter="The numeric column on the horizontal axis. Both axes must be numeric.">{% if is_scatter %}The numeric column on the horizontal axis. Both axes must be numeric.{% else %}The main column the chart is built around. You can also pick one
+               from the column list in the sidebar.{% endif %}</p>
+        </div>
+
+        {# Second column — the treemap nests Column inside this one; the scatter uses it as the
+           vertical (Y) axis. Hidden by JS for charts that don't use it (the pie); no-JS keeps
+           it visible and simply ignored elsewhere. #}
+        <div class="field picker" data-picker data-viz-fields="treemap scatter">
+            <label for="viz-column2-select" data-viz-label
+                   data-label-default="Second column (nesting)"
+                   data-label-scatter="Vertical axis (Y)">{{ 'Vertical axis (Y)' if is_scatter else 'Second column (nesting)' }}</label>
+            <select id="viz-column2-select" name="column2">
+                <option value="" {% if not form.get('column2') %}selected{% endif %}>Choose a column…</option>
+                {% for group in axis_groups %}
+                <optgroup label="{{ group['name'] }}">
+                    {% for col in group['columns'] %}
+                    <option value="{{ col['code'] }}" {% if form.get('column2') == col['code'] %}selected{% endif %}>{{ col['desc'] }} ({{ col['code'] }})</option>
+                    {% endfor %}
+                </optgroup>
+                {% endfor %}
+            </select>
+            <p class="field-hint" data-viz-hint
+               data-hint-default="The treemap splits each Column group by this second column — two columns nested as proportional areas."
+               data-hint-scatter="The numeric column on the vertical axis. Both axes must be numeric.">{% if is_scatter %}The numeric column on the vertical axis. Both axes must be numeric.{% else %}The treemap splits each <strong>Column</strong> group by this
+               second column — two columns nested as proportional areas.{% endif %}</p>
+        </div>
+
+        {% set picked_measure = form.get('measure') or '#' %}
+        <div class="field picker" data-picker data-viz-fields="treemap waterfall choropleth">
+            <label for="viz-measure-select">Measure</label>
+            <select id="viz-measure-select" name="measure">
+                <option value="#" {% if picked_measure == '#' %}selected{% endif %}>Count of cases</option>
+                <optgroup label="Numeric column">
+                    {% for col in numeric_measures %}
+                    <option value="{{ col['code'] }}" {% if picked_measure == col['code'] %}selected{% endif %}>{{ col['desc'] }} ({{ col['code'] }})</option>
+                    {% endfor %}
+                </optgroup>
+            </select>
+            <p class="field-hint">What each mark measures: the number of cases, or a numeric column
+               summarized by the aggregate below.</p>
+        </div>
+
+        {% set picked_agg = form.get('aggregate') or 'count' %}
+        <div class="field picker" data-picker data-viz-fields="treemap waterfall choropleth">
+            <label for="viz-aggregate-select">Aggregate</label>
+            <select id="viz-aggregate-select" name="aggregate">
+                {% for value, label in aggregate_options %}
+                <option value="{{ value }}" {% if picked_agg == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <p class="field-hint">How to summarize the measure. <strong>Count</strong> needs no
+               column; <strong>mean</strong>, <strong>median</strong>, and <strong>mode</strong>
+               summarize the numeric measure you picked.</p>
+        </div>
+
+        {# Correlation matrix (Phase 13): a 2–8 column numeric subset. Checkboxes (name="cols")
+           serialize as repeated ?cols= params, so no-JS submits natively and htmx keeps every
+           pick in the URL; the matrix itself is a server-rendered .heat-N table (the a11y path
+           IS the table). visualize.js adds search + a live count + a soft 8-column cap. Shown
+           only for the correlation chart (data-viz-fields), which hides the single-column
+           pickers above. #}
+        <fieldset class="field viz-corr-field" data-viz-fields="correlation">
+            <legend>Numeric columns <span class="field-optional">(pick {{ correlation_min }}–{{ correlation_max }})</span></legend>
+            <p class="field-hint">Pearson correlation is computed for every pair, over your
+               current data state. Pick between {{ correlation_min }} and {{ correlation_max }}
+               numeric columns.</p>
+            <div class="corr-picker">
+                <div class="corr-picker-toolbar">
+                    <div class="table-search js-only">
+                        <label class="visually-hidden" for="viz-corr-search">Search numeric columns</label>
+                        <input type="search" id="viz-corr-search" class="search-input"
+                               placeholder="Search numeric columns…" autocomplete="off" spellcheck="false">
+                    </div>
+                    <div class="corr-picker-actions js-only">
+                        <span class="corr-picker-count" id="viz-corr-count" role="status"></span>
+                        <button type="button" class="btn btn-secondary btn-sm" id="viz-corr-clear">Clear</button>
+                    </div>
+                </div>
+                <ul class="corr-options" id="viz-corr-options">
+                    {% for col in numeric_measures %}
+                    <li class="corr-option" data-search="{{ (col['desc'] ~ ' ' ~ col['code'])|lower }}">
+                        <label class="corr-check">
+                            <input type="checkbox" name="cols" value="{{ col['code'] }}"
+                                   {% if col['code'] in selected_cols %}checked{% endif %}>
+                            <span>{{ col['desc'] }} <span class="corr-code">({{ col['code'] }})</span></span>
+                        </label>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </fieldset>
+
+        {# The map's grain (county / judicial district / region) is chosen by the segmented
+           toggle on the map card; carry it here so re-submitting the builder (e.g. changing the
+           aggregate) preserves the current level instead of resetting to county. #}
+        <input type="hidden" name="grain" value="{{ form.get('grain') or 'county' }}">
+
+        <button type="submit" class="btn btn-primary">Show chart</button>
+    </form>
+
+    <div class="visualize-canvas" id="visualize-canvas">
+        {% if chart_payload %}
+        {# a ready chart with a valid column: render it + its companion value table #}
+        <div class="viz-result">
+            <section class="chart-card viz-pie" aria-labelledby="viz-chart-heading">
+                <h2 id="viz-chart-heading">{{ header }}
+                    <span class="chart-subhead">— share of cases</span></h2>
+                <p class="chart-note">
+                    {% if chart_payload['other'] > 0 %}
+                    The most common values by case count; the rest are grouped as “Other”.
+                    Drag the slider to change how many slices show.
+                    {% else %}
+                    All {{ chart_payload['labels']|length }} values by case count.
+                    {% endif %}
+                    The table below carries every value.
+                </p>
+                <div class="chart-box viz-pie-box">
+                    <canvas id="visualize-chart" role="img"
+                            aria-label="Pie chart of case share for {{ header }}; the values table below repeats these numbers"></canvas>
+                </div>
+                <script type="application/json" id="visualize-chart-data">{{ chart_payload|tojson }}</script>
+                {% with slider=chart_payload, slider_id='viz', slider_noun='slices' %}
+                {% include 'partials/other_cutoff_slider.html' %}
+                {% endwith %}
+            </section>
+
+            {% if share %}
+            <section aria-label="Values">
+                <div class="view-toolbar">
+                    <h2 id="viz-values-heading">Values</h2>
+                    <div class="table-search js-only">
+                        <label class="visually-hidden" for="viz-value-search">Search values</label>
+                        <input type="search" id="viz-value-search" placeholder="Search values…"
+                               autocomplete="off" spellcheck="false">
+                    </div>
+                </div>
+                <div class="table-wrapper table-scroll">
+                    <table class="data-table" id="viz-value-table" aria-labelledby="viz-values-heading">
+                        <caption class="visually-hidden">Case share for {{ header }}</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Value</th>
+                                <th scope="col" class="num">Cases</th>
+                                <th scope="col" class="num">Share</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in share %}
+                            <tr data-value="{{ row['value']|display_value|lower }}">
+                                <td>{{ row['value']|display_value }}</td>
+                                <td class="num">{{ '{:,}'.format(row['num']) }}</td>
+                                <td class="num">{{ '%.2f'|format(100 * row['num'] / chart_payload['total']) if chart_payload['total'] else '0.00' }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <p class="table-count" id="viz-value-count" role="status"></p>
+                    <button type="button" class="btn btn-secondary btn-sm js-only" id="viz-value-show-more" hidden>Show more</button>
+                </div>
+            </section>
+            {% endif %}
+        </div>
+        {% elif treemap_payload %}
+        {# treemap: two columns nested as proportional areas (data.get_table reshaped) #}
+        <div class="viz-result">
+            <section class="chart-card viz-treemap" aria-labelledby="viz-tree-heading">
+                <h2 id="viz-tree-heading">{{ treemap_payload['xLabel'] }} × {{ treemap_payload['yLabel'] }}
+                    <span class="chart-subhead">—
+                        {% if treemap_payload['aggregate'] == 'count' %}share of cases
+                        {% elif treemap_payload['aggregate'] == 'mean' %}mean {{ treemap_payload['measureLabel'] }}
+                        {% else %}median {{ treemap_payload['measureLabel'] }}{% endif %}</span></h2>
+                <p class="chart-note">
+                    {% if treemap_payload['aggregate'] == 'count' %}
+                    Area = number of cases. Each “{{ treemap_payload['xLabel'] }}” block splits by
+                    “{{ treemap_payload['yLabel'] }}”, so the areas add up to the whole.
+                    {% else %}
+                    Area = the {{ treemap_payload['aggregate'] }} {{ treemap_payload['measureLabel'] }}
+                    for each “{{ treemap_payload['xLabel'] }}” × “{{ treemap_payload['yLabel'] }}”
+                    group — hover for the exact value and case count.
+                    {% endif %}
+                    {% if treemap_payload['tailGroups'] > 0 or treemap_payload['sliderMax'] > treemap_payload['cutoff'] %}
+                    Smaller groups fold into “Other”; drag the slider to change how many show.
+                    {% endif %}
+                    The table below carries every value.
+                </p>
+                <div class="chart-box viz-treemap-box">
+                    <canvas id="visualize-treemap" role="img"
+                            aria-label="Treemap of {{ treemap_payload['xLabel'] }} nested by {{ treemap_payload['yLabel'] }}; the values table below repeats these numbers"></canvas>
+                </div>
+                <script type="application/json" id="visualize-treemap-data">{{ treemap_payload|tojson }}</script>
+                {% with slider=treemap_payload, slider_id='viz-tree', slider_noun='groups' %}
+                {% include 'partials/other_cutoff_slider.html' %}
+                {% endwith %}
+            </section>
+
+            {% if treemap_rows %}
+            <section aria-label="Values">
+                <div class="view-toolbar">
+                    <h2 id="viz-tree-values-heading">Values</h2>
+                    <div class="table-search js-only">
+                        <label class="visually-hidden" for="viz-tree-search">Search values</label>
+                        <input type="search" id="viz-tree-search" placeholder="Search values…"
+                               autocomplete="off" spellcheck="false">
+                    </div>
+                </div>
+                <div class="table-wrapper table-scroll">
+                    <table class="data-table" id="viz-tree-table" aria-labelledby="viz-tree-values-heading">
+                        <caption class="visually-hidden">{{ treemap_payload['xLabel'] }} by {{ treemap_payload['yLabel'] }}</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">{{ treemap_payload['xLabel'] }}</th>
+                                <th scope="col">{{ treemap_payload['yLabel'] }}</th>
+                                <th scope="col" class="num">Cases</th>
+                                {% if treemap_payload['aggregate'] != 'count' %}
+                                <th scope="col" class="num">{{ treemap_payload['aggregate']|capitalize }} {{ treemap_payload['measureLabel'] }}</th>
+                                {% endif %}
+                                <th scope="col" class="num">Share</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in treemap_rows %}
+                            <tr data-value="{{ (row['x'] ~ ' ' ~ row['y'])|lower }}">
+                                <td>{{ row['x'] }}</td>
+                                <td>{{ row['y'] }}</td>
+                                <td class="num">{{ '{:,}'.format(row['n']) }}</td>
+                                {% if treemap_payload['aggregate'] != 'count' %}
+                                <td class="num">{{ '%g'|format(row['value']) }}</td>
+                                {% endif %}
+                                <td class="num">{{ '%.2f'|format(100 * row['n'] / treemap_payload['totalN']) if treemap_payload['totalN'] else '0.00' }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <p class="table-count" id="viz-tree-count" role="status"></p>
+                    <button type="button" class="btn btn-secondary btn-sm js-only" id="viz-tree-show-more" hidden>Show more</button>
+                </div>
+            </section>
+            {% endif %}
+        </div>
+        {% elif waterfall_payload %}
+        {# waterfall: year-over-year change in a numeric aggregate across sentencing years,
+           drawn with Chart.js floating bars (no plugin). The table below carries every year. #}
+        <div class="viz-result">
+            <section class="chart-card viz-waterfall" aria-labelledby="viz-wf-heading">
+                <h2 id="viz-wf-heading">{{ waterfall_payload['groupLabel'] }}
+                    <span class="chart-subhead">— year-over-year
+                        {% if waterfall_payload['aggregate'] == 'count' %}change in case count
+                        {% else %}change in {{ waterfall_payload['aggregate'] }} {{ waterfall_payload['measureLabel'] }}{% endif %}</span></h2>
+                <p class="chart-note">
+                    Each bar is one year’s change from the year before — bars that
+                    <span class="wf-key wf-key-up">rise</span> are green,
+                    <span class="wf-key wf-key-down">fall</span> red. A bar’s top sits at that
+                    year’s {{ 'case count' if waterfall_payload['aggregate'] == 'count'
+                              else waterfall_payload['aggregate'] ~ ' ' ~ waterfall_payload['measureLabel'] }},
+                    so the steps add up from
+                    <strong>{{ waterfall_payload['firstDisplay'] }}</strong> ({{ waterfall_payload['firstYear'] }})
+                    to <strong>{{ waterfall_payload['lastDisplay'] }}</strong> ({{ waterfall_payload['lastYear'] }}).
+                    The table below carries every year.
+                </p>
+                <div class="chart-box viz-waterfall-box">
+                    <canvas id="visualize-waterfall" role="img"
+                            aria-label="Waterfall of year-over-year {{ waterfall_payload['aggregate'] }} for {{ waterfall_payload['groupLabel'] }}; the values table below repeats these numbers"></canvas>
+                </div>
+                <script type="application/json" id="visualize-waterfall-data">{{ waterfall_payload|tojson }}</script>
+                <div class="viz-waterfall-controls js-only">
+                    <label class="wf-toggle">
+                        <input type="checkbox" id="viz-wf-running" data-wf-running>
+                        Show running-total line
+                    </label>
+                </div>
+            </section>
+
+            <section aria-label="Values">
+                <h2 id="viz-wf-values-heading">Values</h2>
+                <div class="table-wrapper table-scroll">
+                    <table class="data-table" id="viz-wf-table" aria-labelledby="viz-wf-values-heading">
+                        <caption class="visually-hidden">Year-over-year {{ waterfall_payload['aggregate'] }} for {{ waterfall_payload['groupLabel'] }}</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Year</th>
+                                <th scope="col" class="num">{{ waterfall_payload['valueHeader'] }}</th>
+                                <th scope="col" class="num">Change</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for step in waterfall_payload['steps'] %}
+                            <tr>
+                                <td>{{ step['year'] }}</td>
+                                <td class="num">{{ step['valueDisplay'] }}</td>
+                                <td class="num wf-delta wf-delta-{{ step['direction'] }}">{{ step['deltaDisplay'] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th scope="row" colspan="2">Net change, {{ waterfall_payload['firstYear'] }}–{{ waterfall_payload['lastYear'] }}</th>
+                                <td class="num wf-delta wf-delta-{{ waterfall_payload['netDirection'] }}">{{ waterfall_payload['netDisplay'] }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </section>
+        </div>
+        {% elif choropleth_payload %}
+        {# choropleth: a Minnesota geography shaded by a per-group aggregate over the active
+           slice. The grain toggle (Phase 9) switches county / judicial district / region — the
+           district & region shapes are dissolved client-side from the county TopoJSON via the
+           crosswalk (no district/region geometry file). The map is drawn by
+           static/js/visualize.js with the geo plugin; the legend swatches below use the SAME
+           .heat-1..8 tokens the crosstab does, and the JS reads their computed colors so map +
+           legend + crosstab all match. #}
+        <div class="viz-result">
+            <section class="chart-card viz-choropleth" aria-labelledby="viz-map-heading">
+                <h2 id="viz-map-heading">{{ choropleth_payload['valueHeader'] }}
+                    <span class="chart-subhead">— by {{ choropleth_payload['grainLabel']|lower }}</span></h2>
+
+                {# grain toggle: county / judicial district / region. Progressive-enhancement
+                   links (no-JS reloads with ?grain=…; with JS htmx swaps the fragment and pushes
+                   the URL) — the same segmented pattern as Explore's sort control, so the grain
+                   is fully stateful in the URL. Measure + aggregate ride along so switching level
+                   keeps the current summary. #}
+                <nav class="segmented viz-grain" aria-label="Map level"
+                     hx-target="#visualize-view" hx-push-url="true">
+                    {% for g in choropleth_grains %}
+                    {% if choropleth_payload['grain'] == g['id'] %}
+                    <span class="segmented-item" aria-current="true">{{ g['label'] }}</span>
+                    {% else %}
+                    <a class="segmented-item"
+                       href="{{ url_for('visualize', chart='choropleth', grain=g['id'], measure=form.get('measure'), aggregate=form.get('aggregate')) }}"
+                       hx-get="{{ url_for('visualize', chart='choropleth', grain=g['id'], measure=form.get('measure'), aggregate=form.get('aggregate')) }}">{{ g['label'] }}</a>
+                    {% endif %}
+                    {% endfor %}
+                </nav>
+
+                <p class="chart-note">
+                    Each {{ choropleth_payload['grainLabel']|lower }} is shaded by its
+                    {% if choropleth_payload['aggregate'] == 'count' %}case count{% else %}{{ choropleth_payload['aggregate'] }} {{ choropleth_payload['measureLabel'] }}{% endif %}
+                    over the current data state — darker means higher.
+                    <strong>{{ choropleth_payload['unitsWithData'] }}</strong> of
+                    {{ choropleth_payload['unitTotal'] }} {{ choropleth_payload['grainLabelPlural'] }}
+                    have cases here{% if choropleth_payload['unitsWithData'] < choropleth_payload['unitTotal'] %}; the rest show as
+                    “no data”{% endif %}.
+                    {% if choropleth_payload['lowNCount'] %}
+                    <strong>{{ choropleth_payload['lowNCount'] }}</strong>
+                    {{ choropleth_payload['grainLabelPlural'] if choropleth_payload['lowNCount'] != 1 else choropleth_payload['grainLabel']|lower }}
+                    {{ 'have' if choropleth_payload['lowNCount'] != 1 else 'has' }} fewer than
+                    {{ choropleth_payload['minN'] }} cases — too thin to shade with confidence, so
+                    {{ 'they are' if choropleth_payload['lowNCount'] != 1 else 'it is' }}
+                    hatched by default (use the toggle below to reveal
+                    {{ 'them' if choropleth_payload['lowNCount'] != 1 else 'it' }}).
+                    {% endif %}
+                    Hover for the value; the table below carries every
+                    {{ choropleth_payload['grainLabel']|lower }}.
+                    Selecting a {{ choropleth_payload['grainLabel']|lower }} on the map — or
+                    its <strong>Keep only</strong> button in the table — filters your data to
+                    just its cases (it becomes a chip in the sidebar, like any other filter).
+                </p>
+                <div class="chart-box viz-map-box">
+                    <canvas id="visualize-choropleth" role="img"
+                            aria-label="Map of Minnesota counties shaded by {{ choropleth_payload['valueHeader']|lower }}; the table below repeats these numbers and offers the same keep-only filter per {{ choropleth_payload['grainLabel']|lower }}"></canvas>
+                </div>
+                <script type="application/json" id="visualize-choropleth-data">{{ choropleth_payload|tojson }}</script>
+
+                {# legend: 0→peak 8-step ramp (same tokens as the crosstab heatmap) + a
+                   no-data chip. The swatches are decorative — the table is the a11y path. #}
+                <div class="viz-legend" id="viz-map-legend">
+                    <span class="viz-legend-caption">
+                        {% if choropleth_payload['aggregate'] == 'count' %}Cases{% else %}{{ choropleth_payload['aggLabel'] }} {{ choropleth_payload['measureLabel'] }}{% endif %}
+                    </span>
+                    <span class="viz-legend-scale">
+                        <span class="viz-legend-end">0</span>
+                        <span class="viz-legend-ramp" aria-hidden="true">
+                            {% for step in range(1, 9) %}<span class="heat-{{ step }}"></span>{% endfor %}
+                        </span>
+                        <span class="viz-legend-end" id="viz-map-peak">{{ choropleth_payload['peakDisplay'] }}</span>
+                    </span>
+                    <span class="viz-legend-nodata">
+                        <span class="viz-legend-swatch viz-legend-nodata-swatch" aria-hidden="true"></span>
+                        No data
+                    </span>
+                    {% if choropleth_payload['lowNCount'] %}
+                    {# small-N texture (Phase 10): the hatched swatch mirrors the CanvasPattern
+                       visualize.js fills thin geographies with — same tokens, both themes. The
+                       chip hides (via JS) when the "Hatch thin samples" toggle is switched off. #}
+                    <span class="viz-legend-nodata" id="viz-map-lown-chip">
+                        <span class="viz-legend-swatch viz-legend-lown-swatch" aria-hidden="true"></span>
+                        Fewer than {{ choropleth_payload['minN'] }} cases
+                    </span>
+                    {% endif %}
+                </div>
+
+                {% if choropleth_payload['lowNCount'] %}
+                {# "Hatch thin samples" toggle (js-only): on by default so thin geographies read as
+                   uncertain; switch off to reveal their (full-peak) shades. Pure client-side — the
+                   payload ships both ramp scales, so no refetch. No-JS keeps the hatched default. #}
+                <div class="viz-map-controls js-only">
+                    <label class="switch">
+                        <input type="checkbox" id="viz-map-hatch" checked>
+                        <span class="switch-track" aria-hidden="true"></span>
+                        Hatch thin samples
+                        <span class="switch-hint">({{ choropleth_payload['lowNCount'] }} below {{ choropleth_payload['minN'] }} cases)</span>
+                    </label>
+                </div>
+                {% endif %}
+            </section>
+
+            {% if choropleth_payload['rows'] %}
+            {% set units = choropleth_payload['grainLabelPlural']|capitalize %}
+            <section aria-label="{{ units }}">
+                <div class="view-toolbar">
+                    <h2 id="viz-map-values-heading">{{ units }}</h2>
+                    <div class="table-search js-only">
+                        <label class="visually-hidden" for="viz-map-search">Search {{ choropleth_payload['grainLabelPlural'] }}</label>
+                        <input type="search" id="viz-map-search" placeholder="Search {{ choropleth_payload['grainLabelPlural'] }}…"
+                               autocomplete="off" spellcheck="false">
+                    </div>
+                </div>
+                <div class="table-wrapper table-scroll">
+                    <table class="data-table" id="viz-map-table" aria-labelledby="viz-map-values-heading">
+                        <caption class="visually-hidden">{{ choropleth_payload['valueHeader'] }} by {{ choropleth_payload['grainLabel']|lower }}</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">{{ choropleth_payload['grainLabel'] }}</th>
+                                {% if choropleth_payload['aggregate'] != 'count' %}
+                                <th scope="col" class="num">{{ choropleth_payload['aggLabel'] }} {{ choropleth_payload['measureLabel'] }}</th>
+                                {% endif %}
+                                <th scope="col" class="num">Cases</th>
+                                {% if choropleth_payload['aggregate'] == 'count' %}
+                                <th scope="col" class="num">Share</th>
+                                {% endif %}
+                                <th scope="col"><span class="visually-hidden">Filter</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in choropleth_payload['rows'] %}
+                            <tr data-value="{{ row['label']|lower }}">
+                                <td>{{ row['label'] }}{% if row['lowN'] %}
+                                    <span class="badge badge-muted viz-lown-tag"
+                                          title="Fewer than {{ choropleth_payload['minN'] }} cases — too few to shade reliably">Low sample</span>{% endif %}</td>
+                                {% if choropleth_payload['aggregate'] != 'count' %}
+                                <td class="num">{{ row['display'] }}</td>
+                                {% endif %}
+                                <td class="num">{{ '{:,}'.format(row['n']) }}</td>
+                                {% if choropleth_payload['aggregate'] == 'count' %}
+                                <td class="num">{{ '%.2f'|format(100 * row['n'] / choropleth_payload['totalN']) if choropleth_payload['totalN'] else '0.00' }}%</td>
+                                {% endif %}
+                                <td class="viz-keep-cell">
+                                    {# the keyboard / no-JS twin of the map click (Phase 11):
+                                       posts the SAME fields to the SAME apply route, so the
+                                       history entry and cache dir are identical; `next`
+                                       returns the redirect to this map view (validated to a
+                                       local path server-side). #}
+                                    <form method="post" class="viz-keep-form"
+                                          action="{{ choropleth_payload['applyUrl'] }}"
+                                          data-loading="Applying filter…">
+                                        <input type="hidden" name="comparison" value="eq">
+                                        <input type="hidden" name="value" value="{{ row['filterValue'] }}">
+                                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                                        <button type="submit" class="btn btn-secondary btn-sm">Keep only<span class="visually-hidden"> {{ row['label'] }}</span></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <p class="table-count" id="viz-map-count" role="status"></p>
+                    <button type="button" class="btn btn-secondary btn-sm js-only" id="viz-map-show-more" hidden>Show more</button>
+                </div>
+            </section>
+            {% endif %}
+        </div>
+        {% elif scatter_payload %}
+        {# scatter/bubble: two numeric columns aggregated to a lattice — one bubble per (x, y)
+           cell with cases, sized by that cell's count (data.get_table reshaped, NEVER one mark
+           per row). Drawn by static/js/visualize.js; the table below carries every cell. #}
+        <div class="viz-result">
+            <section class="chart-card viz-scatter" aria-labelledby="viz-scatter-heading">
+                <h2 id="viz-scatter-heading">{{ scatter_payload['xLabel'] }} × {{ scatter_payload['yLabel'] }}
+                    <span class="chart-subhead">— case count by lattice cell</span></h2>
+                <p class="chart-note">
+                    Each bubble is one combination of
+                    <strong>{{ scatter_payload['xLabel'] }}</strong> (horizontal) and
+                    <strong>{{ scatter_payload['yLabel'] }}</strong> (vertical); its area is the
+                    number of cases at that pair — bigger means more cases.
+                    <strong>{{ '{:,}'.format(scatter_payload['cellCount']) }}</strong>
+                    {{ 'combination has' if scatter_payload['cellCount'] == 1 else 'combinations have' }}
+                    cases ({{ '{:,}'.format(scatter_payload['totalN']) }} in all). No individual
+                    cases are plotted — the table below carries every combination.
+                </p>
+                <div class="chart-box viz-scatter-box">
+                    <canvas id="visualize-scatter" role="img"
+                            aria-label="Bubble chart of {{ scatter_payload['xLabel'] }} against {{ scatter_payload['yLabel'] }}, each bubble sized by case count; the table below repeats these numbers"></canvas>
+                </div>
+                <script type="application/json" id="visualize-scatter-data">{{ scatter_payload|tojson }}</script>
+            </section>
+
+            {% if scatter_rows %}
+            <section aria-label="Values">
+                <div class="view-toolbar">
+                    <h2 id="viz-scatter-values-heading">Values</h2>
+                    <div class="table-search js-only">
+                        <label class="visually-hidden" for="viz-scatter-search">Search values</label>
+                        <input type="search" id="viz-scatter-search" placeholder="Search values…"
+                               autocomplete="off" spellcheck="false">
+                    </div>
+                </div>
+                <div class="table-wrapper table-scroll">
+                    <table class="data-table" id="viz-scatter-table" aria-labelledby="viz-scatter-values-heading">
+                        <caption class="visually-hidden">{{ scatter_payload['xLabel'] }} by {{ scatter_payload['yLabel'] }}, with case counts</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col" class="num">{{ scatter_payload['xLabel'] }}</th>
+                                <th scope="col" class="num">{{ scatter_payload['yLabel'] }}</th>
+                                <th scope="col" class="num">Cases</th>
+                                <th scope="col" class="num">Share</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in scatter_rows %}
+                            <tr data-value="{{ (row['x']|display_value ~ ' ' ~ row['y']|display_value)|lower }}">
+                                <td class="num">{{ row['x']|display_value }}</td>
+                                <td class="num">{{ row['y']|display_value }}</td>
+                                <td class="num">{{ '{:,}'.format(row['n']) }}</td>
+                                <td class="num">{{ '%.2f'|format(100 * row['n'] / scatter_payload['totalN']) if scatter_payload['totalN'] else '0.00' }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <p class="table-count" id="viz-scatter-count" role="status"></p>
+                    <button type="button" class="btn btn-secondary btn-sm js-only" id="viz-scatter-show-more" hidden>Show more</button>
+                </div>
+            </section>
+            {% endif %}
+        </div>
+        {% elif correlation_payload %}
+        {# correlation matrix (Phase 13): Pearson r for every pair of the picked numeric columns,
+           shaded on the SAME .heat-N ramp the crosstab uses (by |r| on the absolute 0→1 scale).
+           The signed number in every cell carries direction (a single-hue ramp can't). Off-diagonal
+           cells at |r| ≥ threshold are flagged as near-mechanical — the guidelines grid showing
+           through (VISUALIZATION_EXPANSION.md §6.5). Server-rendered table = the a11y / no-JS path;
+           there is no canvas, so nothing here needs Chart.js. #}
+        <div class="viz-result">
+            <section class="chart-card viz-correlation" aria-labelledby="viz-corr-heading">
+                <h2 id="viz-corr-heading">Correlation matrix
+                    <span class="chart-subhead">— Pearson r across {{ correlation_payload['k'] }} numeric columns</span></h2>
+                <p class="chart-note">
+                    Each cell is the Pearson correlation of two columns over your current data state
+                    ({{ '{:,}'.format(correlation_payload['sliceN']) }} cases).
+                    <strong>Darker = stronger</strong> relationship in <em>either</em> direction; the
+                    number’s sign is the direction — <strong>+</strong> move together,
+                    <strong>−</strong> move oppositely. Correlation isn’t causation, and a pair can
+                    move together because a third factor drives both.
+                </p>
+
+                {% if correlation_payload['mechanicalCount'] %}
+                {# the teachable artifact: near-1.0 off-diagonal cells are the sentencing grid's own
+                   arithmetic, not an empirical finding. Listed as text so the callout is the
+                   accessible path to the annotation the per-cell marker/tooltip carries visually. #}
+                <div class="corr-callout" role="note">
+                    <p><strong>{{ correlation_payload['mechanicalCount'] }}</strong>
+                       near-mechanical {{ 'pair' if correlation_payload['mechanicalCount'] == 1 else 'pairs' }}
+                       (|r| ≥ {{ correlation_payload['mechanicalDisplay'] }}):
+                       {% for p in correlation_payload['mechanicalPairs'] %}<span class="corr-pair">{{ p['a'] }} × {{ p['b'] }} ({{ p['display'] }})</span>{% if not loop.last %}, {% endif %}{% endfor %}.
+                       Minnesota’s presumptive sentence is <em>read off the Sentencing Guidelines
+                       grid</em> (offense severity × criminal-history score), so the grid’s own
+                       outputs — presumptive time, its lower/upper range, grid-cell time — are
+                       near-duplicates <em>by construction</em>. When those cells glow near 1.0
+                       it’s the grid’s arithmetic showing through, not a pattern the data revealed.
+                    </p>
+                </div>
+                {% endif %}
+
+                <div class="table-wrapper table-scroll">
+                    <table class="data-table corr-matrix" id="viz-corr-table">
+                        <caption class="visually-hidden">Pearson correlation matrix across the selected
+                            numeric columns; each cell is r for the row column against the column column,
+                            and the diagonal is 1.00.</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col" class="corr-corner"><span class="visually-hidden">Column</span></th>
+                                {% for label in correlation_payload['labels'] %}
+                                <th scope="col" class="num" title="{{ label }} ({{ correlation_payload['codes'][loop.index0] }})">{{ correlation_payload['codes'][loop.index0] }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in correlation_payload['grid'] %}
+                            {% set i = loop.index0 %}
+                            <tr>
+                                <th scope="row" title="{{ correlation_payload['codes'][i] }}">{{ correlation_payload['labels'][i] }}</th>
+                                {% for cell in row %}
+                                <td class="num corr-cell{% if cell['diag'] %} corr-diag{% endif %}{% if cell['mechanical'] %} corr-mechanical{% endif %}{% if cell['sign'] == 'neg' %} corr-neg{% endif %}{% if cell['heat'] %} heat-{{ cell['heat'] }}{% endif %}"
+                                    {% if cell['mechanical'] %}title="Near-mechanical: {{ correlation_payload['labels'][i] }} and {{ correlation_payload['labels'][loop.index0] }} move together almost perfectly (r = {{ cell['display'] }}, {{ '{:,}'.format(cell['n']) }} cases) — the guidelines grid computing one from the other."{% elif cell['r'] is not none %}title="r = {{ cell['display'] }} ({{ '{:,}'.format(cell['n']) }} cases)"{% else %}title="Not enough shared data to compute r"{% endif %}>
+                                    {{ cell['display'] }}{% if cell['mechanical'] %}<span class="corr-flag" aria-hidden="true">●</span>{% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="table-note">
+                    The diagonal is 1.00 (each column with itself). Cells are shaded on the same
+                    scale as the Compare heatmap — strength only, so the sign lives in the number.{% if correlation_payload['mechanicalCount'] %}
+                    <span class="corr-flag-key"><span class="corr-flag" aria-hidden="true">●</span> marks near-mechanical pairs.</span>{% endif %}
+                    “—” means too few cases share both values to compute r.
+                </p>
+            </section>
+        </div>
+        {% elif chart and chart['status'] == 'ready' %}
+        {# ready chart type, but its column(s)/aggregate aren't chosen (or valid) yet #}
+        <div class="empty-state">
+            <p class="empty-state-code" aria-hidden="true">◔</p>
+            {% if chart['id'] == 'treemap' %}
+            <h2>Pick two columns to nest</h2>
+            <p>{{ chart['blurb'] }} Choose a <strong>Column</strong> and a
+               <strong>Second column</strong> above, then select <strong>Show chart</strong>.</p>
+            {% elif chart['id'] == 'waterfall' %}
+            <h2>Choose how to summarize each year</h2>
+            <p>{{ chart['blurb'] }} Keep <strong>Count of cases</strong> for the caseload trend,
+               or pick a numeric <strong>Measure</strong> with <strong>mean</strong> or
+               <strong>median</strong>, then select <strong>Show chart</strong>.</p>
+            {% elif chart['id'] == 'choropleth' %}
+            <h2>No geography to map</h2>
+            <p>{{ chart['blurb'] }} No cases in the current data state carry a location, so there
+               is nothing to shade. Clear a filter in the sidebar and try again.</p>
+            {% elif chart['id'] == 'scatter' %}
+            <h2>Pick two numeric columns</h2>
+            <p>{{ chart['blurb'] }} Choose a numeric <strong>Horizontal axis (X)</strong> and a
+               numeric <strong>Vertical axis (Y)</strong> above, then select
+               <strong>Show chart</strong>. Each bubble is one lattice cell, sized by its case
+               count — no individual cases are plotted.</p>
+            {% elif chart['id'] == 'correlation' %}
+            <h2>Pick numeric columns to correlate</h2>
+            <p>{{ chart['blurb'] }} Choose between {{ correlation_min }} and {{ correlation_max }}
+               numeric columns above, then select <strong>Show chart</strong>. Each cell shows how
+               strongly two columns move together over your current data state.</p>
+            {% else %}
+            <h2>Pick a column to chart</h2>
+            <p>{{ chart['blurb'] }} Choose a column above (or from the sidebar list), then
+               select <strong>Show chart</strong>.</p>
+            {% endif %}
+        </div>
+        {% elif chart %}
+        {# a chart type is selected but its render is not built yet #}
+        <div class="empty-state">
+            <p class="empty-state-code" aria-hidden="true">◔</p>
+            <h2>{{ chart['label'] }} — coming soon</h2>
+            <p>{{ chart['blurb'] }} This chart type lands in a later update. Your selection is
+               saved in the page address, so it will render here as soon as it is ready.</p>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p class="empty-state-code" aria-hidden="true">▤</p>
+            <h2>Pick a chart to begin</h2>
+            <p>Choose a chart type and a column, then select <strong>Show chart</strong>.
+               Everything you build runs on your current data state — the same
+               {% if datastate %}<strong>{{ '{:,}'.format(datastate['entries']) }}</strong>{% endif %}
+               cases shown in the sidebar.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>

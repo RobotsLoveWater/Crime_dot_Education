@@ -1,7 +1,12 @@
 # Visualization Expansion (a Visualize workbench: charts, maps, correlation)
 
-**Status:** **PLANNED / IN PROGRESS — `visualization_expansion` branch (off `main`, which already
-includes the base-DataFrame optimization).**
+**Status:** **IMPLEMENTED — all 5 tiers / 16 phases, 2026-07-09, `visualization_expansion` branch**
+(off `main`, which already includes the base-DataFrame optimization). All six chart types (pie,
+treemap, waterfall, choropleth, scatter/bubble, correlation matrix), the "Other"-cutoff slider,
+`mode`, and map-as-filter on both the Visualize tab and the Filter view are built and QA'd (§10
+below). **One acceptance criterion is not met:** no shipped lesson uses a Visualize chart (§10
+item 7) — tracked as follow-up, not a blocker for the tab itself. See `CLAUDE.md`'s
+"visualization expansion" section for the current-state authority and exact routes/files.
 **Author of proposal:** Claude (for Sidney D. Allen)
 **Date:** 2026-07-08 (brainstormed + spec'd)
 **Scope:** a new top-level **Visualize** workbench tab plus two map affordances, giving the Explorer
@@ -214,17 +219,27 @@ Each tier is independently revertible and additive — none changes existing rou
   so pulling the map leaves filtering intact.
 No data migration; user pickles, classes, lessons, and the disk cache are untouched throughout.
 
-## 10. Acceptance criteria (whole effort)
-1. Every Visualize chart computes on the **active history** and reconciles with the sidebar count.
-2. For ≥5 sampled `(chart, measure, aggregate, grain)` combinations, a map/chart cell **equals** the
-   matching Compare/Explore value (exact).
-3. Map-click and hand-typed filters produce **byte-identical `cache/data/` dirs** (100%).
-4. All 87 counties join to the map (startup assertion passes); small-N geographies render as texture.
-5. `mode` appears as an Explore stat card and an aggregate option, with the tie badge.
-6. **No external requests** at 375 / 768 / 1280 in both themes; `VERSIONS.md` matches the vendored
-   libs; `test_base_immutability.py` green.
-7. No change to routes' meaning, cache-dir layout, or the history schema. `≥1` lesson uses a Visualize
-   chart (the educator payoff).
+## 10. Acceptance criteria (whole effort) — verified 2026-07-09, Phase 14 QA
+1. **Met.** Every Visualize chart computes on the **active history** and reconciles with the
+   sidebar count.
+2. **Met.** An 11-combo spot-check across all 6 chart types × 3 grains × 4 aggregates matched
+   Explore/Compare exactly.
+3. **Met.** `test_map_filter_equivalence.py` asserts this for every shape at every grain (not just
+   a sample) — map-click and hand-typed filters produce **byte-identical `cache/data/` dirs**.
+4. **Met.** All 87 counties join (startup assertion, `geo.assert_county_coverage`); a deep filter
+   QA run showed 52 low-N counties rendering as hatch texture.
+5. **Met.** `mode` appears as an Explore stat card and an aggregate option, with the "+N more" tie
+   badge (`dsentenc` is the only shipped multimodal float64 column, 3 modes).
+6. **Met.** Zero external/failed requests at 375 / 768 / 1280 in both themes; `VERSIONS.md` matches
+   the vendored libs (htmx, Chart.js, chartjs-chart-treemap, chartjs-chart-geo — patternomaly was
+   **not** needed, the small-N hatch is a hand-rolled `CanvasPattern`); `test_base_immutability.py`
+   green.
+7. **Partially met.** No change to routes' meaning, cache-dir layout, or the history schema — the
+   only new route is `/visualize`; map-click and the "Keep only" button both ride the pre-existing
+   `/explore/filter/<column>` POST. **`≥1` lesson uses a Visualize chart is NOT met** — no shipped
+   `lessons/*.json` references a chart, and `app.build_lesson_data` only supports `info`/`table`
+   focus views. Closing this needs a new chart focus-view plus an authored lesson step; left as
+   deliberate follow-up work rather than folded into the QA/docs passes (Phases 14–15).
 
 ## 11. Effort estimate
 - **Tier 1 (foundations):** ~1 day — backend `mode` + aggregate helper + the tab shell (the shell is

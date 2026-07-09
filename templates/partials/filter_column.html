@@ -55,6 +55,9 @@
             median <strong>{{ info['mdn'] }}</strong> ·
             std <strong>{{ info['std'] }}</strong>.</p>
 
+        {# geography column (district): the map fills the value input above (Phase 11) #}
+        {% if filter_map %}{% include 'partials/filter_map.html' %}{% endif %}
+
         <div class="filter-preview" id="filter-preview" role="status" aria-live="polite"
              hx-get="{{ url_for('explore_filter_preview', column=column) }}"
              hx-trigger="change from:#numeric-filter-form, keyup changed delay:600ms from:#numeric-filter-form"
@@ -77,6 +80,9 @@
             <p class="field-hint">“Not equal to” is meant for a single value.</p>
         </fieldset>
 
+        {# geography columns (county/region) get the map input beside the list (Phase 11);
+           the wrapper div is a plain block unless the map is present #}
+        <div{% if filter_map %} class="filter-geo-split"{% endif %}>
         <div class="value-picker">
             <div class="value-picker-toolbar">
                 <div class="table-search js-only">
@@ -101,6 +107,8 @@
                 </li>
                 {% endfor %}
             </ul>
+        </div>
+        {% if filter_map %}{% include 'partials/filter_map.html' %}{% endif %}
         </div>
 
         <div class="filter-preview" id="filter-preview" role="status" aria-live="polite"

@@ -1,8 +1,14 @@
 # Visualization Expansion — Implementation Prompts
 
-> **Status: PLANNED — `visualization_expansion` branch (off `main`, which already includes the
-> base-DataFrame optimization).** Nothing here is built yet. Feed **one phase at a time** to a fresh
-> Claude instance (or use as a dev checklist). Each phase should end green before the next starts.
+> **Status: all phases (0–15) are DONE** (2026-07-09, `visualization_expansion` branch, off `main`
+> which already includes the base-DataFrame optimization). Phase 14's cross-cutting QA passed
+> everything verifiable — both guardrail tests, an 11-combo correctness spot-check across all 6
+> chart types, the 87-county join, small-N hatch, `mode` + its tie badge, map-click → filter,
+> responsive/theme/no-CDN QA. **One open gap remains from §10 criterion 7:** no shipped lesson uses
+> a Visualize chart — `app.build_lesson_data` only supports `info`/`table` focus views, and closing
+> it needs a new chart focus-view plus an authored lesson step (a feature+content deliverable, not a
+> QA or docs fix). Tracked as follow-up work, not a blocker for calling the tab itself shipped. The
+> prompts below are kept as the build record.
 
 Sequenced, self-contained prompts for the **Visualize workbench**: a new top-level tab with an
 extensive chart vocabulary (pie, treemap, waterfall, choropleth, scatter/bubble, correlation matrix),
@@ -62,7 +68,7 @@ Each phase carries `**Effort:** S/M/L · **Risk:** Low/Med/High · **Model:** �
 
 # TIER 1 — Foundations
 
-## Phase 0 — Guardrails & docs prep (no user-facing change)
+## Phase 0 — Guardrails & docs prep (no user-facing change) ✅ DONE
 **Effort:** S · **Risk:** Low · **Model:** Sonnet
 
 **Goal:** extend the immutability guardrail to the read paths the new stats/aggregations will use, so
@@ -82,7 +88,7 @@ every later phase can prove it mutated nothing; confirm the twin docs are in pla
 
 ---
 
-## Phase 1 — Backend: `mode` + shared measure/aggregate helper
+## Phase 1 — Backend: `mode` + shared measure/aggregate helper ✅ DONE
 **Effort:** M · **Risk:** Med · **Model:** Opus
 
 **Goal:** the one new descriptive stat + the one shared aggregation code path every later tier reuses.
@@ -105,7 +111,7 @@ match hand-computed spot checks; immutability test green.
 
 ---
 
-## Phase 2 — Explore: `mode` stat card
+## Phase 2 — Explore: `mode` stat card ✅ DONE
 **Effort:** S · **Risk:** Low · **Model:** Sonnet
 
 **Goal:** surface `mode` beside mean/median in the Explore statistics view (the "minor upgrade" that
@@ -123,7 +129,7 @@ multimodal badge shows.
 
 ---
 
-## Phase 3 — Visualize tab shell (blank canvas)
+## Phase 3 — Visualize tab shell (blank canvas) ✅ DONE
 **Effort:** L · **Risk:** Med · **Model:** Opus (high)
 
 **Goal:** the backbone all chart families plug into — a new tab, the fragment plumbing, the sidebar
@@ -153,7 +159,7 @@ Explore; builder posts state into a URL that survives hard refresh; no console e
 
 # TIER 2 — New chart types
 
-## Phase 4 — Reusable "Other"-cutoff slider + Pie
+## Phase 4 — Reusable "Other"-cutoff slider + Pie ✅ DONE
 **Effort:** M · **Risk:** Med · **Model:** Opus
 
 **Goal:** the first real chart + the reusable long-tail control.
@@ -172,7 +178,7 @@ refetch where feasible; no-JS shows a sensible default.
 
 ---
 
-## Phase 5 — Treemap (two-column nested)
+## Phase 5 — Treemap (two-column nested) ✅ DONE
 **Effort:** M · **Risk:** Med · **Model:** Opus
 
 **Goal:** the part-of-whole view for two columns (the treemap-over-sunburst decision).
@@ -188,7 +194,7 @@ works; loads only on the Visualize view.
 
 ---
 
-## Phase 6 — Waterfall (year-over-year)
+## Phase 6 — Waterfall (year-over-year) ✅ DONE
 **Effort:** M · **Risk:** Med · **Model:** Opus
 
 **Goal:** the time view — change in a numeric aggregate across `sentyear` (the natural home for the
@@ -208,7 +214,7 @@ visible 2016-era step; both themes.
 
 # TIER 3 — Geography (the centerpiece)
 
-## Phase 7 — Geo foundation: vendor + county-name join + crosswalk
+## Phase 7 — Geo foundation: vendor + county-name join + crosswalk ✅ DONE
 **Effort:** L · **Risk:** High · **Model:** Opus (ultra)
 
 **Goal:** the geometry + the reliable join everything geographic rests on.
@@ -231,7 +237,7 @@ regions; no external crosswalk file.
 
 ---
 
-## Phase 8 — County choropleth
+## Phase 8 — County choropleth ✅ DONE
 **Effort:** L · **Risk:** High · **Model:** Opus (ultra)
 
 **Goal:** the first map — MN colored by a measure+aggregate on the active slice.
@@ -249,7 +255,7 @@ combos; legend correct; both themes; no blank-until-refresh.
 
 ---
 
-## Phase 9 — District / region dissolve + grain toggle
+## Phase 9 — District / region dissolve + grain toggle ✅ DONE
 **Effort:** M · **Risk:** Med · **Model:** Opus
 
 **Goal:** the three-level grain switch.
@@ -265,7 +271,7 @@ aggregate; toggle is stateful in the URL.
 
 ---
 
-## Phase 10 — Small-N texture
+## Phase 10 — Small-N texture ✅ DONE
 **Effort:** M · **Risk:** Med · **Model:** Opus
 
 **Goal:** make thin samples *look* uncertain instead of confidently colored.
@@ -283,7 +289,7 @@ tooltip; threshold is one documented constant; both themes.
 
 ---
 
-## Phase 11 — Map-click → filter (Visualize + Filter view) + a11y fallback  ⚠ VITAL
+## Phase 11 — Map-click → filter (Visualize + Filter view) + a11y fallback  ⚠ VITAL ✅ DONE
 **Effort:** L · **Risk:** High · **Model:** Fable
 
 **Goal:** the linchpin — clicking a geography appends the *exact* filter typing it would, on both
@@ -314,7 +320,7 @@ chip; screen-reader/no-JS path works; the equivalence test passes.
 
 # TIER 4 — Correlate (new math)
 
-## Phase 12 — Aggregated lattice scatter / bubble
+## Phase 12 — Aggregated lattice scatter / bubble ✅ DONE
 **Effort:** M · **Risk:** Med · **Model:** Opus
 
 **Goal:** relationship view without 294k overplotted points.
@@ -331,7 +337,7 @@ presumptive `time`) shows the expected lattice.
 
 ---
 
-## Phase 13 — Correlation matrix
+## Phase 13 — Correlation matrix ✅ DONE
 **Effort:** L · **Risk:** High · **Model:** Opus (ultra)
 
 **Goal:** a numeric correlation heatmap that teaches the grid.
@@ -352,7 +358,7 @@ no disk cache written; annotation present; immutability test green.
 
 # TIER 5 — QA & docs
 
-## Phase 14 — Cross-cutting QA
+## Phase 14 — Cross-cutting QA ✅ DONE
 **Effort:** L · **Risk:** Med · **Model:** Opus (high)
 
 **Goal:** prove it holds together across themes, sizes, a11y, and the repo's hard lines.
@@ -372,7 +378,7 @@ no failed/external network requests.
 
 ---
 
-## Phase 15 — Docs true + roadmap close-out
+## Phase 15 — Docs true + roadmap close-out ✅ DONE
 **Effort:** S–M · **Risk:** Low · **Model:** Sonnet
 
 **Goal:** leave the repo docs matching reality.
@@ -391,8 +397,14 @@ and vendored asset; this file reads as *done*.
 
 ---
 
-## Done criteria (whole effort)
+## Done criteria (whole effort) — met except one tracked gap
 Mirrors `VISUALIZATION_EXPANSION.md` §10: charts compute on the active history and match
-Explore/Compare exactly; map-click == typed-filter cache dirs; all 87 counties join; small-N is
-texture; `mode` shipped with the tie badge; no external requests in both themes; immutability green;
-no change to routes' meaning, cache layout, or the history schema; ≥1 lesson uses a Visualize chart.
+Explore/Compare exactly (verified, 11-combo spot-check); map-click == typed-filter cache dirs
+(verified, `test_map_filter_equivalence.py`); all 87 counties join (verified, startup assertion +
+QA); small-N is texture (verified); `mode` shipped with the tie badge (verified); no external
+requests in both themes (verified); immutability green (verified, `test_base_immutability.py`); no
+change to routes' meaning, cache layout, or the history schema (verified — the only new route is
+`/visualize`; map-click and "Keep only" both ride the existing `/explore/filter/<column>` POST).
+**Not met:** ≥1 lesson uses a Visualize chart — no shipped `lessons/*.json` references a chart focus
+view (`app.build_lesson_data` only handles `info`/`table`). Left as follow-up work; see
+`CLAUDE.md`'s visualization-expansion section for the honest status.

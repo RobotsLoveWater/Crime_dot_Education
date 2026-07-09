@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block title %} — Visualize{% endblock %}
+
+{% block head %}
+{# Chart libraries load ONLY on the Visualize view (vendored, no runtime CDN) — the same
+   per-view convention as explore.html / compare.html. Chart.js arrives here in Tier 2
+   (Phase 4: pie); the treemap plugin joins in Phase 5 (loaded AFTER chart.umd.min.js so it
+   auto-registers the 'treemap' type); the geo plugin (choropleth) joins in Phase 8 — it does
+   NOT self-register, so visualize.js calls Chart.register(ChartGeo.*) explicitly. otherbucket.js
+   loads before visualize.js so window.chartBucket is ready when a chart renders. #}
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/vendor/chartjs-chart-treemap.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/vendor/chartjs-chart-geo.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/otherbucket.js') }}" defer></script>
+{# geomap.js: the shared TopoJSON fetch / plugin registration / dissolve plumbing used by
+   BOTH map surfaces (this choropleth and the Filter view's map input) — one geometry
+   implementation, loaded before the view script that draws with it. #}
+<script src="{{ url_for('static', filename='js/geomap.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/visualize.js') }}" defer></script>
+{% endblock %}
+
+{% block sidebar_extra %}
+{# reuse the Phase 2 column browser, pointed at this view; clicking a column sets it as the
+   chart's primary column (?column=…) and swaps the view fragment. #}
+{% with browser_endpoint='visualize', browser_target='#visualize-view', browser_title='Columns' %}
+{% include 'partials/column_browser.html' %}
+{% endwith %}
+{% endblock %}
+
+{% block body %}
+{# htmx swap target: the Visualize view (builder + canvas) is replaced here; hx-push-url
+   keeps every builder state bookmarkable — same pattern as explore.html / compare.html #}
+<div id="visualize-view" class="visualize-view">
+    {% include 'partials/visualize_view.html' %}
+</div>
+{% endblock %}

@@ -191,6 +191,19 @@ def get_moc_options(session, moc_filter, active):
     return temp_options[str(moc_filter)][int(active)-1]
 
 
+def get_aggregate(session, group_column, measure, aggregate, history_override=None) -> dict:
+    # Aggregate the active filtered slice: group_column -> {group_value: value}, via
+    # Data.aggregate_by_group. The one session-aware entry point the Visualize tiers call
+    # for choropleth fills, waterfall/treemap values, and bubble sizes.
+    #
+    # Computed FRESH per request and NEVER disk-cached -- the Visualize charts/maps ride
+    # the per-request path (like crosstabs and, later, correlations), so this writes no new
+    # .bin artifacts and adds nothing to the cache-dir layout. Reads the shared base through
+    # _execute, read-only (the base stays immutable). history_override lets a lesson sandbox
+    # apply its own state on top without touching the student's stored history.
+    return _execute(session, history_override).aggregate_by_group(group_column, measure, aggregate)
+
+
 # --- base DataFrame singleton (Lever B: load the base once per process) -----------
 # The base (full-dataset) frame is identical for every request and is never mutated
 # in place — filters return new frames via boolean indexing (see the immutability
@@ -222,6 +235,48 @@ def _base_df():
         'base DataFrame mutated between requests (shape/identity drift)'
 
     return _BASE
+
+
+# --- county -> district / region crosswalk (Phase 7 geo foundation) ----------------
+# Every row already carries county + district + region, so the dissolve mappings a
+# district/region choropleth needs are DERIVED from the data (df.groupby('county')
+# [...].first()) -- there are no external crosswalk files, only the vendored county
+# TopoJSON. Verified functional: no county spans >1 district or >1 region, so .first()
+# is exact (yields 10 districts + 4 regions). Memoized once per process next to _base_df;
+# read-only over the shared base (groupby returns new objects -- the base stays immutable,
+# guarded by test_base_immutability.py).
+COUNTY_COLUMN = 'county'
+CROSSWALK_COLUMNS = ['district', 'region']
+_COUNTY_CROSSWALK = None  # {'district': {county: d}, 'region': {county: r}}
+
+
+def _county_crosswalk() -> dict:
+    """Return the process-wide county->{district, region} crosswalk, built once.
+
+    Structure: {'district': {county_name: district_value},
+                'region':   {county_name: region_value}}.
+    Keys are the dataset's own county spellings (geo.py reconciles them to map
+    feature names). District values are float (e.g. 4.0), matching the numeric-filter
+    encoding a map-click emits (f.district.eq.4.0).
+    """
+    global _COUNTY_CROSSWALK
+
+    if _COUNTY_CROSSWALK is None:
+        base = _base_df()
+        # observed=True: only the counties actually present; .first() is exact because
+        # each county maps to a single district and region (see the module note above).
+        grouped = base.groupby(COUNTY_COLUMN, observed=True)[CROSSWALK_COLUMNS].first()
+        _COUNTY_CROSSWALK = {
+            'district': grouped['district'].to_dict(),
+            'region': grouped['region'].to_dict(),
+        }
+
+    return _COUNTY_CROSSWALK
+
+
+def county_values() -> list:
+    """Sorted list of the distinct county names present in the base dataset."""
+    return sorted(_county_crosswalk()['district'].keys())
 
 
 def _execute(session, history_override=None) -> Data:

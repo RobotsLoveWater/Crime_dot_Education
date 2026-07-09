@@ -2,6 +2,14 @@
 {% block title %} — {{ 'Filter ' ~ header if column else 'Filter' }}{% endblock %}
 
 {% block head %}
+{# Chart.js + the geo plugin power the Phase 11 map input for the geography columns
+   (county / district / region). Loaded per-view (vendored, no runtime CDN) — the same
+   convention as explore.html / compare.html / visualize.html; geomap.js (the shared
+   TopoJSON/dissolve plumbing) must come before filter.js, which draws the map. On
+   non-geography columns the map code no-ops. #}
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/vendor/chartjs-chart-geo.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/geomap.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/filter.js') }}" defer></script>
 {% endblock %}
 

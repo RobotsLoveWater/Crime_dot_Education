@@ -14,6 +14,13 @@
 # Runs standalone (`uv run python test_base_immutability.py`, prints a report and exits
 # non-zero on failure). The test_* functions are also pytest-compatible if pytest is
 # ever added to the env (it is not a project dependency today).
+#
+# Visualization-expansion (see VISUALIZATION_EXPANSION.md / _PROMPTS.md) extended the
+# pipeline below with aggregate + correlation reads: the aggregate read routes through the
+# real Phase 1 helper (Data.aggregate_by_group -- choropleth/waterfall/treemap/bubble values),
+# and the correlation read exercises the exact df[cols].corr() shape Tier 4's correlation
+# matrix now uses (app.build_correlation, Phase 13). Both prove those read shapes leave the
+# shared base untouched.
 
 import sys
 import functools
@@ -23,7 +30,14 @@ import make_history
 from data import Data
 
 # A spread of dtypes: numeric (float64) + low-cardinality categorical (object).
-SPOT_COLS = ["time", "sex", "moc1", "race"]
+# 'county' is included because it's the group key the visualization-expansion
+# aggregate/correlation reads below exercise (see VISUALIZATION_EXPANSION.md §6.1/§6.5).
+SPOT_COLS = ["time", "sex", "moc1", "race", "county"]
+
+# Numeric subset for the representative correlation read below -- mirrors the kind of
+# 2-8 column pick Tier 4's correlation matrix (VISUALIZATION_EXPANSION_PROMPTS.md
+# Phase 13) will let a user make.
+CORRELATION_SUBSET = ["time", "history", "aggsentc"]
 
 # Representative chain exercising all three filter kinds the app emits.
 NUMERIC = make_history.filter_single("time", "gt", "14")                          # f.time.gt.14
@@ -74,6 +88,32 @@ def _run_pipeline(base):
     # get_moc_options reassigns the *reader's* self.df (inplace filter_moc default) but
     # must never mutate the underlying base frame object -- that's the crux of the property.
     reader.get_moc_options(["A", "*", "*", "*", "*"])
+
+    # --- visualization-expansion read shapes ---
+
+    # Aggregate reads through the real Phase 1 helper (Data.aggregate_by_group): the
+    # (group_column, measure, aggregate) -> by-group series that feeds choropleth fills,
+    # waterfall/treemap values, and bubble sizes (VISUALIZATION_EXPANSION.md §6.1). Exercise
+    # all three branches (count / numeric mean / groupby-mode) against the base via an
+    # explicit source= so each is proven read-only over the shared frame.
+    results["agg_count"] = reader.aggregate_by_group("county", "#", "count", source=base)
+    results["agg_mean"] = reader.aggregate_by_group("county", "time", "mean", source=base)
+    results["agg_mode"] = reader.aggregate_by_group("county", "time", "mode", source=base)
+
+    # Phase 9 grain switch aggregates over the district (float64) and region (categorical)
+    # columns instead of county — same helper, different group column, same read-only contract.
+    results["agg_district"] = reader.aggregate_by_group("district", "time", "mean", source=base)
+    results["agg_region"] = reader.aggregate_by_group("region", "#", "count", source=base)
+
+    # County->district/region crosswalk read (Phase 7 geo foundation): the groupby.first()
+    # that cache._county_crosswalk() derives from the base. Read-only over the shared frame,
+    # so exercise the same shape here to prove it leaves the base untouched.
+    results["crosswalk"] = base.groupby("county", observed=True)[["district", "region"]].first()
+
+    # Correlation read: the exact df[cols].corr() shape Tier 4's Pearson correlation matrix
+    # uses (VISUALIZATION_EXPANSION.md §6.5 / app.build_correlation, Phase 13) -- a user-picked
+    # numeric subset, computed fresh and never disk-cached.
+    results["correlation"] = base[CORRELATION_SUBSET].corr()
 
     return results
 

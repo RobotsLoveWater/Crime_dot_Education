@@ -39,6 +39,7 @@
 {% set section = 'compare' if p.startswith('/table') or p.startswith('/explore/table') else
                  'filter' if p.startswith('/filter') or p.startswith('/explore/filter') or p.startswith('/explore/moc') else
                  'stats' if p.startswith('/info') or p.startswith('/explore') else
+                 'visualize' if p.startswith('/visualize') else
                  'lessons' if p.startswith('/lesson') else
                  'authoring' if p.startswith('/admin') else '' %}
 
@@ -60,6 +61,7 @@
             <li><a href="{{ url_for('explore') }}" {% if section == 'stats' %}aria-current="page"{% endif %}>Statistics</a></li>
             <li><a href="{{ url_for('explore_table') }}" {% if section == 'compare' %}aria-current="page"{% endif %}>Compare</a></li>
             <li><a href="{{ url_for('explore_filter') }}" {% if section == 'filter' %}aria-current="page"{% endif %}>Filter</a></li>
+            <li><a href="{{ url_for('visualize') }}" {% if section == 'visualize' %}aria-current="page"{% endif %}>Visualize</a></li>
             <li><a href="{{ url_for('lesson_catalog') }}" {% if section == 'lessons' %}aria-current="page"{% endif %}>Lessons</a></li>
             {% if user['is_educator'] %}
             <li><a href="{{ url_for('admin') }}" {% if section == 'authoring' %}aria-current="page"{% endif %}>Authoring</a></li>
@@ -231,6 +233,10 @@
     <a href="{{ url_for('explore_filter') }}" {% if section == 'filter' %}aria-current="page"{% endif %}>
         <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>
         <span class="bottom-nav-label">Filter</span>
+    </a>
+    <a href="{{ url_for('visualize') }}" {% if section == 'visualize' %}aria-current="page"{% endif %}>
+        <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 12V3a9 9 0 1 0 9 9z"/></svg>
+        <span class="bottom-nav-label">Visualize</span>
     </a>
     <a href="{{ url_for('lesson_catalog') }}" {% if section == 'lessons' %}aria-current="page"{% endif %}>
         <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4 2 9l10 5 10-5z"/><path d="M6 11.5V16c0 1 2.7 2 6 2s6-1 6-2v-4.5"/></svg>

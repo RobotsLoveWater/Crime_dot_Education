@@ -36,6 +36,15 @@
             <span class="stat-value">{{ info['mdn'] }}</span>
         </div>
         <div class="stat-card">
+            <span class="stat-label">Mode</span>
+            <span class="stat-value">
+                {{ info['mode'] }}
+                {% if info['mode_extra'] > 0 %}
+                <span class="badge badge-muted" title="{{ info['mode_extra'] }} other value{{ 's' if info['mode_extra'] != 1 else '' }} tie the same count">+{{ info['mode_extra'] }} more</span>
+                {% endif %}
+            </span>
+        </div>
+        <div class="stat-card">
             <span class="stat-label">Std. deviation</span>
             <span class="stat-value">{{ info['std'] }}</span>
         </div>
@@ -47,8 +56,8 @@
         <h2>Distribution</h2>
         <p class="chart-note">
             {% if chart['other'] > 0 %}
-            The {{ chart['labels']|length }} most common values; the remaining
-            {{ '{:,}'.format(chart['otherValues']) }} values are grouped as “Other”.
+            The most common values by case count; the rest are grouped as “Other”
+            {% if chart['sliderMax'] > chart['sliderMin'] %}(drag the slider to change how many show){% endif %}.
             {% else %}
             All {{ chart['labels']|length }} values by case count.
             {% endif %}
@@ -56,6 +65,9 @@
         </p>
         <div class="chart-box"><canvas id="explore-chart" aria-label="Bar chart of the value distribution; the values table repeats these numbers" role="img"></canvas></div>
         <script type="application/json" id="explore-chart-data">{{ chart|tojson }}</script>
+        {% with slider=chart, slider_id='explore', slider_noun='values' %}
+        {% include 'partials/other_cutoff_slider.html' %}
+        {% endwith %}
     </section>
 
     <section aria-label="Values">

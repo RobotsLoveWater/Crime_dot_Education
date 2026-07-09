@@ -307,9 +307,26 @@
 
   var pickerSeq = 0;
 
+  // Hide the native <select> once its combobox exists (idempotent).
+  function hideNative(select) {
+    select.classList.add('picker-native');
+    select.tabIndex = -1;
+    select.setAttribute('aria-hidden', 'true');
+  }
+
   function enhancePicker(wrap) {
     var select = wrap.querySelector('select');
-    if (!select || wrap.dataset.enhanced) return;
+    if (!select) return;
+    if (wrap.dataset.enhanced) {
+      // Already enhanced. When a picker rides inside an htmx-swapped fragment (the
+      // Visualize builder re-includes its own form), htmx's settle step re-applies the
+      // server response's attributes to id-matched swapped elements — wiping the
+      // .picker-native class we add to hide the native <select>, so it reappears next to
+      // the combobox. The enhanced guard lives on the id-less wrapper (which htmx never
+      // settles), so we don't rebuild the combobox — we just restore the hidden state.
+      hideNative(select);
+      return;
+    }
     wrap.dataset.enhanced = '1';
 
     // flatten the options (placeholder rows with empty values are not results)
@@ -350,9 +367,7 @@
     var label = wrap.querySelector('label');
     if (label) label.htmlFor = input.id;
 
-    select.classList.add('picker-native');
-    select.tabIndex = -1;
-    select.setAttribute('aria-hidden', 'true');
+    hideNative(select);
     select.insertAdjacentElement('afterend', input);
     input.insertAdjacentElement('afterend', menu);
 
@@ -497,7 +512,11 @@
   }
 
   initPickers();
+  // afterSwap enhances freshly-swapped pickers immediately (no flash of the raw select);
+  // afterSettle re-runs so already-enhanced pickers repair the .picker-native class that
+  // htmx's settle step wipes off id-matched <select>s (see enhancePicker's repair branch).
   document.body.addEventListener('htmx:afterSwap', initPickers);
+  document.body.addEventListener('htmx:afterSettle', initPickers);
   document.body.addEventListener('htmx:historyRestore', initPickers);
 
   /* ---------- Educator checkbox (auth pages) ----------
