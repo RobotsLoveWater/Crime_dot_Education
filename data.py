@@ -33,6 +33,19 @@ class Data:
         'reverse_alphanumeric'
     ]
 
+    # Shared measure/aggregate vocabulary for the Visualize workbench (see
+    # VISUALIZATION_EXPANSION.md §6.1). A "measure" is either COUNT_MEASURE ('#',
+    # count-of-cases -- the same sentinel the Compare builder already uses) or a numeric
+    # column name; an "aggregate" is one of these. `aggregate_by_group` maps
+    # (group_column, measure, aggregate) -> a by-group series over the filtered slice.
+    COUNT_MEASURE = '#'
+    VALID_AGGREGATES = [
+        'count',
+        'mean',
+        'median',
+        'mode'
+    ]
+
     # display order for the explore column browser's groups; group names come from
     # the `group` attribute on codebook.xml entries (parsed into self.groups below).
     # Any group not listed here - including the "Other" fallback - sorts last.
@@ -249,7 +262,9 @@ class Data:
                   'nan': None,
                   'mean': None,
                   'mdn': None,
-                  'std': None}
+                  'std': None,
+                  'mode': None,
+                  'mode_extra': 0}
 
         # set the header from the codebook
         output['header'] = self.codebook[False]
@@ -285,6 +300,14 @@ class Data:
             output['mean'] = str(round(column.mean() * 10 ** precision) / 10 ** precision)
             output['mdn'] = str(round(column.median() * 10 ** precision) / 10 ** precision)
             output['std'] = str(round(column.std() * 10 ** precision) / 10 ** precision)
+            # mode: plea bargaining clusters sentences on round numbers (12/24/36/48/60
+            # months), so the mode is a real fingerprint of plea practice -- but it is
+            # genuinely multimodal. Show the first modal value + how many others tie it
+            # ("+N more") so multimodality is surfaced, never silently dropped.
+            modes = column.mode()  # dropna=True, sorted ascending
+            if len(modes) > 0:
+                output['mode'] = str(round(modes.iloc[0] * 10 ** precision) / 10 ** precision)
+                output['mode_extra'] = int(len(modes) - 1)
 
         output['raw_numbers'] = raw_numbers
         output['len'] = len(column)
@@ -368,6 +391,56 @@ class Data:
 
         return output
 
+    def distinct_counts(self, *cols) -> list:
+        # Number of distinct non-null values per column over the current filtered view.
+        # Read-only by contract: Series.nunique returns a scalar and never mutates self.df
+        # (the shared base stays immutable, guarded by test_base_immutability.py). Used by the
+        # scatter lattice guard to reject a pathologically high-cardinality column pair BEFORE
+        # paying get_table's O(|x_unique| * |y_unique|) nested-filter build.
+        return [int(self.df[c].nunique(dropna=True)) for c in cols]
+
+    def aggregate_by_group(self, group_column, measure, aggregate, source=None) -> dict:
+        # Map (group_column, measure, aggregate) -> {group_value: value} over the current
+        # filtered view. This is the one shared aggregation path the Visualize tiers reuse:
+        # it feeds choropleth fills, waterfall/treemap values, and bubble sizes
+        # (VISUALIZATION_EXPANSION.md §6.1). measure == COUNT_MEASURE ('#') counts cases;
+        # otherwise measure is a numeric column aggregated by `aggregate`.
+        #
+        # Read-only by contract: groupby + the reductions below return NEW objects, so the
+        # shared base is never mutated (guarded by test_base_immutability.py). Returns raw
+        # numeric values (not the rounded strings get_column_info/get_table return) because
+        # the consumers are charts/color-scales; presentation rounds for display.
+
+        # no source means self.df is used
+        if source is None: source = self.df
+
+        if aggregate not in self.VALID_AGGREGATES:
+            raise ValueError(str(aggregate) + " is not a valid aggregate.")
+
+        # observed=True so a categorical group key (e.g. county) yields only the groups
+        # actually present in the slice -- absent geographies are omitted, not emitted as
+        # NaN. sort=True (the default) leaves the returned dict in sorted group-key order.
+        grouped = source.groupby(group_column, observed=True)
+
+        if aggregate == 'count':
+            # count-of-cases per group; the measure is irrelevant to a plain count. Matches
+            # Compare's N = len(cell), so a count map reconciles with the crosstab exactly.
+            series = grouped.size()
+        else:
+            # mean/median/mode aggregate a numeric column, so '#' (count-of-cases) has
+            # nothing to reduce -- reject it rather than silently returning counts.
+            if measure == self.COUNT_MEASURE:
+                raise ValueError(aggregate + " needs a numeric measure, not '" + self.COUNT_MEASURE + "'.")
+            column = grouped[measure]
+            if aggregate == 'mean':
+                series = column.mean()
+            elif aggregate == 'median':
+                series = column.median()
+            else:  # mode -- first modal value per group (ties -> first, like get_column_info)
+                series = column.agg(_first_mode)
+
+        return series.to_dict()
+
     def num_occur(self, col, val) -> int:
         # grandfathered in from cli-legacy
 
@@ -391,6 +464,16 @@ class Data:
 
     def has_column(self, column):
         return column in self.df
+
+
+def _first_mode(series):
+    # First modal value of a Series (ties -> the smallest, matching Series.mode()'s sort);
+    # NaN when the group is empty / all-NaN. Shared by get_column_info's mode stat and the
+    # groupby-mode aggregate so both apply the identical tie rule.
+    modes = series.mode()  # dropna=True, sorted ascending
+    if len(modes) == 0:
+        return float('nan')
+    return modes.iloc[0]
 
 
 def format_column_info(output, sorting, precision=2):

@@ -1,0 +1,226 @@
+{
+  "id": "the-gender-gap-a-dress-rehearsal",
+  "title": "The Gender Gap: A Dress Rehearsal in Disparity Reasoning",
+  "description": "Women are rare in this dataset and their sentences are shorter. Those are two findings, not one - and this module teaches the discipline that keeps them apart. You will measure the raw gap, watch it shrink and then collapse as you hold offense family and criminal history constant, and confront the twist: because `time` is the sex-blind presumptive recommendation, the gap that vanishes was composition all along - which relocates the real question about differential treatment to the discretionary decisions this column never records. The gender gap is among the most consistently replicated patterns in the sentencing literature, which makes it the right place to rehearse disparity reasoning before Unit IV raises the stakes.",
+  "author": "unmanaged",
+  "order": 11,
+  "objectives": [
+    "Distinguish a raw gap from a conditional gap, and 'rarer in the data' from 'sentenced more shortly' as two separate findings",
+    "Execute a stratified comparison in the Explorer, holding offense family and criminal-history score constant one at a time",
+    "Define Simpson's paradox and explain how group composition can make a pooled comparison misleading",
+    "Explain why the presumptive-sentence gap collapses under conditioning - because `time` is a sex-blind function of the sentencing grid - and what that does and does not establish about differential treatment",
+    "State the Minnesota dispositional-departure pattern by sex precisely, including why the word 'dispositional' is load-bearing"
+  ],
+  "steps": [
+    {
+      "type": "read",
+      "title": "Two facts, not one",
+      "body": "Open the Explorer in a second tab, as always. Before you touch a filter, here are two sentences about the same dataset:\n\n1. **Women are rare in this data.** Females are just **18%** of the sentenced-felony records in this 2001-2019 dataset - and in Minnesota, females have never accounted for more than 20 percent of people sentenced for felonies (Minnesota Sentencing Guidelines Commission [MSGC], 2019, 2024, 2026).\n2. **Women's sentences are, on average, shorter than men's.** The median `time` is about **12 months** for women against **18 months** for men - a raw gender gap of roughly six months that appears in study after study across jurisdictions (Daly & Bordt, 1995; Starr, 2015).\n\nIt is tempting to read these as one fact - 'the system treats women differently' - but they are two separate observations, sitting at different depths of the funnel you met in Module 0. *How many women appear in the data* is a question about everything upstream: offending, reporting, arrest, charging, conviction. *How long their sentences are once they appear* is a question about the last stage only. This module is about the second question, but the first will keep intruding, and part of the discipline is noticing when it does.\n\nOne more callback before we start. In Module 3 you learned that when one group is far larger than another, the larger group will out-count the smaller one on nearly everything - even on characteristics that are actually *rarer* within it (Tversky & Kahneman, 1971; Agresti, 2013). Men are roughly four-fifths of this dataset. So for the entire module, raw counts are banned as comparisons. Percentages and group-wise means only.\n\n**References (this page):** Agresti, A. (2013). *Categorical data analysis* (3rd ed.). Wiley. | Daly, K., & Bordt, R. L. (1995). Sex effects and sentencing: An analysis of the statistical literature. *Justice Quarterly, 12*(1), 141-175. https://doi.org/10.1080/07418829500092601 | Minnesota Sentencing Guidelines Commission. (2019). *2019 report to the Legislature.* | Minnesota Sentencing Guidelines Commission. (2024). *2024 report to the Legislature.* | Minnesota Sentencing Guidelines Commission. (2026). *2026 report to the Legislature.* | Starr, S. B. (2015). Estimating gender disparities in federal criminal cases. *American Law and Economics Review, 17*(1), 127-159. https://doi.org/10.1093/aler/ahu010 | Tversky, A., & Kahneman, D. (1971). Belief in the law of small numbers. *Psychological Bulletin, 76*(2), 105-110. https://doi.org/10.1037/h0031322"
+    },
+    {
+      "type": "question",
+      "title": "One finding or two?",
+      "body": "A classmate looks at the dataset and says: 'Women are only about 18% of the records, and their average sentence is shorter. So the courts clearly go easier on women.' Which statement best describes the problem with this reasoning?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "There is no problem - two pieces of evidence pointing the same direction make the conclusion stronger",
+          "The two observations sit at different funnel depths: the 18% share reflects every stage upstream of sentencing, while sentence length reflects only the final stage, so they cannot simply be added together as evidence about 'the courts'",
+          "The problem is purely statistical: 18% is too small a sample to compute a reliable mean",
+          "The claim is wrong because raw counts were used instead of percentages"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "read",
+      "title": "Why gender first - and why this is a rehearsal",
+      "body": "Unit IV asks this course's hardest question: what should we make of sentencing differences across racial groups? Before going there, we practice on gender, and it is worth being honest about why.\n\nThe gender gap is among the most robust and consistently replicated findings in the sentencing literature. Daly and Bordt (1995) reviewed the statistical literature across 50 court datasets: of 249 reported outcomes, 60% showed effects favoring women, and roughly half the datasets showed sex effects favoring women overall. Starr (2015), using federal data and unusually rich controls, found men's sentences averaging more than 60% longer than women's for comparable arrest conduct. Steffensmeier, Ulmer, and Kramer (1998) found a gender effect that survived controls for offense severity and prior record in Pennsylvania. The direction of the finding is not seriously contested; what it *means* is.\n\nThat combination - a stable, well-replicated pattern with contested interpretation - makes gender the right training ground. You can concentrate on the *method* without the interpretive weight that racial disparity carries. And here is the promise this module makes: every move you learn here - raw gap, composition check, conditioning, what survives, enumeration of what the data cannot say - will be repeated in Unit IV, step for step. If a move feels skippable here, notice that feeling. It will be far more tempting to skip there.\n\n**References (this page):** Daly, K., & Bordt, R. L. (1995). Sex effects and sentencing: An analysis of the statistical literature. *Justice Quarterly, 12*(1), 141-175. https://doi.org/10.1080/07418829500092601 | Starr, S. B. (2015). Estimating gender disparities in federal criminal cases. *American Law and Economics Review, 17*(1), 127-159. https://doi.org/10.1093/aler/ahu010 | Steffensmeier, D., Ulmer, J., & Kramer, J. (1998). The interaction of race, gender, and age in criminal sentencing: The punishment cost of being young, black, and male. *Criminology, 36*(4), 763-798. https://doi.org/10.1111/j.1745-9125.1998.tb01265.x"
+    },
+    {
+      "type": "question",
+      "title": "The logic of the rehearsal",
+      "body": "Why does this course place the gender-gap module *before* the racial-disparity module, rather than after or instead of it?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Because the gender gap is larger than the racial gap, so it is easier to detect",
+          "Because gender disparities are fully explained, so there is nothing left to argue about",
+          "Because the gender gap is well-replicated in the literature while its interpretation remains contested, letting students practice disparity method with lower interpretive stakes before applying the identical sequence to race",
+          "Because the dataset records sex more accurately than race"
+        ],
+        "correct": 2
+      }
+    },
+    {
+      "type": "explore",
+      "title": "Lab 1: Reproduce the raw gap",
+      "body": "In your Explorer tab: **clear** the filter history. Run a **column summary on `sex`** (its values are `male` and `female`) and write down the percentage of each. Then run a **crosstab of `sex` against `time`** and write down the **mean and median `time` for each group**.\n\nYou should find women at about 18% of the rows, with a median `time` near **12 months** against men's **18** (means about **20** vs **29**). You now hold the module's two opening facts in your own hands: the share (how rare), and the gap (how much shorter). Keep both numbers on paper - you will compare every later view against them.\n\nThe sandbox on the left shows the `sex` summary for reference.",
+      "state": [],
+      "focus": { "view": "info", "column": "sex" }
+    },
+    {
+      "type": "question",
+      "title": "The objection you should raise yourself",
+      "body": "You have the raw gap: women's median `time` is lower than men's. Before anyone is allowed to interpret that number, which objection must be dealt with first?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "The mean is meaningless for sentence data; only the mode should be used",
+          "Men and women may not be in the data for the same offenses - if women's records cluster in lower-severity offense families, the raw gap partly reflects what people were sentenced *for*, not how they were *treated*",
+          "The dataset is too old to say anything about sentencing",
+          "Sentences are set by a grid, so no gap of any kind is possible"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "read",
+      "title": "Composition, and a paradox with a name",
+      "body": "The objection you just raised has a formal name and a famous failure mode.\n\n**Composition.** Women's felony cases tend to cluster in lower-severity offense types - property and drug offenses - while men's skew toward offenses against persons (Doerner & Demuth, 2010; U.S. Bureau of Justice Statistics, 2009). That pattern holds sharply in Minnesota, as you are about to confirm: roughly a third of women's records are drug offenses and much of the rest is theft and forgery, while men carry more than double women's share of assault. Even a sentencing system that treated every case identically *within* each offense family would therefore produce a raw gap, purely because the two groups bring different case mixes to court. A raw gap is a blend of two things you cannot see separately yet: different *cases* and (possibly) different *treatment*.\n\n**The failure mode.** When groups are pooled across strata with different compositions, the pooled comparison can shrink, vanish, or even point the *opposite direction* from every within-stratum comparison. This is **Simpson's paradox** (Simpson, 1951; Blyth, 1972). It is not an exotic curiosity; it is the default risk whenever you compare group means across a lumpy composition, and textbook treatments of categorical data begin with it for exactly that reason (Agresti, 2013).\n\nThe remedy is the oldest move in applied statistics: **hold the confounding variable constant** and look *within* strata - compare women to men *within* drug offenses, *within* assault, and so on (Fisher, 1935; Agresti, 2013). The Explorer's filter-then-crosstab workflow is precisely this move. What survives inside the strata is the **within-stratum gap**; whatever part of the raw gap the conditioning removes was composition. Those two ideas carry the rest of the module.\n\n**References (this page):** Agresti, A. (2013). *Categorical data analysis* (3rd ed.). Wiley. | Blyth, C. R. (1972). On Simpson's paradox and the sure-thing principle. *Journal of the American Statistical Association, 67*(338), 364-366. https://doi.org/10.1080/01621459.1972.10482387 | Doerner, J. K., & Demuth, S. (2010). The independent and joint effects of race/ethnicity, gender, and age on sentencing outcomes in U.S. federal courts. *Justice Quarterly, 27*(1), 1-27. | Fisher, R. A. (1935). *The design of experiments.* Oliver & Boyd. | Simpson, E. H. (1951). The interpretation of interaction in contingency tables. *Journal of the Royal Statistical Society, Series B, 13*(2), 238-241. https://doi.org/10.1111/j.2517-6161.1951.tb00088.x | U.S. Bureau of Justice Statistics. (2009). *Felony sentences in state courts, 2006 - Statistical tables.*"
+    },
+    {
+      "type": "question",
+      "title": "Simpson's paradox, precisely",
+      "body": "Which of the following is the correct statement of Simpson's paradox?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "A statistic computed on a small sample is more variable than one computed on a large sample",
+          "A comparison made on pooled data can differ from - and even reverse - the comparison made within every stratum, when the strata have different compositions",
+          "Correlation between two variables never implies causation",
+          "The mean and median of a skewed distribution disagree"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "explore",
+      "title": "Lab 2: The composition audit",
+      "body": "Back in the Explorer: with the history still **clear**, run a **crosstab of `sex` against `moc1`**, and read it in **percentages within each sex** - for each group, what share of *that group's* records falls in each offense family? (The sandbox on the left shows this crosstab as raw counts; convert to within-sex percentages in your own tab, because counts are banned - men out-count women in every family regardless.)\n\nWhat you should find, matching the literature (Doerner & Demuth, 2010): women's records tilt toward **drugs** (`D`, about a third of women vs. a quarter of men) and property-type families - **theft-related** (`U`), **forgery** (`C`), **theft** (`T`) - while men carry more than double women's share of **assault** (`A`, ~16% of men vs. ~8% of women). Write down, on paper: which offense family shows the largest gap between the sexes, and whether the direction matches the expectation.",
+      "state": [],
+      "focus": { "view": "table", "dependant": "#", "x_axis": "sex", "y_axis": "moc1" }
+    },
+    {
+      "type": "read",
+      "title": "First conditioning: hold offense family constant",
+      "body": "Now the central move. Instead of comparing all women to all men, compare them **within one offense family at a time**: filter to a single `moc1` value, then crosstab `sex` against mean `time`. Each filtered view is a stratum, and each within-stratum comparison holds offense family constant by construction (Fisher, 1935; Agresti, 2013).\n\nBefore you run it, one fact that governs everything below - a callback to Module 7. The `time` column is the **presumptive** sentence: the number the Minnesota grid recommends at the intersection of offense severity and criminal-history score (MSGC, 2024, §2.C.1). Sex is **not** an input to that grid. So holding the grid coordinates constant should, in principle, squeeze the sex gap in `time` toward nothing - and watching *how fast* it squeezes tells you how much of the raw gap was ever about treatment versus composition.\n\nThe literature predicts the shape of what you will see: legal case characteristics - offense type and severity chief among them - account for a large portion of the raw gender difference (Doerner & Demuth, 2010; Steffensmeier et al., 1998; Starr, 2015). Two cautions before the lab. First, expect the gap's *size* to differ across families - there is no law that conditioning affects every stratum equally. Second, remember Module 10: as filters stack, cell sizes fall, and statistics computed on thin cells are volatile (Wainer, 2007). Women are roughly a fifth of the data, so female cells thin out about four times faster than male cells under the same filters. Check N before you trust any within-stratum mean.\n\n**References (this page):** Agresti, A. (2013). *Categorical data analysis* (3rd ed.). Wiley. | Doerner, J. K., & Demuth, S. (2010). The independent and joint effects of race/ethnicity, gender, and age on sentencing outcomes in U.S. federal courts. *Justice Quarterly, 27*(1), 1-27. | Fisher, R. A. (1935). *The design of experiments.* Oliver & Boyd. | Minnesota Sentencing Guidelines Commission. (2024). *Minnesota Sentencing Guidelines and commentary* (effective August 1, 2024), §2.C.1. | Starr, S. B. (2015). Estimating gender disparities in federal criminal cases. *American Law and Economics Review, 17*(1), 127-159. | Steffensmeier, D., Ulmer, J., & Kramer, J. (1998). The interaction of race, gender, and age in criminal sentencing. *Criminology, 36*(4), 763-798. | Wainer, H. (2007). The most dangerous equation. *American Scientist, 95*(3), 249-256."
+    },
+    {
+      "type": "explore",
+      "title": "Lab 3: One-family conditioning",
+      "body": "In the Explorer: **clear**, then **filter to the drug family** (`moc1 = D`), and run the **crosstab of `sex` against mean `time`**. Write down the within-stratum gap and each cell's N. Then **revert**, filter to **assault** (`moc1 = A`), and repeat.\n\nWhat you should see in the drug family: the gap shrinks but does not vanish - the **mean** gap falls from about 8.6 months (raw) to about **6**, and the **median** gap from about 6 to about **2**. Compare each within-stratum gap to the raw gap from Lab 1. The gap grew, shrank, or held - have a written answer for both families before the next question. The sandbox shows the drug-family `time` distribution (both sexes pooled) for context.",
+      "state": ["f.moc1.eq.D"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "question",
+      "title": "Reading the conditioned view",
+      "body": "Within the drug-offense family, how did the gender gap in mean `time` compare to the raw (unconditioned) gap from Lab 1?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "It grew larger than the raw gap",
+          "It shrank relative to the raw gap but did not disappear",
+          "It disappeared entirely - men and women have equal means within the family",
+          "It reversed - women's mean exceeds men's within the family"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "read",
+      "title": "Second conditioning: criminal history - a variable with a funnel inside it",
+      "body": "Offense family is not the only thing that drives the presumptive sentence. Recall from Module 5 that the grid has two axes: the presumptive sentence sits at the intersection of offense severity and the **criminal-history score** (MSGC, 2024, §2.C.1; Frase, 2005). So a proper conditioning pass must hold history constant too - and in this dataset women's median history score is **0** against men's **1**, so history is a live candidate for part of the gap.\n\nThe `history` column deserves a closer look before you filter on it, because it is not a simple fact about a person. Under §2.B of the Guidelines, the score is the sum of points from prior felonies, custody status at the time of the offense, prior misdemeanors and gross misdemeanors, and prior juvenile adjudications (MSGC, 2024, §2.B; Minn. Stat. § 244.09). Every one of those components is a record of **prior contact with the system** - which means every earlier trip through the funnel is baked into this variable. Two people with identical past conduct but different past *processing* (one arrested and convicted, one never caught) carry different history scores. When you condition on `history`, you are holding constant not prior behavior but prior *system output*.\n\nWhy this matters for the gender gap: women's criminal-history profiles skew lower than men's, and legal factors including prior record account for much of the raw gap (Doerner & Demuth, 2010). So some of the gap flows *through* history - and that is itself an interesting fact, not a nuisance, because it pushes part of the question upstream into stages this dataset never observes.\n\n**References (this page):** Doerner, J. K., & Demuth, S. (2010). The independent and joint effects of race/ethnicity, gender, and age on sentencing outcomes in U.S. federal courts. *Justice Quarterly, 27*(1), 1-27. | Frase, R. S. (2005). Sentencing guidelines in Minnesota, 1978-2003. *Crime and Justice, 32*, 131-219. | Minnesota Sentencing Guidelines Commission. (2024). *Minnesota Sentencing Guidelines and commentary* (effective August 1, 2024), §§2.B, 2.C.1. | Minn. Stat. § 244.09."
+    },
+    {
+      "type": "question",
+      "title": "What conditioning on history actually holds constant",
+      "body": "When you filter this dataset to `history == 0` and compare men's and women's mean `time`, what have you held constant?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Each person's prior criminal behavior",
+          "Each person's prior recorded contact with the criminal justice system, as scored under the Guidelines' point rules",
+          "Each person's likelihood of reoffending",
+          "Nothing - the history score is random"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "explore",
+      "title": "Lab 4: Two-way conditioning",
+      "body": "The full move, inside a single offense family. In the Explorer: **clear**, filter to the **drug family** (`moc1 = D`), then add **`history == 0`**, and crosstab **`sex` against mean `time`**. Record the gap and both cell Ns.\n\nWatch what happens to the numbers you have been tracking. At this two-way-conditioned view, the **median** gap is **0.0** - identical for men and women - and the **mean** gap has fallen to about **2.5 months** (from 8.6 raw). Run the same two filters on **assault** (`moc1 = A`, `history = 0`) and the mean gap is essentially **zero** as well. On paper, in one sentence and **without** claiming to know its cause: why did the gap that looked so solid in Lab 1 nearly evaporate here? (That restraint is the skill being graded.)\n\nMind your Ns as you go - you are two filters deep in the smaller group's territory (Wainer, 2007) - but here the female cells are still in the thousands, so the collapse is real, not a small-N artifact.",
+      "state": ["f.moc1.eq.D", "f.history.eq.0"],
+      "focus": { "view": "info", "column": "time" }
+    },
+    {
+      "type": "read",
+      "title": "What collapsed - and where the question actually goes",
+      "body": "Here is the module's payload, and it is not the one the raw gap led you to expect. The six-month gap did **not** leave a stubborn residual after conditioning. Within an offense family and `history == 0`, the **median** gap is **zero**; keep narrowing to a single fully specified grid cell - one offense, one severity, one history score - and the presumptive gap is **exactly zero**, because `time` is the grid's recommendation and **sex is not one of the grid's inputs** (MSGC, 2024, §2.C.1). The Explorer was never going to find a within-cell `time` gap, because by law there isn't one.\n\nSo the entire raw `time` gap was **composition**: women's cases occupy lower grid cells - lower-severity offenses, shorter records. That is a real and important finding. But read exactly what it is a finding *about*: it is about **what women are convicted of and what records they carry**, which are questions about arrest, charging, and prior processing - upstream funnel stages - not about how a judge treats two identical cases.\n\nThis does not clear the system of gender differences. It says `time` is the **wrong instrument** for finding them, because a presumptive recommendation cannot encode discretion. The place discretion actually lives - where a judge may treat comparable cases differently by sex within what the guidelines allow - is the **dispositional departure**: sending a presumptive-prison case to probation instead. And here Minnesota shows a large sex difference. Among presumptive-commitment cases, the **mitigated dispositional departure** rate - probation where the grid presumed prison - was **55.9% for women vs. 33.7% for men** in 2017 and **53.4% vs. 37.9%** in 2022 (MSGC, 2019, p. 29; MSGC, 2024, p. 30). The word **dispositional** is load-bearing: for *durational* departures the direction ties or reverses (males 22% vs. females 20% in 2017; 20% vs. 17% in 2022; 17% vs. 17% in 2024) (MSGC, 2019, 2024, 2026). (A denominator warning you met in Module 7: that 55.9% is a share of presumptive-*commit* cases, not of all cases - measured over every sentence, women's raw departure rate is actually lower, because so few of their cases presume prison in the first place.)\n\nAnd even that departure signal cannot be *explained* by this data. The literature offers at least five candidates for it, and this dataset can adjudicate between none:\n\n1. **Judicial leniency.** Judges may assess blameworthiness and dangerousness differently by sex - the focal-concerns account (Steffensmeier, Kramer, & Streifel, 1993).\n2. **Familial paternalism.** Courts may weigh caregiving; Daly (1987, 1989) found 'familied' defendants of both sexes treated more leniently and argued judges protect children and families rather than women per se.\n3. **Upstream charging and plea decisions.** Disparities accumulate across discretionary stages before sentencing (Kutateladze, Andiloro, Johnson, & Spohn, 2014); Starr (2015) located most of the unexplained federal gender disparity in charging, plea bargaining, and fact-finding - stages a sentencing-only dataset never sees.\n4. **Legally relevant but unrecorded case facts.** Within one offense code, role in the offense, weapon use, and victim injury vary and none is a column here (Starr, 2015; National Research Council, 1983).\n5. **Selection into the dataset.** If marginal female cases are diverted or resolved below the felony level at higher rates, the women who remain are a non-random remnant (Bushway, Johnson, & Slocum, 2007; Klepper, Nagin, & Tierney, 1983).\n\nFive doors; the key to none of them is in this dataset - a limit the Commission itself gestures at when it writes of its own tables that 'these are descriptive statistics that describe and summarize patterns in the data. There is no discussion about the cause' (MSGC, 2024, p. 15; Connelly, Playford, Gayle, & Dibben, 2016).\n\n**References (this page):** Bushway, S., Johnson, B. D., & Slocum, L. A. (2007). Is the magic still there? *Journal of Quantitative Criminology, 23*(2), 151-178. https://doi.org/10.1007/s10940-007-9024-4 | Connelly, R., Playford, C. J., Gayle, V., & Dibben, C. (2016). The role of administrative data in the big data revolution in social science research. *Social Science Research, 59*, 1-12. https://doi.org/10.1016/j.ssresearch.2016.04.015 | Daly, K. (1987). Discrimination in the criminal courts: Family, gender, and the problem of equal treatment. *Social Forces, 66*(1), 152-175. | Daly, K. (1989). Rethinking judicial paternalism. *Gender & Society, 3*(1), 9-36. | Klepper, S., Nagin, D., & Tierney, L. (1983). Discrimination in the criminal justice system. In *Research on sentencing: The search for reform* (Vol. 2, pp. 55-128). National Academy Press. | Kutateladze, B. L., Andiloro, N. R., Johnson, B. D., & Spohn, C. C. (2014). Cumulative disadvantage. *Criminology, 52*(3), 514-551. | Minnesota Sentencing Guidelines Commission. (2019). *2019 report to the Legislature*, p. 29. | Minnesota Sentencing Guidelines Commission. (2024). *2024 report to the Legislature*, pp. 15, 30. | Minnesota Sentencing Guidelines Commission. (2026). *2026 report to the Legislature.* | National Research Council. (1983). *Research on sentencing: The search for reform.* National Academy Press. | Starr, S. B. (2015). Estimating gender disparities in federal criminal cases. *American Law and Economics Review, 17*(1), 127-159. | Steffensmeier, D., Kramer, J., & Streifel, C. (1993). Gender and imprisonment decisions. *Criminology, 31*(3), 411-446."
+    },
+    {
+      "type": "question",
+      "title": "The load-bearing word",
+      "body": "A student writes: 'MSGC reports show women receive departures at higher rates than men.' What is wrong with this sentence?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Nothing - MSGC reports confirm it for all departure types",
+          "It omits the word 'dispositional': the female-favoring pattern holds for mitigated dispositional departures (among presumptive-commit cases), but for durational departures the direction ties or reverses",
+          "MSGC reports do not break departures down by sex at all",
+          "Departures are too rare in Minnesota to report by sex"
+        ],
+        "correct": 1
+      }
+    },
+    {
+      "type": "question",
+      "title": "Which door can the data open?",
+      "body": "Of the five candidate explanations for the sex difference in dispositional departures - judicial leniency, familial paternalism, upstream charging/plea decisions, unrecorded case facts, and selection into the dataset - which can this dataset, by itself, definitively confirm or rule out?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "Judicial leniency, because sentences are what the data records",
+          "Selection into the dataset, because we can count who is present",
+          "None of them - each is consistent with the observed pattern, and distinguishing them requires information the monitoring data does not contain",
+          "All of them, if enough filters are applied"
+        ],
+        "correct": 2
+      }
+    },
+    {
+      "type": "read",
+      "title": "The honest headline, and the bridge",
+      "body": "One last skill: saying what you found without saying more than you found. Compare two headlines for this module's result:\n\n- *'Courts favor women.'* - a causal claim about judicial behavior, which nothing you computed can support: the `time` gap turned out to be composition, and the departure difference is equally consistent with upstream charging, unrecorded case facts, and selection (Starr, 2015; Kutateladze et al., 2014; National Research Council, 1983).\n- *'In this dataset, the raw six-month gender gap in presumptive sentence disappears once offense family and criminal history are held constant, because `time` is a sex-blind grid recommendation; the gap reflects composition, and what discretion remains shows up not in `time` but in a higher rate of mitigated dispositional departures for women.'* - a description, stated with its conditioning and its scope explicit, that a methodologist could not object to.\n\nThe second headline is not weaker; it is *exact*. Description and explanation are separate tasks, and the entire architecture of this course exists to keep them separate (National Research Council, 1983; MSGC, 2024, p. 15).\n\nNow name what you just did, because you will do it again: **raw gap -> composition audit -> condition on offense -> condition on history -> watch what collapses and what remains -> locate the remaining discretion (here, departures, not `time`) -> enumerate what the data cannot say -> write the honest headline.** That is the sequence. Unit IV applies it verbatim to race - where the raw gap is politically charged, the temptation to skip from description to explanation is stronger, and the five doors are, if anything, heavier. The rehearsal is over when the sequence runs without the temptation winning.\n\n**References (this page):** Kutateladze, B. L., Andiloro, N. R., Johnson, B. D., & Spohn, C. C. (2014). Cumulative disadvantage. *Criminology, 52*(3), 514-551. | Minnesota Sentencing Guidelines Commission. (2024). *2024 report to the Legislature*, p. 15. | National Research Council. (1983). *Research on sentencing: The search for reform.* National Academy Press. | Starr, S. B. (2015). Estimating gender disparities in federal criminal cases. *American Law and Economics Review, 17*(1), 127-159."
+    },
+    {
+      "type": "question",
+      "title": "Write like a methodologist",
+      "body": "Which of the following headlines correctly and honestly reports what you found about the gender gap in this dataset?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "'Judges give women a discount at sentencing'",
+          "'The gender gap in sentence length is a myth - there is no difference between men and women'",
+          "'The raw gap in presumptive sentence disappears once offense and criminal history are held constant, so it reflects case composition rather than a within-cell difference in the grid recommendation'",
+          "'Gender determines sentence length in Minnesota'"
+        ],
+        "correct": 2
+      }
+    },
+    {
+      "type": "checkpoint",
+      "title": "Checkpoint: Rebuild the conditioned view",
+      "body": "From a clear history, rebuild the module's key analytical view: filter to the **drug family** (`moc1 = D`), then add **`history == 0`**. This is the two-way-conditioned stratum in which the sex gap in median `time` fell to zero.\n\nBefore you submit, answer on paper (your instructor may collect these): (1) the within-stratum mean and median gap you observed, and both cell Ns; (2) in your own words, why the raw gap collapsed here - what `time` is, and why sex cannot move it within a grid cell; (3) one sentence on where, if anywhere, gender discretion could still be hiding, given what `time` does and does not measure.",
+      "state": ["f.moc1.eq.D", "f.history.eq.0"],
+      "expect_state": ["f.moc1.eq.D", "f.history.eq.0"]
+    },
+    {
+      "type": "read",
+      "title": "Full module reference list",
+      "body": "Agresti, A. (2013). *Categorical data analysis* (3rd ed.). Wiley.\n\nBlyth, C. R. (1972). On Simpson's paradox and the sure-thing principle. *Journal of the American Statistical Association, 67*(338), 364-366. https://doi.org/10.1080/01621459.1972.10482387\n\nBushway, S., Johnson, B. D., & Slocum, L. A. (2007). Is the magic still there? The use of the Heckman two-step correction for selection bias in criminology. *Journal of Quantitative Criminology, 23*(2), 151-178. https://doi.org/10.1007/s10940-007-9024-4\n\nConnelly, R., Playford, C. J., Gayle, V., & Dibben, C. (2016). The role of administrative data in the big data revolution in social science research. *Social Science Research, 59*, 1-12. https://doi.org/10.1016/j.ssresearch.2016.04.015\n\nDaly, K. (1987). Discrimination in the criminal courts: Family, gender, and the problem of equal treatment. *Social Forces, 66*(1), 152-175. https://doi.org/10.1093/sf/66.1.152\n\nDaly, K. (1989). Rethinking judicial paternalism: Gender, work-family relations, and sentencing. *Gender & Society, 3*(1), 9-36. https://doi.org/10.1177/089124389003001002\n\nDaly, K., & Bordt, R. L. (1995). Sex effects and sentencing: An analysis of the statistical literature. *Justice Quarterly, 12*(1), 141-175. https://doi.org/10.1080/07418829500092601\n\nDoerner, J. K., & Demuth, S. (2010). The independent and joint effects of race/ethnicity, gender, and age on sentencing outcomes in U.S. federal courts. *Justice Quarterly, 27*(1), 1-27. https://doi.org/10.1080/07418820902926197\n\nFisher, R. A. (1935). *The design of experiments.* Oliver & Boyd.\n\nFrase, R. S. (2005). Sentencing guidelines in Minnesota, 1978-2003. *Crime and Justice, 32*, 131-219. https://doi.org/10.1086/655356\n\nKlepper, S., Nagin, D., & Tierney, L. (1983). Discrimination in the criminal justice system: A critical appraisal of the literature. In A. Blumstein, J. Cohen, S. E. Martin, & M. H. Tonry (Eds.), *Research on sentencing: The search for reform* (Vol. 2, pp. 55-128). National Academy Press.\n\nKutateladze, B. L., Andiloro, N. R., Johnson, B. D., & Spohn, C. C. (2014). Cumulative disadvantage: Examining racial and ethnic disparity in prosecution and sentencing. *Criminology, 52*(3), 514-551. https://doi.org/10.1111/1745-9125.12047\n\nMinnesota Sentencing Guidelines Commission. (2019). *2019 report to the Legislature.* https://mn.gov/msgc-stat/documents/reports/2017/2019MinnSentencingGuidelinesCommReportLegislature.pdf\n\nMinnesota Sentencing Guidelines Commission. (2024). *2024 report to the Legislature.* https://www.lrl.mn.gov/docs/2024/mandated/240055.pdf\n\nMinnesota Sentencing Guidelines Commission. (2024). *Minnesota Sentencing Guidelines and commentary* (effective August 1, 2024). https://mn.gov/sentencing-guidelines/assets/2024_Minn_Sentencing_Guidelines_Commentary_tcm30-639154.pdf\n\nMinnesota Sentencing Guidelines Commission. (2026). *2026 report to the Legislature.* https://mn.gov/sentencing-guidelines/assets/2026-Minn-Sentencing-Guidelines-Comm-Report-to-the-Legislature_tcm30-719777.pdf\n\nMinn. Stat. § 244.09.\n\nNational Research Council. (1983). *Research on sentencing: The search for reform* (A. Blumstein, J. Cohen, S. E. Martin, & M. H. Tonry, Eds.). National Academy Press. https://doi.org/10.17226/19436\n\nPresident's Commission on Law Enforcement and Administration of Justice. (1967). *The challenge of crime in a free society.* U.S. Government Printing Office.\n\nSimpson, E. H. (1951). The interpretation of interaction in contingency tables. *Journal of the Royal Statistical Society, Series B, 13*(2), 238-241. https://doi.org/10.1111/j.2517-6161.1951.tb00088.x\n\nStarr, S. B. (2015). Estimating gender disparities in federal criminal cases. *American Law and Economics Review, 17*(1), 127-159. https://doi.org/10.1093/aler/ahu010\n\nSteffensmeier, D., Kramer, J., & Streifel, C. (1993). Gender and imprisonment decisions. *Criminology, 31*(3), 411-446. https://doi.org/10.1111/j.1745-9125.1993.tb01136.x\n\nSteffensmeier, D., Ulmer, J., & Kramer, J. (1998). The interaction of race, gender, and age in criminal sentencing: The punishment cost of being young, black, and male. *Criminology, 36*(4), 763-798. https://doi.org/10.1111/j.1745-9125.1998.tb01265.x\n\nTversky, A., & Kahneman, D. (1971). Belief in the law of small numbers. *Psychological Bulletin, 76*(2), 105-110. https://doi.org/10.1037/h0031322\n\nU.S. Bureau of Justice Statistics. (2009). *Felony sentences in state courts, 2006 - Statistical tables* (NCJ 226846).\n\nWainer, H. (2007). The most dangerous equation. *American Scientist, 95*(3), 249-256."
+    }
+  ]
+}

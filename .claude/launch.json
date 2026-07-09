@@ -121,6 +121,83 @@
       "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5262"],
       "port": 5262,
       "autoPort": false
+    },
+    {
+      "name": "explorer-viz-phase2",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5273"],
+      "port": 5273,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-viz-phase4",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5284"],
+      "port": 5284,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-viz-phase5",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5295"],
+      "port": 5295,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-viz-phase6",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5306"],
+      "port": 5306,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-viz-phase8",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5317"],
+      "port": 5317,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-viz-phase9",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5328"],
+      "port": 5328,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-viz-phase10",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5339"],
+      "port": 5339,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-viz-phase11",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5350"],
+      "port": 5350,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-viz-phase12",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5361"],
+      "port": 5361,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-viz-phase13",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5372"],
+      "port": 5372,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-viz-phase14",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5383"],
+      "port": 5383,
+      "autoPort": false
     }
   ]
 }

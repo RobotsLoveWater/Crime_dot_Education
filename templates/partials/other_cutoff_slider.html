@@ -1,0 +1,19 @@
+{# Reusable "Other"-cutoff slider (VISUALIZATION_EXPANSION.md Phase 4). Re-slices a
+   top-N + "Other" chart client-side (static/js/otherbucket.js) with no refetch —
+   .js-only, so no-JS keeps the server-rendered default bucketing. Expects:
+     slider      – the bucket payload (sliderMin / sliderMax / cutoff)
+     slider_id   – unique id fragment (one slider per view)
+     slider_noun – what the values are ("values", "counties", …); defaults to "values"
+   Renders nothing when there is nothing to slide (one or two distinct values). #}
+{% if slider and slider['sliderMax'] > slider['sliderMin'] %}
+<div class="bucket-slider js-only" data-bucket-slider-wrap>
+    <label for="bucket-slider-{{ slider_id }}">Show top
+        <output id="bucket-out-{{ slider_id }}" data-bucket-value>{{ slider['cutoff'] }}</output>
+        {{ slider_noun or 'values' }}</label>
+    <input type="range" id="bucket-slider-{{ slider_id }}" data-bucket-slider
+           min="{{ slider['sliderMin'] }}" max="{{ slider['sliderMax'] }}"
+           value="{{ slider['cutoff'] }}" step="1"
+           aria-describedby="bucket-hint-{{ slider_id }}">
+    <span class="field-hint" id="bucket-hint-{{ slider_id }}">The rest are grouped as “Other”.</span>
+</div>
+{% endif %}

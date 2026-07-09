@@ -12,7 +12,9 @@
 
   var PAGE_SIZE = 50;   // rows shown initially in the value table
   var PAGE_STEP = 100;  // rows added per "Show more" click
-  var chart = null;     // the live Chart.js instance (one chart per view)
+  var chart = null;         // the live Chart.js instance (one chart per view)
+  var chartPayload = null;  // the reusable bucket payload for the active column
+  var chartCutoff = null;   // current top-N cutoff (driven by the "Other" slider)
 
   function cssVar(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -20,23 +22,35 @@
 
   /* ---------- Distribution chart ---------- */
 
+  // Read the embedded bucket payload once per view swap; the slider re-slices it
+  // client-side (window.chartBucket) so dragging never refetches.
+  function readChartData() {
+    var dataEl = document.getElementById('explore-chart-data');
+    if (!dataEl) { chartPayload = null; return; }
+    try { chartPayload = JSON.parse(dataEl.textContent); }
+    catch (e) { chartPayload = null; return; }
+    chartCutoff = chartPayload.cutoff;
+  }
+
+  function bucketed() {
+    if (chartPayload && window.chartBucket) return window.chartBucket.bucket(chartPayload, chartCutoff);
+    return chartPayload; // no helper loaded: fall back to the server's default bucketing
+  }
+
   function renderChart() {
     if (chart) { chart.destroy(); chart = null; }
 
     var canvas = document.getElementById('explore-chart');
-    var dataEl = document.getElementById('explore-chart-data');
-    if (!canvas || !dataEl || typeof Chart === 'undefined') return;
+    if (!canvas || !chartPayload || typeof Chart === 'undefined') return;
 
-    var payload;
-    try { payload = JSON.parse(dataEl.textContent); } catch (e) { return; }
-
-    var labels = payload.labels.slice();
-    var counts = payload.counts.slice();
+    var view = bucketed();
+    var labels = view.labels.slice();
+    var counts = view.counts.slice();
     var barColor = cssVar('--chart-1');
     var colors = labels.map(function () { return barColor; });
-    if (payload.other > 0) {
-      labels.push('Other (' + payload.otherValues.toLocaleString() + ' values)');
-      counts.push(payload.other);
+    if (view.other > 0) {
+      labels.push('Other (' + view.otherValues.toLocaleString() + ' values)');
+      counts.push(view.other);
       colors.push(cssVar('--color-text-faint')); // visually distinct catch-all bucket
     }
 
@@ -196,9 +210,21 @@
     requestAnimationFrame(function () { if (chart) chart.resize(); });
   }
 
+  // Wire the "Other"-cutoff slider (when present) to re-render the bar on drag.
+  function initSlider() {
+    if (!chartPayload || !window.chartBucket) return;
+    var root = document.getElementById('explore-view');
+    chartCutoff = window.chartBucket.wireSlider(root, chartPayload, function (c) {
+      chartCutoff = c;
+      renderChart();
+    });
+  }
+
   function initInteractive() {
     initValueTable();
     syncActiveColumn();
+    readChartData();
+    initSlider();
   }
 
   initBrowserSearch();

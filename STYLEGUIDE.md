@@ -86,6 +86,14 @@ Implementation (Phase 3): a discrete 8-step ramp (`.heat-1`–`.heat-8` in `comp
 Cell text flips to `--color-on-accent` from step 7; the mix percentages skew away from the
 mid-ramp (and dark's step 6 uses a lighter mix) so both text colors keep AA contrast.
 
+Correlation-matrix variant (Visualize, Phase 13): the same `.heat-N` ramp, but shaded by
+**`|r|` on the absolute 0→1 scale** (not the matrix peak) — correlation already has a fixed,
+interpretable range, so a shade means the same thing in every matrix. A single-hue ramp can't
+encode direction, so the **signed number is always rendered** (real `−` for negatives) and
+negative cells carry a non-color cue (`.corr-neg`, dotted underline). Off-diagonal cells at
+`|r| ≥ 0.90` are flagged as near-mechanical (`.corr-flag` `●` + tooltip + a text callout) — the
+sentencing grid's arithmetic made visible, annotated rather than hidden.
+
 ### Typography
 
 Font: **Inter variable**, self-hosted at `static/fonts/InterVariable.woff2` (OFL license).
@@ -199,7 +207,8 @@ reserves its height so the footer is never covered.
   badge (warning-subtle), lesson status (success/accent/muted-subtle).
 - **Stat cards.** Surface, radius `--radius-md`, `--shadow-1` (light) / border (dark). Value
   in `--fs-xl` weight 600 tabular-nums; label in `--fs-sm` muted above. Used for N, missing,
-  mean, median, std.
+  mean, median, std, mode (mode's value carries a `.badge-muted` "+N more" beside it when
+  multimodal).
 - **Data tables.** Wrapped in `.table-wrapper` (radius, border, horizontal scroll). Sticky
   `thead` (surface bg, muted 600 text — not accent-filled). Numeric columns right-aligned
   tabular-nums. Row hover `--color-accent-subtle`. Sortable headers get `aria-sort` and a
@@ -217,6 +226,38 @@ reserves its height so the footer is never covered.
   `aria-pressed`/checked radios; URL-backed state (e.g. sort orders) uses links, with the
   active segment rendered as a non-interactive element carrying `aria-current` (never a live
   link styled as selected).
+- **Toggle switch** (`.switch`). A slider-style on/off control for a single boolean, built over
+  a real, focusable `<input type="checkbox">` (visually hidden; still the accessible + form
+  control, so it works without JS). CSS track (`--radius-full`, `--color-border-strong` →
+  `--color-accent` when checked) + thumb (`--color-surface`, `--shadow-1`, translates on check);
+  focus ring on `:focus-visible`. Use for a client-side view option, not for submitting state —
+  e.g. the choropleth's "Hatch thin samples" override, `.js-only`, on by default.
+- **Map input** (`.filter-map`, Filter view geography columns — Phase 11 of the visualization
+  expansion). A canvas map that is an *input device for the form beside it*, never a token
+  builder: clicking a shape toggles the same checkbox (county/region) or fills the same numeric
+  value input (district) the hand path uses, then fires the form's `change` so the existing
+  htmx preview refreshes. Colors are **selection state, not a value ramp**: selected =
+  `--color-accent`, selectable (has cases) = `--color-accent-subtle`, no cases in the slice =
+  `--color-border`; borders `--color-surface`. `.js-only`; the value list/input stays the
+  complete no-JS + screen-reader path (same names and counts as text), and the canvas carries
+  `role="img"` with an accessible name pointing at the list. Beside the categorical picker at
+  ≥1024px (`.filter-geo-split`, two equal grid columns), stacked below it otherwise.
+- **Visualize builder** (`/visualize`, visualization-expansion Phase 3 shell). A two-column
+  `.visualize-layout` grid — `.visualize-form` (chart-type `<select>` plus column/measure/
+  aggregate pickers, reusing the `[data-picker]` searchable combobox) on the left,
+  `.visualize-canvas` on the right — stacking to one column under 768px. The canvas holds a
+  single **empty state** ("pick a chart type", or a per-type placeholder) until a chart renders;
+  a rendered chart fills it as `.viz-result` (chart + companion value table — the same "chart is
+  never the only way to read a value" rule as Explore/Compare). Field labels re-purpose per chart
+  type client-side (e.g. the same Column/Second-column pickers serve as treemap's parent/child and
+  scatter's X/Y) so one builder serves all six chart types with no page reload.
+- **Map-click filter** (Visualize choropleth). Shapes with data are clickable: pointer cursor
+  on hover, a "Click to keep only this …" line in the tooltip, and a **"Keep only" button
+  per row** of the companion table (`.viz-keep-cell` / `.viz-keep-form`, a `.btn-sm`
+  mini-form) as the keyboard/no-JS twin. Both POST the *existing* filter-apply route
+  (`comparison=eq` + the server-shipped dataset value + a server-validated local `next` back
+  to the map) — the click is never a bespoke filter path, so the history entry, chip, and
+  cache directory are byte-identical to typing the filter.
 - **Column browser** (explore sidebar, below the data-state module). All documented columns
   grouped by category — groups come from the `group` attribute on `codebook.xml` entries,
   ordered by `Data.GROUP_ORDER`. Each item: friendly description primary, mono column code
@@ -326,7 +367,58 @@ reserves its height so the footer is never covered.
 - Vendored at `static/js/vendor/chart.umd.min.js`, pinned (record exact version in a comment
   at the top of the file and in `static/js/vendor/VERSIONS.md`).
 - Bars for distributions (top ~20 values + "Other" bucket); horizontal bars when category
-  labels are long. Grouped bars for small crosstabs. **No pies, no 3D.**
+  labels are long. Grouped bars for small crosstabs. **No 3D, no gratuitous animation.**
+- **Pie** is allowed on the **Visualize** tab only, and strictly for **share of cases** across
+  one categorical column — never mean/median/mode (a pie is a part-of-whole mark, so a summary
+  statistic has no place on it). Hard-cap the slices (top ~12 + "Other"); slice colors cycle
+  `--chart-1`…`--chart-8` and the "Other" catch-all uses `--color-text-faint`; separators use
+  `--color-surface` so they read in both themes; legend beside the pie on wide canvases, below
+  it when narrow.
+- **"Other"-cutoff slider** (`templates/partials/other_cutoff_slider.html` +
+  `static/js/otherbucket.js`): the reusable long-tail control shared by the Explore distribution
+  bar and the Visualize pie **and treemap**. The server pre-buckets a sensible default (also the
+  no-JS view) and ships the capped value head plus a residual tail, so dragging re-slices top-N +
+  "Other" entirely client-side (no refetch) with "Other" exact at any cutoff. `.js-only`; renders
+  nothing when there is nothing to slide.
+- **Treemap** (Visualize tab). Two-column nested rectangles (`chartjs-chart-treemap`), sized by
+  count **or** a numeric measure+aggregate (mean/median/mode) — the one area mark where an
+  aggregate besides count is offered. Leaves color by parent group, cycling `--chart-1`…`--chart-8`;
+  the "Other"-cutoff slider applies (a second slider instance, `slider_id` `viz-tree`). Box
+  `.viz-treemap-box` (440px; 360px under 768px); companion table lists the same groups and values.
+- **Waterfall** (Visualize tab). Year-over-year change in a measure+aggregate across `sentyear`,
+  drawn as Chart.js **floating bars** (`[start, end]` data, no plugin) — rising deltas
+  `--color-success`, falling `--color-danger` (`.wf-delta-up`/`.wf-delta-down` and
+  `.wf-key-up`/`.wf-key-down` share that color language across the note key, the table's Change
+  column, and the bars, so a student reads the direction the same way in all three places). An
+  optional running-total line (`.wf-toggle`, `.js-only`) overlays the deltas. Box
+  `.viz-waterfall-box` (420px; 340px under 768px); the companion is a full year-by-year table with
+  a net-change `<tfoot>` row — no "Other"-cutoff slider, since nothing here is bucketed.
+- **Choropleth** (Visualize tab, the visualization-expansion centerpiece). A county / judicial-
+  district / region **grain toggle** (`.viz-grain`, reuses `.segmented`, htmx-swapped) sits above
+  the map; district/region geometry is dissolved from the county TopoJSON at runtime
+  (`static/js/geomap.js`), never a separate geometry file. Fill color is the same 8-step
+  `.heat-1`–`.heat-8` ramp the crosstab heatmap uses, scaled to the active measure+aggregate; a
+  `.viz-legend` below the map shows the ramp's low/high ends, a no-data swatch, and — only when a
+  shape falls below the small-N threshold — a **low-N swatch** (`.viz-legend-lown-swatch`, a
+  diagonal-stripe token gradient) beside the "Hatch thin samples" toggle (see Toggle switch). Box
+  `.viz-map-box` (480px; 380px under 768px). The companion table carries a **"Keep only"** mini-form
+  per row (see Map-click filter) and a "Low sample" tag (`.viz-lown-tag`) mirroring the map's hatch
+  for the no-JS/screen-reader path.
+- **Scatter / bubble** (Visualize tab). One view, not two: two numeric columns aggregate to a
+  **lattice** of points (never raw rows — the cell count is capped) plotted as a Chart.js bubble
+  chart, radius ∝ √count, so overplotting is impossible by construction. Box `.viz-scatter-box`
+  (460px; 360px under 768px); companion table lists each lattice cell's x / y / count / share. No
+  "Other"-cutoff slider (nothing here is bucketed).
+- **Correlation matrix** (Visualize tab, the only chart type with no canvas). A searchable
+  checkbox multiselect over 2–8 numeric columns (`.viz-corr-field`/`.corr-picker` — search box,
+  live count, a soft 8-item cap, a Clear action) feeds a server-rendered `.corr-matrix` table:
+  sticky row headers and a sticky corner cell inside the scroll wrapper (like the crosstab),
+  centered tabular-nums cells. Negative values carry a dotted underline (`.corr-neg`) since a
+  single-hue ramp can't encode sign; off-diagonal cells at `|r| ≥ 0.90` get a small `●` marker
+  (`.corr-flag`) plus a `.corr-callout` box above the table spelling out which pairs are
+  near-mechanical — the sentencing grid's own arithmetic, annotated rather than hidden. Computed
+  fresh every request, never disk-cached. Color rule: see the correlation-matrix heat-ramp entry
+  under "Chart palette" above.
 - Grid lines `--color-border`, labels `--color-text-muted`, font from `--font-base` at
   `--fs-xs`. Tooltips on; animations off (data tool, not a dashboard demo).
 - Every chart is a *companion* to a table that carries the same numbers — the chart is never
@@ -381,10 +473,15 @@ static/
     components.css    ← everything under "Components"
     views.css         ← per-view layout (workbench shell, lesson dock, landing)
   js/
-    vendor/htmx.min.js, chart.umd.min.js, VERSIONS.md   ← pinned, never hand-edited
+    vendor/htmx.min.js, chart.umd.min.js, chartjs-chart-treemap.min.js,
+           chartjs-chart-geo.min.js, VERSIONS.md   ← pinned, never hand-edited
     theme.js          ← toggle + FOUC guard partner
     app.js            ← pickers, toasts, dialogs, table search (vanilla, no build step)
+    otherbucket.js    ← reusable "Other"-cutoff slider (Explore bar + Visualize pie/treemap)
+    geomap.js         ← shared TopoJSON/dissolve plumbing (Visualize choropleth + Filter map)
+    visualize.js      ← Visualize-view chart rendering (loaded only by visualize.html)
   fonts/InterVariable.woff2
+  geo/mn-counties-topo.json   ← vendored MN-counties TopoJSON (visualization expansion)
 ```
 
 No build step, no Node tooling — files are served as written. The legacy `style.css` was

@@ -51,13 +51,31 @@ Governed by two documents: **`EDUCATOR_PORTAL.md`** (scope & design authority) a
 authoring UI — see section 5. Residual auth hardening (rate-limiting, HTTPS, a real educator-role
 boundary) is also still open — see section 3.
 
+### 0a. Visualization expansion (Visualize workbench + map-as-filter) — **shipped** ✅
+
+Delivered on the `visualization_expansion` branch (2026-07-09): a new **Visualize** tab with an
+extensive chart vocabulary over the current filtered slice — pie, treemap, waterfall (year-over-
+year, surfacing the 2016 drug-sentencing-reform break), a county/judicial-district/region
+**choropleth** (small samples rendered as texture rather than a confident color), an aggregated
+scatter/bubble view, and a correlation matrix over a chosen numeric-column subset. **Map-as-filter**
+threads through both the Visualize tab and the Filter view: clicking a geography applies the same
+filter typing it would, verified byte-identical at the cache-directory level
+(`test_map_filter_equivalence.py`). Also added `mode` as a descriptive statistic alongside mean/
+median everywhere they appear.
+
+Governed by two documents: **`VISUALIZATION_EXPANSION.md`** (scope & design authority) and
+**`VISUALIZATION_EXPANSION_PROMPTS.md`** (the 16-phase build order, 0–15, all done). **One tracked
+gap:** no shipped lesson uses a Visualize chart yet — `app.build_lesson_data` only supports `info`/
+`table` focus views; closing it needs a new chart focus-view plus an authored lesson step (folded
+into section 2's "grow the lesson library" item below, not a blocker on the tab itself).
+
 ### 1. Dissemination gaps (closest to the original goals)
 
-- **Richer figures / visualization.** The web app now has **interactive Chart.js charts** —
-  distribution bars on the statistics view and grouped-bar companions on crosstabs (added in the
-  UI overhaul). Still open: the legacy CLI's **exportable Seaborn figures** have not been
-  reintroduced (`matplotlib`/`seaborn` remain dependencies and `settings.xml` still holds a
-  palette), and there are no map/time-series figure types yet.
+- ~~**Richer figures / visualization.**~~ **Done** — the **Visualize workbench** (see section 0a
+  below) added pie, treemap, waterfall (time), choropleth (geography), scatter/bubble, and a
+  correlation matrix, plus map-as-filter. Still open: the legacy CLI's **exportable Seaborn
+  figures** have not been reintroduced (`matplotlib`/`seaborn` remain dependencies and
+  `settings.xml` still holds a palette).
 - **Data export.** Crosstab CSV and the class gradebook CSV now export (both UTF-8 + BOM).
   Still missing: a **filtered-dataset export** — saving the current filtered view itself to CSV
   (reusing `Data.save`), not just its cross-tabulation.
@@ -71,6 +89,10 @@ boundary) is also still open — see section 3.
 - **Grow the lesson library** beyond the current three intro modules, with educator-facing
   authoring documentation. (Per-module **teaching notes** now exist — an educator-only field on
   the lesson JSON — as does a computed answer-key view.)
+- **Add a Visualize-chart lesson focus view.** The visualization expansion's one open acceptance
+  gap: `app.build_lesson_data` only renders `info`/`table` focus views, so no lesson can dock a
+  Visualize chart (pie/treemap/waterfall/choropleth/scatter/correlation) yet. Needs a new focus
+  type plus an authored step using it.
 - **Align the lesson docs.** `lessons/README.md` and `LEARNING_MODULES_PROMPTS.md` still read as
   forward-looking plans; update them to the shipped implementation (as `CLAUDE.md` now is).
 
