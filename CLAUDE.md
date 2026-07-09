@@ -116,6 +116,7 @@ uv run flask --app app run     # add --debug for reload
 | `OPTIMIZATION_PROMPTS.md` | Phased build order (Phases 0–4) for the base DataFrame optimization above, house-style like the other `*_PROMPTS.md`. **All phases done (categorical + load-once + Parquet + `--preload`).** |
 | `VISUALIZATION_EXPANSION.md` | **Design/scope authority** for the Visualize workbench: a new top-level tab with an extensive chart vocabulary (pie, treemap, waterfall, choropleth, scatter/bubble, correlation matrix) + map-as-filter, all over the current filtered slice. Verified data facts (geo encodings, numeric columns), the substrate-reuse argument, the confounding/`float64`/immutability constraints, risks. Read before touching the viz work. **Implemented — all 5 tiers/16 phases built on `visualization_expansion`; one acceptance criterion (a lesson using a chart) is tracked as an open gap** — see "Done: visualization expansion" below. |
 | `VISUALIZATION_EXPANSION_PROMPTS.md` | Phased build order (16 phases, 0–15, across 5 tiers) for the visualization expansion, each with an effort · risk rating and a **recommended model** (Sonnet rarely / Opus with escalating effort incl. ultra / Fable only for the vital P11 cache-compat linchpin). House-style like the other `*_PROMPTS.md`. **All phases done.** |
+| `REQUEST_PATH_OPTIMIZATION_PROMPTS.md` | Phased build order (Phases 0–5) for the **request-path optimization** — the per-request work layered on top of the base-df levers (measurement harness, per-request `account.retrieve` memo, sidebar badge without a replay, the filtered-slice LRU, `get_table`/`num_each` vectorization). Self-contained (rationale + build order in one doc), house-style like the other `*_PROMPTS.md`; each phase carries an effort · risk rating and a **recommended model from a four-model vocabulary — Sonnet ultracode / Opus xhigh / Opus ultracode / Fable xhigh** (Fable reserved for the Phase 5 `.bin` byte-identity linchpin, mirroring its P11 role in the viz prompts). **Planned only — nothing built yet; drafted on the `optimizations-minor` branch.** See "Planned: request-path optimization" below. |
 | `static/css/tokens.css`, `static/css/base.css` | Phase 0 token system: all design tokens (both themes, exact `STYLEGUIDE.md` tables — plus `--overlay` for drawer/dialog backdrops) and reset/typography/focus/reduced-motion. Loaded first; theme switches via `data-theme` on `<html>` (FOUC-guard inline script in `layout.html` — which also sets a `js` class gating JS-only CSS — toggle in `static/js/theme.js`, persisted to `localStorage.theme`, fires a `themechange` event). |
 | `static/css/components.css`, `static/css/views.css` | Phase 1 shell styles per the styleguide's file organization: `components.css` = buttons/badges/chips/toasts/dialog/alerts/empty-state/loading; `views.css` = top bar, workbench grid, sidebar + tablet drawer, breakpoints, **phone shell (data-state bar, bottom nav, sticky-first-column tables, bottom-sheet dock — Phase 7)**. The retired `style.css` is gone (Phase 7); its still-live base rules (`.container`, bare `h1`/`h2`/`h3`/`p`) moved here + into `base.css`. |
 | `static/js/app.js` | Phase 1 shell behaviors (vanilla, no build step): toast auto-dismiss + `HX-Trigger`/`htmx:responseError` toast paths, `[data-confirm]` dialog interception, sidebar drawer with focus trap (Phase 7: opened by **any** `[aria-controls="sidebar"]` trigger — the tablet ☰ or the phone data-state bar — focus returns to the opener), htmx-bound global progress bar, `[data-loading]` submit feedback ("Computing statistics…"). Phase 3 added the **searchable picker**: a `[data-picker]` wrapper around a native `<select>` gets a filtering combobox (arrows/Enter/Esc); the hidden select keeps carrying the form value (and is the no-JS fallback). |
@@ -790,6 +791,50 @@ must stay identical (so **numeric columns must stay `float64`** — the three ch
 [data.py:78](data.py:78)/[246](data.py:246)/[329](data.py:329) depend on it; only strings get
 re-typed), and the base DataFrame is **never mutated in place** today (no `inplace=`/`.drop`/
 `.fillna`/`astype` on `self.df`) — the sharing levers rest on keeping it that way.
+
+## Planned: request-path optimization (per-request work on top of the base)
+
+**Planned, not yet built** — drafted on the `optimizations-minor` branch (off `main`, which now
+includes the merged visualization-expansion PR #4, 2026-07-09); no code has landed. Governed by one
+self-contained doc, **`REQUEST_PATH_OPTIMIZATION_PROMPTS.md`** (rationale + phased build order in one
+file). This is the **sequel** to the base DataFrame optimization: Levers A–D made the *base* cheap to
+hold and share; this targets everything that runs *on top of the base, per request* — the redundant
+history replays, the O(n·k) stat loop, the nested-filter crosstab, and the repeat pickle reads the
+base work didn't touch. (Several targets — `aggregate_by_group`/`get_aggregate`, `build_choropleth`,
+`_county_crosswalk`, the scatter's `get_table` — are visualization-expansion code, which is why that
+PR is folded in first.)
+
+**Six phases** (0–5), dependency-ordered, each with an effort · risk rating and a recommended model
+drawn from a fixed four-model vocabulary — **Sonnet ultracode / Opus xhigh / Opus ultracode /
+Fable xhigh**:
+- **P0 — Baseline & harness** (Sonnet ultracode): an env-gated timing shim + a repeatable benchmark
+  over four flows; capture before-numbers; confirm the golden `.bin` snapshot + guardrail tests
+  (`test_base_immutability.py`, `test_map_filter_equivalence.py`) are green. Nothing is optimized
+  until it's measured.
+- **P1 — Cache-neutral I/O reclamation** (Sonnet ultracode): per-request `account.retrieve` memo
+  (`flask.g` — it's unpickled 4–6× per render), memoize `build_column_browser` and
+  `lessons.list_modules`. No output/cache-key change.
+- **P2 — Sidebar badge without a replay** (Opus xhigh): `inject_globals` forces a full history
+  replay for the count on every logged-in page; reuse the count the filter-apply route already
+  computes.
+- **P3 — Filtered-slice LRU** (Opus ultracode): the structural win — a bounded slice cache next to
+  `_base_df()`/`_county_crosswalk()` so viewing N columns of one filter state stops rebuilding the
+  same frame N×, and the double-replay inside `render_explore` collapses to one. Also removes the
+  replay behind `get_aggregate`/`build_choropleth`. Extends `test_base_immutability.py`.
+- **P4 — Vectorize the crosstab** (Opus xhigh): `get_table`'s O(cells) nested filters → one
+  `groupby([x,y]).agg(...)`. Never disk-cached, so no `.bin` risk — only display parity. Speeds
+  Compare, lesson `table` steps, and the Visualize scatter (`build_scatter`).
+- **P5 — Vectorize per-column stats** (Fable xhigh): `num_each`'s O(n·k) loop → `value_counts`
+  (O(n)). The one phase that can shift `<col>.bin` bytes — gated behind an explicit
+  order-preserve-vs-re-warm-the-golden-snapshot decision. Fable is reserved for this cache-compat
+  linchpin, mirroring its P11 role in the viz prompts.
+
+**Inherited hard constraints** (same as the base-df work): cache byte-identity (P1–P4 are
+cache-neutral by design; P5 is the gated exception), `float64` stays `float64`, and neither the base
+nor a cached filtered slice is ever mutated in place (`test_base_immutability.py` is the guardrail,
+extended in P3). A standing "profile & discover" step at the end of every phase feeds Appendix B of
+the doc (the running list of further candidate wins — `get_moc_options`, `filter_or_same` →
+`isin`, the dashboard N+1 — found but deliberately not yet scheduled).
 
 ## Git remotes
 
