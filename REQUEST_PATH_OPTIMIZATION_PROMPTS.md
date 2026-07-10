@@ -280,6 +280,19 @@ or the mode tie-count logic.
 **Profile & discover:** with 3–5 landed, re-run every Phase 0 flow and record the after-numbers.
 Anything still hot goes to Appendix B for a possible round two.
 
+**Resolved (2026-07-09): option (a), the order-preserving swap — built and verified.** One
+`value_counts` pass supplies the counts, but the pickled dict keeps the old layout exactly:
+keys are `col.unique()`'s own elements in order of appearance (same np types), values are
+Python ints, and a NaN key stays 0 (the old `col == nan` never matched a row). Verified with a
+before/after oracle over **all 170 non-excluded columns × 2 history states**: every `<col>.bin`
+pickle plus formatted display output (16 sample columns × 5 sortings) byte-identical — 372
+files, zero diffs — plus an equivalence check on the all-distinct `Unnamed: 0` shape (excluded
+from the full run: the old path needs ~a day on 294k uniques, and the column is unreachable —
+no codebook entry). Timing: `get_column_info` across all columns 22.9 s → 0.96 s (23.8×); the
+worst column, `moc` (11,475 uniques), 4.22 s → 9 ms (~446×). Option (b) was rejected because
+its only benefit is cosmetic while it invalidates every `cache/data/*` artifact and the golden
+set. After-numbers for all flows: `perf/BASELINE.md`.
+
 ---
 
 ## Appendix A — Change ledger (for the CLAUDE.md update at the end)
@@ -292,7 +305,7 @@ Anything still hot goes to Appendix B for a possible round two.
 | 2 | Badge count without replay | `app.py` | neutral (not in `.bin`) | badge == real entries |
 | 3 | Filtered-slice LRU | `cache.py` | neutral | `test_base_immutability.py` (extended) |
 | 4 | `get_table` → groupby | `data.py` | n/a (never cached) | cell-for-cell equivalence |
-| 5 | `num_each` → `value_counts` | `data.py` | **changes unless order-preserved** | golden `.bin` |
+| 5 | `num_each` → `value_counts` | `data.py` | **neutral — order-preserved (a), verified byte-identical** | before/after `.bin` oracle, 372 files |
 
 At the end, fold a "Done: request-path optimization" section into `CLAUDE.md` (mirroring the
 "Done: base DataFrame optimization" section) and note the new LRU next to `_base_df`/`_county_crosswalk`
@@ -322,6 +335,15 @@ before committing to any — several may not be worth the risk at this app's sca
   history step on a miss — negligible, listed only for completeness.
 - **Correlation `pair_n`** ([app.py:1830](app.py:1830), `present.T.dot(present)`) is already
   vectorized and fine; noted so a future reader doesn't "optimize" it needlessly.
+- **`SCATTER_MAX_CELLS` cap could be raised (product call, Phase 4 finding).** The 10,000-cell
+  guard ([app.py:1813](app.py:1813)) was sized against the *old* O(cells) nested-filter `get_table`,
+  where the scatter's `time × history` lattice took **~1.5 s** to build (the single most expensive
+  thing in the Phase 0 baseline). After the Phase 4 groupby rewrite that same lattice builds in
+  **~17 ms**, and a ~1,500-cell count-only build extrapolates to well under ~100 ms at the full
+  10k cap — so the **performance** half of the guard's rationale is gone. The **readability** half
+  remains (10k overplotted bubbles are unreadable), so the cap is now a pure legibility floor, not
+  a perf floor. Left unchanged here per the phase's "log, don't change it" note — raising it is a
+  Visualize UX decision, not a request-path one.
 
 ---
 

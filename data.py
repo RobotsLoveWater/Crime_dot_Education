@@ -17,6 +17,7 @@ import math
 import xml.etree.ElementTree as ET
 
 import moc
+from perf.profiling import timed
 
 
 class Data:
@@ -251,6 +252,7 @@ class Data:
 
         return output
 
+    @timed('get_column_info')
     def get_column_info(self, header, precision=3) -> dict:
 
         column = self.df[header]
@@ -351,33 +353,70 @@ class Data:
             possible.append(output)
         return possible
 
+    @timed('get_table')
     def get_table(self, d_col, x_col, y_col, precision=3) -> dict:
-
-        sheet = {}
+        # One grouped aggregation replaces the old O(|x_unique| * |y_unique|) nested-filter
+        # sweep (a filter(x == ix) then filter(y == iy) per cell). Crosstabs are NEVER
+        # disk-cached (computed fresh per request), so there is no .bin compatibility risk
+        # here -- the only bar is exact display parity with the old per-cell path, which the
+        # reshape below preserves cell-for-cell (request-path optimization Phase 4):
+        #   * every (ix, iy) in x_unique x y_unique still gets a cell (empty ones -> N=0), and
+        #   * NaN row/column keys are still emitted -- the old filter(col == ix) matched no rows
+        #     when ix was NaN (NaN == NaN is False), so those cells were all N=0 / 'N/A'.
+        #     build_crosstab and the treemap/scatter builders drop NaN keys downstream, but
+        #     get_table's historical output carried them, so we keep emitting them.
+        scale = 10 ** precision
 
         x_unique = self.df[x_col].unique()
         y_unique = self.df[y_col].unique()
 
+        # observed=True keeps only the (x, y) combinations actually present in the slice;
+        # dropna=True (the default) omits any group whose x or y key is NaN -- matching the old
+        # path exactly (== NaN never selected a row). Absent combinations default to N=0 below.
+        grouped = self.df.groupby([x_col, y_col], observed=True)
+        counts = grouped.size().to_dict()               # {(ix, iy): N}
+
+        means = medians = stds = None
+        if d_col:
+            # Per-group Series reductions -- NOT a vectorized groupby.agg. groupby's Cython
+            # mean/std kernels accumulate the sum in a different order than Series.mean/std,
+            # which can differ by a ULP and flip a value sitting exactly on a rounding boundary
+            # (measured: one cell went '33.007' vs '33.008' at 33.0075). Iterating the observed
+            # groups and calling the SAME Series reductions the old per-cell path used -- over
+            # the SAME rows in the SAME order (groupby is stable within a group) -- reproduces
+            # the old numbers bit-for-bit. Only observed (non-empty) groups are visited, so this
+            # is still far cheaper than the old O(cells) double boolean-mask filtering; empty
+            # cells fall through to 'N/A' below. mean/median skip NaN and std is sample std
+            # (ddof=1) -- the same defaults the old per-cell reductions used.
+            means, medians, stds = {}, {}, {}
+            for key, col in grouped[d_col]:
+                m = col.mean()
+                if pd.notna(m): means[key] = m
+                md = col.median()
+                if pd.notna(md): medians[key] = md
+                sd = col.std()
+                if pd.notna(sd): stds[key] = sd
+
+        def fmt(value):
+            # 'N/A' when the aggregate is absent (empty cell, or an all-NaN / 1-row group whose
+            # reduction was NaN and so was never stored), else the identical
+            # str(round(v * scale) / scale) the nested-loop path produced.
+            if value is None:
+                return 'N/A'
+            return str(round(value * scale) / scale)
+
+        sheet = {}
         for ix in x_unique:
-            sheet[ix] = {}
-            ix_df = self.filter(x_col, 'eq', ix, inplace=False, source=None)
+            row = {}
             for iy in y_unique:
-                iy_df = self.filter(y_col, 'eq', iy, inplace=False, source=ix_df)
-                sheet[ix][iy] = {'N': len(iy_df.index)}
+                cell = {'N': int(counts.get((ix, iy), 0))}
                 if d_col:
-
-                    # account for edge cases
-                    sheet[ix][iy]['mean'] = 'N/A'
-                    sheet[ix][iy]['mdn'] = 'N/A'
-                    sheet[ix][iy]['std'] = 'N/A'
-
-                    # set normally if possible
-                    if pd.notna(iy_df[d_col].mean()):
-                        sheet[ix][iy]['mean'] = str(round(iy_df[d_col].mean() * 10 ** precision) / 10 ** precision)
-                    if pd.notna(iy_df[d_col].median()):
-                        sheet[ix][iy]['mdn'] = str(round(iy_df[d_col].median() * 10 ** precision) / 10 ** precision)
-                    if pd.notna(iy_df[d_col].std()):
-                        sheet[ix][iy]['std'] = str(round(iy_df[d_col].std() * 10 ** precision) / 10 ** precision)
+                    key = (ix, iy)
+                    cell['mean'] = fmt(means.get(key))
+                    cell['mdn'] = fmt(medians.get(key))
+                    cell['std'] = fmt(stds.get(key))
+                row[iy] = cell
+            sheet[ix] = row
 
         return sheet
 
@@ -451,13 +490,19 @@ class Data:
         # grandfathered in from cli-legacy
 
         # calculate the occurrence of each unique value in a column
-        unique = col.unique()
-        unique_num = {}
-
-        for iu in unique:
-            unique_num[iu] = self.num_occur(col, iu)
-
-        return unique_num
+        #
+        # One value_counts pass (O(n)) replaces the per-unique-value num_occur scan
+        # (len(col[col == iu]) for each of k uniques -- O(n*k); request-path optimization
+        # Phase 5, order-preserving swap). This dict is pickled into <col>.bin via
+        # get_column_info, so its layout is contract:
+        #   * keys are the elements of col.unique() itself, in order of appearance -- the
+        #     same np.float64/str/np.nan objects, NOT value_counts' index (whose sort
+        #     order and key boxing differ);
+        #   * values are Python ints (value_counts holds np.int64);
+        #   * a NaN key stays 0, exactly as the old `col == nan` never matched a row
+        #     (get_column_info derives the real NaN count separately from the not-NaN sum).
+        counts = col.value_counts().to_dict()  # dropna: the NaN key is pinned to 0 below
+        return {iu: (int(counts.get(iu, 0)) if pd.notna(iu) else 0) for iu in col.unique()}
 
     def get_unique_cases(self):
         return self.df['dcnum'].unique()
