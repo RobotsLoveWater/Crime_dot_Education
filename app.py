@@ -16,6 +16,7 @@ from flask import request
 from flask import redirect, url_for
 from flask import flash
 from flask import Response
+from flask import g
 
 from markupsafe import Markup, escape
 
@@ -24,9 +25,11 @@ import html
 import re
 import json
 import datetime
+import time
 import io
 import csv
 import collections
+import functools
 import statistics
 import urllib.parse
 
@@ -43,6 +46,7 @@ from data import Data
 
 import cache
 from cache import get_data, get_moc_options, _execute, history_text_to_item, history_item_to_text
+import perf.profiling as profiling
 
 # create the app
 app = Flask(__name__)
@@ -112,6 +116,30 @@ SORT_OPTIONS = [
 EXCLUDED_NOTE = 'Excluded from analysis — identifies individual people or cases.'
 
 
+# Phase 0 timing shim (REQUEST_PATH_OPTIMIZATION_PROMPTS.md): total wall time per request,
+# printed only under PROFILE_REQUESTS=1 -- see perf/profiling.py. reset() clears the
+# per-request _execute/get_column_info/get_table counters so each request's numbers don't
+# bleed into the next.
+@app.before_request
+def _profile_before_request():
+    if profiling.ENABLED:
+        profiling.reset()
+        g._profile_start = time.perf_counter()
+
+
+@app.after_request
+def _profile_after_request(response):
+    if profiling.ENABLED and hasattr(g, '_profile_start'):
+        elapsed = time.perf_counter() - g._profile_start
+        print('[PROFILE] TOTAL {} {} took {:.2f}ms'.format(
+            request.method, request.path, elapsed * 1000))
+        profiling.REQUEST_LOG.append({
+            'method': request.method, 'path': request.path,
+            'elapsed': elapsed, 'counters': profiling.snapshot(),
+        })
+    return response
+
+
 @app.template_filter('share_chain')
 def share_chain(history):
     # Builds the /share/<chain> path segment from a user's own active filters (educator
@@ -166,6 +194,25 @@ def dataset_total():
     return _dataset_total
 
 
+def current_entries():
+    # Filtered case count for the sidebar badge, read WITHOUT replaying the history
+    # (REQUEST_PATH_OPTIMIZATION_PROMPTS.md Phase 2). The filter-apply route stamps the
+    # resulting count onto the active history entry (account.set_history_count), and
+    # reverting to an entry restores its stamped count — so the current count is almost
+    # always a plain dict read off the account (already memoized this request, Phase 1).
+    #   - unfiltered base state (action None) carries no count → the full dataset;
+    #   - a stamped count → use it directly;
+    #   - otherwise fall back to get_data (first load of an account filtered before this
+    #     optimization, or a /share chain the apply route never counted): a warm _data.bin
+    #     read in the common case, and only a one-off replay if that slice is genuinely cold.
+    active = account.retrieve(session['userid'])['history'][-1]
+    if 'count' in active:
+        return active['count']
+    if active['action'] is None:
+        return dataset_total()
+    return get_data(session)['entries']
+
+
 def current_user():
     # best-effort user lookup for layout context (error handlers, context processor);
     # never raises — a missing pickle just renders the logged-out shell
@@ -186,7 +233,7 @@ def inject_globals():
     if is_logged_in():
         try:
             context['datastate'] = {
-                'entries': get_data(session)['entries'],
+                'entries': current_entries(),
                 'total': dataset_total()
             }
         except Exception:
@@ -631,13 +678,10 @@ def logout():
     return not_logged_in()
 
 
-def build_column_browser(data):
-    # Sidebar column browser: every documented column in the current dataframe,
-    # grouped per codebook.xml's `group` attributes and ordered by Data.GROUP_ORDER.
-    # Descriptions come straight from the codebook parse (CODEBOOK), not the cached
-    # `data['columns']` dict, so codebook edits show up without clearing the cache.
+@functools.lru_cache(maxsize=4)
+def _build_column_browser_cached(column_list, excluded):
     groups = {}
-    for code in data['column_list']:
+    for code in column_list:
         desc = CODEBOOK.codebook.get(code)
         if not desc:
             continue  # undocumented columns (e.g. dcnum2) stay out of the browser
@@ -645,12 +689,25 @@ def build_column_browser(data):
         groups.setdefault(name, []).append({
             'code': code,
             'desc': desc,
-            'excluded': code in data['excluded']
+            'excluded': code in excluded
         })
 
     rank = {name: k for k, name in enumerate(Data.GROUP_ORDER)}
     return [{'name': name, 'columns': sorted(groups[name], key=lambda c: c['desc'].lower())}
             for name in sorted(groups, key=lambda n: (rank.get(n, len(rank)), n))]
+
+
+def build_column_browser(data):
+    # Sidebar column browser: every documented column in the current dataframe,
+    # grouped per codebook.xml's `group` attributes and ordered by Data.GROUP_ORDER.
+    # Descriptions come straight from the codebook parse (CODEBOOK), not the cached
+    # `data['columns']` dict, so codebook edits show up without clearing the cache.
+    #
+    # data['column_list']/['excluded'] are process-constant (filters never drop
+    # columns), so the built groups are memoized on that tuple rather than rebuilt on
+    # every explore/filter/compare render -- keyed on the columns themselves, not
+    # `data`'s object identity, since `data` is a fresh dict per request.
+    return _build_column_browser_cached(tuple(data['column_list']), tuple(data['excluded']))
 
 
 # Hard caps on individually-drawn slices/bars for the reusable "Other"-cutoff control
@@ -1189,6 +1246,11 @@ def explore_filter_column(column):
         account.history_add(session['userid'], entry)
 
         remaining = get_data(session)['entries']
+        # Stamp the resulting count on the active history entry so the sidebar badge can
+        # read it without replaying the history on the next page (Phase 2). This is the
+        # same number the flash below shows, so it's already paid for — stop throwing it
+        # away. The redirect's inject_globals then reads it straight off the entry.
+        account.set_history_count(session['userid'], remaining)
         flash('Filter applied — {:,} cases remain.'.format(remaining), 'success')
         # land back on the view we came from (not a bare redirect home): the same filter
         # column view, now showing updated chips, refreshed counts, or the zero-case state.

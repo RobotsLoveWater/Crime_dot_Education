@@ -12,11 +12,13 @@
 import os
 import pickle
 from copy import deepcopy
+from collections import OrderedDict
 
 from data import Data
 from data import format_column_info
 
 import account
+from perf.profiling import timed
 
 # Base datafile: prefer the typed columnar Parquet base (Lever C -- ~10x smaller on disk,
 # ~20x faster to parse) when it exists, else fall back to the CSV so a machine that only
@@ -279,10 +281,57 @@ def county_values() -> list:
     return sorted(_county_crosswalk()['district'].keys())
 
 
+# --- filtered-slice LRU (Phase 3: memoize per-history-token filtered frames) --------
+# Lever B memoized the *base*; every cache miss on a *filtered* state still replays the
+# whole filter chain from the base. Viewing N columns of one filter state is N requests,
+# each re-filtering the identical slice (flow (a) logged 9 _execute calls for 8 column
+# views); a cold column render even replays twice in one page (render_explore's two
+# get_data calls). This bounded LRU holds the already-filtered frame keyed by the canonical
+# history-token tuple get_data builds its cache dir from, so repeat views of the same state
+# hand back the shared frame instead of re-filtering.
+#
+# Bounded so a session walking many states can't grow memory without limit. Each slice is a
+# row-subset far smaller than the base and shares its category index with the base, so a
+# handful of entries is cheap. Callers treat the frame read-only (filter(inplace=False) /
+# aggregate_by_group(source=) / get_table all return new frames), exactly as they treat the
+# shared base -- so the same immutability contract (test_base_immutability.py) covers it.
+_FILTERED_CACHE_MAX = 8
+_filtered_cache = OrderedDict()       # token tuple -> filtered df (base excluded)
+_filtered_fingerprints = {}           # token tuple -> (shape, id); debug-only tripwire
+
+
+def _slice_key(history) -> tuple:
+    """Canonical LRU key for a history: the filter-token tuple (the base entry at index 0
+    excluded, any override already appended). Identical to the '/'.join(...) path get_data
+    keys its disk cache dir on, so a slice can never be served for the wrong state -- the
+    same failure mode test_map_filter_equivalence.py guards for cache dirs."""
+    return tuple(history_item_to_text(item) for item in history[1:])
+
+
+def _filtered_cache_insert(key, df) -> None:
+    _filtered_cache[key] = df
+    _filtered_cache.move_to_end(key)
+    _filtered_fingerprints[key] = (df.shape, id(df))
+    while len(_filtered_cache) > _FILTERED_CACHE_MAX:
+        evicted, _ = _filtered_cache.popitem(last=False)  # drop the least-recently-used
+        _filtered_fingerprints.pop(evicted, None)
+
+
+def _clear_filtered_cache() -> None:
+    """Drop every cached slice. Used by the guardrail test and the benchmark to force a
+    genuinely cold run; not needed in normal operation (the LRU self-bounds)."""
+    _filtered_cache.clear()
+    _filtered_fingerprints.clear()
+
+
 def _execute(session, history_override=None) -> Data:
+    """Return a Data wrapping the filtered slice for this session (+ any lesson override).
 
-    temp_data = Data()
-
+    Serves the frame from the in-memory LRU when warm, else replays the history from the
+    base (the timed, expensive path -- see _replay_history) and caches the result. The base
+    (empty-filter) state is never cached: it IS the shared _base_df() singleton. The frame
+    is handed out read-only by contract, exactly like _base_df().
+    """
     if session:
         history = account.retrieve(session['userid'])['history']
     else:
@@ -293,6 +342,39 @@ def _execute(session, history_override=None) -> Data:
     if history_override:
         history = history + history_override
 
+    temp_data = Data()
+
+    key = _slice_key(history)
+
+    # an empty filter chain IS the base itself -- hand back the shared base, never cache it.
+    if not key:
+        temp_data.df = _base_df()
+        return temp_data
+
+    cached = _filtered_cache.get(key)
+    if cached is not None:
+        _filtered_cache.move_to_end(key)  # mark most-recently-used
+        # debug-only tripwire (stripped under `python -O`), mirroring _base_df: a served
+        # slice must not have drifted in shape/identity since it was cached.
+        assert (cached.shape, id(cached)) == _filtered_fingerprints[key], \
+            'filtered slice mutated between requests (shape/identity drift)'
+        temp_data.df = cached
+        return temp_data
+
+    # miss: replay the chain from the base (the one expensive path, timed as '_execute'),
+    # then cache the resulting slice for the next viewer of this same state.
+    _replay_history(temp_data, history)
+    _filtered_cache_insert(key, temp_data.df)
+    return temp_data
+
+
+@timed('_execute')
+def _replay_history(temp_data, history) -> None:
+    # The actual base-replay -- runs ONLY on a slice-cache miss (the LRU short-circuit in
+    # _execute returns before reaching here on a hit). This is what the benchmark's
+    # '_execute' counter now measures: in Phase 0 every _execute was a real replay, so
+    # 'apply filter -> view 8 columns' logged 9; the slice cache collapses the 8 repeat
+    # column views to LRU hits, leaving 1 real replay. Mutates the passed-in temp_data.df.
     for item in history:
         if item['action']:
             action = item['action']
@@ -315,8 +397,6 @@ def _execute(session, history_override=None) -> Data:
             # the CSV. temp_data.df is None here (fresh Data), and the first filter
             # above replaces this reference with a new frame, so the base stays pristine.
             temp_data.df = _base_df()
-
-    return temp_data
 
 
 def cache_info(loaded_data, columns, history_list=None):

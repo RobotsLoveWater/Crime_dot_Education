@@ -35,32 +35,59 @@ class LessonError(Exception):
     pass
 
 
-def list_modules() -> list:
+# Memo for list_modules(): re-parsing every lessons/*.json on every call (catalog,
+# dashboard, deep links) is wasted work between authoring edits. Keyed on a directory
+# signature (each file's name + mtime + size) rather than a bare "have we run before"
+# flag, so an edited/added/removed lesson file is picked up on the next call without
+# a process restart.
+_list_modules_cache = None  # (signature, modules) or None
 
-    # missing directory just means no lessons yet (mirrors get_user_list on a missing classcode)
+
+def _lessons_signature():
     if not os.path.isdir(LESSONS_DIR):
-        return []
+        return None
 
-    modules = []
+    signature = []
     for name in sorted(os.listdir(LESSONS_DIR)):
-
         if not name.endswith('.json'):
             continue
+        stat = os.stat(os.path.join(LESSONS_DIR, name))
+        signature.append((name, stat.st_mtime_ns, stat.st_size))
 
-        module = _load_file(os.path.join(LESSONS_DIR, name))
-        validate(module, source=name)
+    return tuple(signature)
 
-        # id must match the filename stem, since both are the URL segment
-        stem = name[:-len('.json')]
-        if module['id'] != stem:
-            raise LessonError(name + ": id '" + str(module['id']) + "' does not match filename stem '" + stem + "'")
 
-        modules.append(module)
+def list_modules() -> list:
 
-    # optional 'order' controls catalog sequence (lower first); modules without it sort last,
-    # ties broken by id. Both the catalog (/lesson) and the homepage read this order.
-    modules.sort(key=lambda m: (m.get('order', 10**9), m['id']))
+    global _list_modules_cache
 
+    signature = _lessons_signature()
+    if _list_modules_cache is not None and _list_modules_cache[0] == signature:
+        return _list_modules_cache[1]
+
+    # missing directory just means no lessons yet (mirrors get_user_list on a missing classcode)
+    modules = []
+    if os.path.isdir(LESSONS_DIR):
+        for name in sorted(os.listdir(LESSONS_DIR)):
+
+            if not name.endswith('.json'):
+                continue
+
+            module = _load_file(os.path.join(LESSONS_DIR, name))
+            validate(module, source=name)
+
+            # id must match the filename stem, since both are the URL segment
+            stem = name[:-len('.json')]
+            if module['id'] != stem:
+                raise LessonError(name + ": id '" + str(module['id']) + "' does not match filename stem '" + stem + "'")
+
+            modules.append(module)
+
+        # optional 'order' controls catalog sequence (lower first); modules without it sort last,
+        # ties broken by id. Both the catalog (/lesson) and the homepage read this order.
+        modules.sort(key=lambda m: (m.get('order', 10**9), m['id']))
+
+    _list_modules_cache = (signature, modules)
     return modules
 
 

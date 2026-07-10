@@ -158,10 +158,60 @@ def test_execute_matches_direct_and_leaves_base_intact():
     _assert_unchanged(base, snap)
 
 
+def test_filtered_slice_cache_serves_and_stays_immutable():
+    """Phase 3 (request-path optimization): a filtered state executed twice is served from
+    the in-memory slice LRU (the SAME frame object, byte-identical to a direct filter), and
+    a full get_column_info / get_table / aggregate_by_group / get_moc_options pass over that
+    cached slice never mutates it. This is the filtered-slice twin of the base guardrail:
+    the LRU shares slices read-only exactly as _base_df shares the base."""
+    base = _load_base().df
+    base_snap = _snapshot(base)
+
+    # start from a clean LRU so this is an unambiguous miss -> hit
+    cache._clear_filtered_cache()
+
+    key = (cache.history_item_to_text(NUMERIC),)  # f.time.gt.14 -- the canonical token
+
+    exec1 = cache._execute(None, [NUMERIC])   # miss: builds + caches the slice
+    exec2 = cache._execute(None, [NUMERIC])   # hit: must be the SAME cached frame
+
+    assert exec2.df is exec1.df, "second _execute was not served from the slice LRU"
+    assert cache._filtered_cache[key] is exec1.df, "LRU is not holding the built slice"
+
+    # byte-identical to a direct boolean filter of the base (the slice is correct, not just
+    # cached) -- the wrong-state failure mode the plan warns about would surface here
+    direct = Data().filter("time", "gt", "14", inplace=False, source=base)
+    assert exec1.df.equals(direct), "cached slice != direct filter result"
+
+    # snapshot the cached slice, then run the read pipeline over it (the same read shapes the
+    # base guardrail exercises, but pointed at the shared SLICE)
+    slice_snap = _snapshot(exec1.df)
+    reader = Data()
+    reader.df = exec1.df
+    reader.get_column_info("time")                 # numeric-stats branch
+    reader.get_column_info("sex")                  # categorical branch
+    reader.get_table("time", "sex", "race")        # crosstab: filters internally, read-only
+    reader.aggregate_by_group("county", "#", "count", source=exec1.df)
+    reader.aggregate_by_group("county", "time", "mean", source=exec1.df)
+    reader.get_moc_options(["A", "*", "*", "*", "*"])  # reassigns reader.df, must not mutate slice
+
+    # the cached slice is byte-for-byte unchanged and still the object the LRU holds
+    _assert_unchanged(exec1.df, slice_snap)
+    assert cache._filtered_cache[key] is exec1.df, "LRU slice replaced/mutated by reads"
+
+    # a third execute still hits the same untouched frame (tripwire must stay green)
+    exec3 = cache._execute(None, [NUMERIC])
+    assert exec3.df is exec1.df, "post-read _execute stopped serving the cached slice"
+
+    # and the shared base underneath is likewise untouched
+    _assert_unchanged(base, base_snap)
+
+
 def main():
     checks = [
         ("base immutable through full pipeline", test_base_dataframe_immutable_through_pipeline),
         ("_execute matches direct + base intact", test_execute_matches_direct_and_leaves_base_intact),
+        ("filtered-slice LRU serves + stays immutable", test_filtered_slice_cache_serves_and_stays_immutable),
     ]
     print("=" * 70)
     print("base DataFrame immutability guardrail")

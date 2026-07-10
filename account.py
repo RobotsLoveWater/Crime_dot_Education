@@ -12,6 +12,8 @@
 import os
 import pickle
 
+from flask import g, has_app_context
+
 NO_CLASS_CODE = 'unmanaged'
 
 # classcode convention: signing up with a classcode like 'edu-smith' grants educator
@@ -93,16 +95,49 @@ def form_userid(username, classcode) -> str:
     return classcode + '/' + username
 
 
+def _request_cache() -> dict:
+    # flask.g lives exactly as long as the current application context (one per
+    # request), so a dict hung off it is a free per-request memo -- never a module
+    # global, since accounts are mutable per-user state (REQUEST_PATH_OPTIMIZATION_PROMPTS.md
+    # Phase 1 "Don't"). Callers must check has_app_context() first.
+    if not hasattr(g, '_account_cache'):
+        g._account_cache = {}
+    return g._account_cache
+
+
+def _invalidate(userid) -> None:
+    # Every writer below calls this right after persisting, so a route that writes
+    # then reads within the same request never sees the pre-write copy. No-op outside
+    # a request (nothing was cached to begin with).
+    if has_app_context():
+        _request_cache().pop(userid, None)
+
+
 def retrieve(userid) -> dict:
+
+    # Memoized per request (flask.g) -- a single explore render unpickles the same
+    # user file 4-6x (once per get_data()/_execute() call plus inject_globals)
+    # without this. Falls back to a plain disk read with no caching when there is no
+    # active Flask application context (e.g. perf/benchmark.py's setup calls, which run
+    # outside request dispatch), so behavior there is unchanged.
+    if has_app_context():
+        cached = _request_cache()
+        if userid in cached:
+            return cached[userid]
 
     if os.path.exists(get_user_directory(userid)):
 
         with open(get_user_directory(userid), 'rb') as handle:
-            return pickle.load(handle)
+            user = pickle.load(handle)
 
     else:
 
         raise FileNotFoundError
+
+    if has_app_context():
+        _request_cache()[userid] = user
+
+    return user
 
 
 def create(username, classcode, password, overwrite=False, classes=None) -> dict:
@@ -137,6 +172,8 @@ def create(username, classcode, password, overwrite=False, classes=None) -> dict
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+    _invalidate(userid)
+
     return user
 
 
@@ -155,6 +192,8 @@ def add_class(userid, class_id) -> dict:
 
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    _invalidate(userid)
 
     return user
 
@@ -176,6 +215,8 @@ def history_add(userid, entry) -> None:
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+    _invalidate(userid)
+
 
 def history_revert(userid, entry_number=1):
 
@@ -193,6 +234,30 @@ def history_revert(userid, entry_number=1):
 
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    _invalidate(userid)
+
+
+def set_history_count(userid, count) -> None:
+
+    # Cache the filtered case count on the active (most recent) history entry, so the
+    # sidebar badge (app.inject_globals) can read it WITHOUT replaying the history
+    # (REQUEST_PATH_OPTIMIZATION_PROMPTS.md Phase 2). Written by the filter-apply route
+    # right after it computes the count for its "N cases remain" flash. The count rides
+    # along through revert/clear: reverting to an entry restores the count stamped when it
+    # was applied, and the base entry carries none (the badge treats the unfiltered state
+    # as the full dataset). Purely a display cache -- it never enters the cache/data/ path
+    # (cache.history_item_to_text reads only 'action'), so cache keys and .bin bytes are
+    # unchanged; the .bin files stay the source of truth on a genuine miss.
+    user = retrieve(userid)
+
+    if user['history']:
+        user['history'][-1]['count'] = count
+
+        with open(get_user_directory(userid), 'wb') as handle:
+            pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        _invalidate(userid)
 
 
 def get_progress(userid, module_id) -> dict:
@@ -230,6 +295,8 @@ def set_progress(userid, module_id, step, answers=None, completed=None) -> None:
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+    _invalidate(userid)
+
 
 def set_lesson_state(userid, module_id, state) -> None:
 
@@ -250,6 +317,8 @@ def set_lesson_state(userid, module_id, state) -> None:
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+    _invalidate(userid)
+
 
 def remove_class(userid, class_id) -> dict:
 
@@ -266,6 +335,8 @@ def remove_class(userid, class_id) -> dict:
 
         with open(get_user_directory(userid), 'wb') as handle:
             pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        _invalidate(userid)
 
     return user
 
@@ -291,6 +362,8 @@ def reset_progress(userid, module_ids) -> dict:
     with open(get_user_directory(userid), 'wb') as handle:
         pickle.dump(user, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+    _invalidate(userid)
+
     return user
 
 
@@ -304,3 +377,5 @@ def delete_account(userid) -> None:
     path = get_user_directory(userid)
     if os.path.exists(path):
         os.remove(path)
+
+    _invalidate(userid)
