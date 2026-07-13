@@ -51,11 +51,27 @@ Sets/deep-links a data state so the student can inspect a filtered dataset.
 | `state` | token[] | *(optional)* History tokens that define this step's dataset. Sets the module's **active state** (see "Active state" below). Omit to keep the current active state. |
 | `focus` | object | *(optional)* Deep-link target into an existing analysis view. |
 
-`focus.view` ∈ `info | table`:
+`focus.view` ∈ `info | table | chart`:
 - `info` → deep-links to `/info/<column>`. Requires `column`.
 - `table` → deep-links to the cross-tab view. Requires `dependant`, `x_axis`, `y_axis`
   (semantic roles; the wiring phase maps them to the route respecting the app's documented
   x/y axis flip). Use `"#"` for `dependant` to mean count-only.
+- `chart` → pins a **Visualize chart**, drawn read-only over the lesson's data state (E1). Uses
+  the same builder fields the Visualize workbench takes:
+
+  | Field | Meaning |
+  |-------|---------|
+  | `chart` | the chart-type id (`VIZ_CHART_TYPES`) — e.g. `pie`, `treemap`, `waterfall`, `scatter`, `correlation`, `histogram`, `ecdf`, `kde`, `box`, `violin`, `bar`, `grouped-bar`, `stacked-bar`, `line`, `area`, `slope`, `bump`, `mosaic`, `pair-plot`, `animated`. |
+  | `column` | primary column (chart-dependent; the x/value column, or the series split for `animated`). |
+  | `column2` | second column, for the two-column charts (treemap/scatter/grouped/stacked/mosaic; the optional group for box/violin). |
+  | `measure` | numeric measure column, or `"#"` for a count. |
+  | `aggregate` | `count | mean | median | mode` (chart-dependent). |
+  | `cols` | list of numeric columns for `correlation` / `pair-plot`. |
+
+  The chart is computed on the step's active state, exactly like `info`/`table`, and never mutates
+  the student's history. **`choropleth` (the map-as-filter chart) is not offered** — its map-click
+  and per-row "Keep only" controls apply filters, which a read-only lesson sandbox must not do; a
+  `choropleth` (or otherwise invalid) chart focus falls back to the "no chart pinned" nudge.
 
 ### `question`
 Poses a question with a gradeable `answer`. Fields: `title`, `body`, `answer`.

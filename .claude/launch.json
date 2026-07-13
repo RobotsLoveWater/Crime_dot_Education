@@ -198,6 +198,83 @@
       "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5383"],
       "port": 5383,
       "autoPort": false
+    },
+    {
+      "name": "explorer-cle-a1",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5394"],
+      "port": 5394,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-cle-c1",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5405"],
+      "port": 5405,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-cle-c2",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5416"],
+      "port": 5416,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-cle-c3",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5427"],
+      "port": 5427,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-cle-d1",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5438"],
+      "port": 5438,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-cle-d2",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5449"],
+      "port": 5449,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-cle-d3",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5460"],
+      "port": 5460,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-cle-d4",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5471"],
+      "port": 5471,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-cle-d5",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5482"],
+      "port": 5482,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-cle-e1",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5493"],
+      "port": 5493,
+      "autoPort": false
+    },
+    {
+      "name": "explorer-cle-e2",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "flask", "--app", "app", "run", "--port", "5504"],
+      "port": 5504,
+      "autoPort": false
     }
   ]
 }

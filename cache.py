@@ -206,6 +206,66 @@ def get_aggregate(session, group_column, measure, aggregate, history_override=No
     return _execute(session, history_override).aggregate_by_group(group_column, measure, aggregate)
 
 
+def get_aggregate_two(session, group_a, group_b, measure, aggregate, history_override=None) -> dict:
+    # Two-group sibling of get_aggregate: aggregate the active filtered slice into a nested
+    # {a_value: {b_value: value}} matrix via Data.aggregate_by_two. The one session-aware
+    # entry point the wave-2 Visualize charts call for grouped / stacked / 100%-stacked /
+    # stacked-area / slope / bump / mosaic / animated payloads (CHART_LIBRARY_EXPANSION.md §5).
+    #
+    # Computed FRESH per request and NEVER disk-cached -- exactly like get_aggregate and the
+    # crosstab/correlation reads: these charts ride the per-request path, so this writes no
+    # new .bin artifacts and adds nothing to the cache-dir layout. Reads the shared base
+    # through _execute, read-only (the base/slice stays immutable). history_override lets a
+    # lesson sandbox apply its own state on top without touching the student's stored history.
+    return _execute(session, history_override).aggregate_by_two(group_a, group_b, measure, aggregate)
+
+
+def distribution_stats(session, column, group_column=None, bins=None, bandwidth=None,
+                       history_override=None) -> dict:
+    # Distribution engine over the active filtered slice: five-number summary + 1.5*IQR
+    # whiskers, histogram, ECDF, and binned KDE per column (optionally split by a categorical
+    # group_column), via Data.distribution_stats. The one session-aware entry point the wave-2
+    # histogram / ECDF / KDE / box / violin charts call (CHART_LIBRARY_EXPANSION.md §5, B2).
+    #
+    # Computed FRESH per request and NEVER disk-cached -- exactly like get_aggregate/two and
+    # the crosstab/correlation reads: these charts ride the per-request path, so this writes no
+    # new .bin artifacts and adds nothing to the cache-dir layout. Reads the shared base
+    # through _execute, read-only (the base/slice stays immutable). history_override lets a
+    # lesson sandbox apply its own state on top without touching the student's stored history.
+    return _execute(session, history_override).distribution_stats(
+        column, group_column=group_column, bins=bins, bandwidth=bandwidth)
+
+
+def kde_density(session, column, history_override=None) -> dict:
+    # Density-curve read over the active filtered slice, via Data.kde_density -- the numpy-only
+    # engine behind the KDE chart (chart-library-expansion Phase D2). Reuses distribution_stats
+    # for the shared grid + FD histogram + Silverman bandwidth, and ADDS the pre-convolution
+    # linear-binned gridded weights so the client convolves at any bandwidth with no refetch, plus
+    # the spikiness flag driving the "read the histogram instead" nudge (CHART_LIBRARY_EXPANSION.md
+    # §8). No raw per-row values leave the server -- the weights are a bounded density array.
+    #
+    # Computed FRESH per request and NEVER disk-cached -- exactly like get_aggregate/two,
+    # distribution_stats, and bin2d: these charts ride the per-request path, so this writes no new
+    # .bin artifacts and adds nothing to the cache-dir layout. Reads the shared base through
+    # _execute, read-only (the base/slice stays immutable). history_override lets a lesson sandbox
+    # apply its own state on top without touching the student's stored history.
+    return _execute(session, history_override).kde_density(column)
+
+
+def bin2d(session, col_x, col_y, history_override=None) -> dict:
+    # 2D-binned density of two numeric columns over the active filtered slice, via Data.bin2d
+    # -- the read behind the pair-plot / SPLOM off-diagonal panels (CHART_LIBRARY_EXPANSION.md
+    # §4, Phase B3): one np.histogram2d grid (counts + edges), capped bins, discrete columns on
+    # their natural value lattice.
+    #
+    # Computed FRESH per request and NEVER disk-cached -- exactly like get_aggregate/two and
+    # distribution_stats: these charts ride the per-request path, so this writes no new .bin
+    # artifacts and adds nothing to the cache-dir layout. Reads the shared base through
+    # _execute, read-only (the base/slice stays immutable). history_override lets a lesson
+    # sandbox apply its own state on top without touching the student's stored history.
+    return _execute(session, history_override).bin2d(col_x, col_y)
+
+
 # --- base DataFrame singleton (Lever B: load the base once per process) -----------
 # The base (full-dataset) frame is identical for every request and is never mutated
 # in place — filters return new frames via boolean indexing (see the immutability

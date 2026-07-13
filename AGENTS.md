@@ -1,6 +1,6 @@
-# CLAUDE.md — Crime[dot]Education / MN Sentencing Explorer
+# AGENTS.md — Crime[dot]Education / MN Sentencing Explorer
 
-Guide for future Claude instances working in this repo. Read this before making changes.
+Guide for future Codex instances working in this repo. Read this before making changes.
 
 ## What this is
 

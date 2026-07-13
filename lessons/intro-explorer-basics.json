@@ -9,7 +9,8 @@
     "Describe what one row in the sentencing dataset represents",
     "Apply, chain, revert, and clear filters, and explain how the filter history works",
     "Locate the row count (N), mean, and median in a column summary",
-    "Read a single cell of a cross-tabulation and explain what data it describes"
+    "Read a single cell of a cross-tabulation and explain what data it describes",
+    "Read a column's distribution as a chart in the Visualize tab"
   ],
   "steps": [
     {
@@ -73,6 +74,13 @@
         "compute": { "stat": "median", "column": "time" },
         "tolerance": 0.1
       }
+    },
+    {
+      "type": "explore",
+      "title": "See the shape: the Visualize tab",
+      "body": "Numbers like the mean and median summarize a column; a **chart shows its shape**. The Explorer's **Visualize** tab (between Filter and Lessons) turns the data in view into pictures. Below is a **histogram** of `time` on the same `sentyear >= 2015` data you just measured - each bar counts the cases whose sentence length falls in that range.\n\nNotice the shape: a tall pile at the short sentences and a **long tail stretching to the right** toward the rare, very long ones. That right tail is exactly what pulls the **mean** above the **median** - the median sits under the bulk of the bars, while a handful of very long sentences drag the average rightward. Drag the **bin slider** under the chart to widen or narrow the bars; the table beneath it carries the exact counts. In your other tab, open **Visualize**, pick **Histogram**, and choose `time` to build the same picture.",
+      "state": ["f.sentyear.ge.2015"],
+      "focus": { "view": "chart", "chart": "histogram", "column": "time" }
     },
     {
       "type": "read",

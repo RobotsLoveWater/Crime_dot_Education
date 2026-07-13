@@ -76,8 +76,17 @@ Dark theme uses **borders, not shadows**, for elevation (shadows are near-invisi
 
 ### Chart palette (both themes)
 
-`--chart-1` `#6366F1` · `--chart-2` `#0EA5E9` · `--chart-3` `#10B981` · `--chart-4` `#F59E0B`
-· `--chart-5` `#EF4444` · `--chart-6` `#8B5CF6` · `--chart-7` `#14B8A6` · `--chart-8` `#F472B6`
+The categorical series colors. One hue family per slot, ordered so adjacent (and pie-wrap)
+slots never share a family — validated visually distinct with the dataviz skill's checker
+(worst-adjacent normal ΔE 73.5, CVD ΔE 23.0):
+
+`--chart-1` `#2563EB` · `--chart-2` `#F97316` · `--chart-3` `#059669` · `--chart-4` `#DC2626`
+· `--chart-5` `#0891B2` · `--chart-6` `#CA8A04` · `--chart-7` `#8B5CF6` · `--chart-8` `#DB2777`
+
+A device-wide **"Chart colors"** control (top bar → Colors; `static/js/palette.js`) swaps these
+tokens app-wide between **Default**, a **Colorblind-safe** set (`[data-palette="cb"]` in
+`tokens.css`, theme-aware), and **Custom** (eight user hexes applied inline). It persists to
+`localStorage` and, like the theme toggle, dispatches `themechange` so live charts redraw.
 
 Heatmap shading (crosstab): a single-hue ramp from `--color-accent-subtle` → `--color-accent`.
 The number is **always rendered in the cell** — color is never the only signal.
@@ -242,15 +251,32 @@ reserves its height so the footer is never covered.
   complete no-JS + screen-reader path (same names and counts as text), and the canvas carries
   `role="img"` with an accessible name pointing at the list. Beside the categorical picker at
   ≥1024px (`.filter-geo-split`, two equal grid columns), stacked below it otherwise.
-- **Visualize builder** (`/visualize`, visualization-expansion Phase 3 shell). A two-column
-  `.visualize-layout` grid — `.visualize-form` (chart-type `<select>` plus column/measure/
-  aggregate pickers, reusing the `[data-picker]` searchable combobox) on the left,
-  `.visualize-canvas` on the right — stacking to one column under 768px. The canvas holds a
-  single **empty state** ("pick a chart type", or a per-type placeholder) until a chart renders;
-  a rendered chart fills it as `.viz-result` (chart + companion value table — the same "chart is
-  never the only way to read a value" rule as Explore/Compare). Field labels re-purpose per chart
-  type client-side (e.g. the same Column/Second-column pickers serve as treemap's parent/child and
-  scatter's X/Y) so one builder serves all six chart types with no page reload.
+- **Visualize builder** (`/visualize`, visualization-expansion Phase 3 shell; chart-library-
+  expansion Tier A rebuilt the picker onto the registry). A two-column `.visualize-layout` grid —
+  `.visualize-form` (the chart **finder**, below, plus column/measure/aggregate/subset/cutoff/
+  bins pickers, reusing the `[data-picker]` searchable combobox) on the left, `.visualize-canvas`
+  on the right — stacking to one column under 768px. The canvas holds a single **empty state**
+  ("pick a chart type", or a per-type placeholder) until a chart renders; a rendered chart fills
+  it as `.viz-result` (chart + companion value table — the same "chart is never the only way to
+  read a value" rule as Explore/Compare). Field show/hide is **registry-driven**
+  (`VIZ_FIELD_CHARTS`, derived from each chart's `inputs`) rather than hard-coded per chart, so a
+  new registry entry gets working field visibility for free; the same Column/Second-column
+  pickers still re-purpose per chart client-side (e.g. treemap's parent/child, scatter's X/Y,
+  line's series split) so one builder serves all 26 chart types with no page reload.
+- **Chart finder** (chart-library-expansion Phase A1, replaces the old flat `<select>`). A
+  searchable, purpose-grouped card gallery (`VIZ_CHART_GALLERY`) — radio cards (`.viz-chart-card`,
+  the no-JS/keyboard-complete path) grouped under the six family headings (Comparison ·
+  Composition · Distribution · Trend · Relationship · Geography), each showing the chart's label
+  and one-line blurb. A `.js-only` search input filters cards by label + `synonyms` + `tags`
+  (e.g. "proportion", "over time", "spread" all surface the right charts) and hides empty groups;
+  clearing the search reopens the full grouped list — **searching never hides a chart that isn't
+  also reachable by browsing.**
+- **Chart info box** (`partials/viz_info_box.html`, chart-library-expansion Phase A1/A2). Renders
+  a selected chart's `info{shows, best_for, watch_out}` — three short labeled paragraphs — live in
+  the builder as the finder selection changes, and as a collapsible `<details>` "About this chart"
+  on the results canvas. `watch_out` is where the honesty pedagogy lives (KDE/violin smoothing
+  away round-number clustering, 100%-stacked/mosaic hiding absolute Ns, small-N maps misleading,
+  animation dramatizing noise) — never trimmed for length.
 - **Map-click filter** (Visualize choropleth). Shapes with data are clickable: pointer cursor
   on hover, a "Click to keep only this …" line in the tooltip, and a **"Keep only" button
   per row** of the companion table (`.viz-keep-cell` / `.viz-keep-form`, a `.btn-sm`
@@ -409,7 +435,8 @@ reserves its height so the footer is never covered.
   chart, radius ∝ √count, so overplotting is impossible by construction. Box `.viz-scatter-box`
   (460px; 360px under 768px); companion table lists each lattice cell's x / y / count / share. No
   "Other"-cutoff slider (nothing here is bucketed).
-- **Correlation matrix** (Visualize tab, the only chart type with no canvas). A searchable
+- **Correlation matrix** (Visualize tab, one of two chart types with no canvas — the other is
+  the mosaic, below). A searchable
   checkbox multiselect over 2–8 numeric columns (`.viz-corr-field`/`.corr-picker` — search box,
   live count, a soft 8-item cap, a Clear action) feeds a server-rendered `.corr-matrix` table:
   sticky row headers and a sticky corner cell inside the scroll wrapper (like the crosstab),
@@ -419,6 +446,58 @@ reserves its height so the footer is never covered.
   near-mechanical — the sentencing grid's own arithmetic, annotated rather than hidden. Computed
   fresh every request, never disk-cached. Color rule: see the correlation-matrix heat-ramp entry
   under "Chart palette" above.
+- **Categorical-series family** (bar, lollipop, dot plot, donut, grouped bar, stacked bar, 100%
+  stacked bar — chart-library-expansion Phase C1). One box (`.viz-catseries-box`, 480px; 380px
+  under 768px) and **one renderer** for all seven variants, driven by each registry entry's
+  `variant`. Bar/lollipop/dot are single-series marks over `Data.aggregate_by_group`
+  (lollipop/dot draw the tip via an inline `afterDatasetsDraw` plugin — no extra dependency);
+  donut is the pie with a cutout; grouped/stacked/100%-stacked read the two-group matrix
+  (`Data.aggregate_by_two`, B1), with 100%-stacked normalizing to percent client-side (the
+  companion table still carries the real Ns). The "Other"-cutoff slider applies only to
+  single-series variants. Colors cycle `--chart-1`…`--chart-8`; companion table each.
+- **Line family** (line, area, stacked area, slope, bump — Phase C2). One box (`.viz-line-box`,
+  440px; 340px under 768px). Line/area read a single-series `aggregate_by_group` over
+  `sentyear`; stacked-area/slope/bump read the two-group matrix (B1). **Bump's rank transform is
+  computed server-side** (never in JS), plotted on an inverted y-axis with hand-rolled end labels
+  (no datalabels dependency) and capped to the top 8 series so it doesn't spaghetti.
+- **Animated time-series** (Phase D5). The same multi-line chart as the line family
+  (`.viz-animated-box`, 440px; 340px under 768px) plus a `.viz-player` row below it: a play/pause
+  button beside a keyboard-accessible year `<input type="range">` scrubber. **Never autoplays**;
+  `prefers-reduced-motion` disables the tween and the play button, leaving the scrubber for
+  manual stepping (`.viz-player-reduced` note); the static multi-line chart is the export/fallback
+  truth. Companion table = the full per-year matrix, not just the current frame.
+- **Histogram + ECDF** (Phase C3). One box (`.viz-distribution-box`, 420px; 320px under 768px).
+  Histogram = native adjacent bars over a fine base binning, re-binned by a client-side
+  bin-width slider that **merges bars with no refetch** (bars always sum to N at any width).
+  ECDF = a stepped line, y-axis 0–1 — the share of cases at or below each value. Companion table
+  each.
+- **Density (KDE)** (Phase D2). One box (`.viz-kde-box`, 420px; 320px under 768px) with a
+  bandwidth slider that **re-convolves the server's shared binned weights client-side** (no
+  refetch), clamped to the reported physical bandwidth bounds. **The loudest honesty guardrail in
+  the library:** when case mass concentrates on a handful of exact values, a `.viz-spiky-note`
+  (`.alert-warning`) nudge toward the histogram is always shown, never suppressed. Companion
+  table = the underlying histogram.
+- **Box + violin** (Phase D1). One box (`.viz-boxviolin-box`, 440px; 340px under 768px), one per
+  group when a second column is picked. Box uses the vendored `@sgratzl/chartjs-chart-boxplot`
+  plugin fed the distribution engine's precomputed five-number summary (`whiskerMin`/`whiskerMax`
+  explicit, `outliers: []` — counts only, never raw arrays). **Violin is not the plugin's
+  `violin` type** (which wants raw arrays) — it's hand-rolled: a bar shell plus a mirrored
+  KDE-area polygon per group, clipped to the chart area, sharing one global max width so groups'
+  widths stay comparable. `BOXVIOLIN_MAX_GROUPS` caps how many groups render. Companion table
+  each.
+- **Mosaic** (Phase D3, the one chart type besides the correlation matrix with **no canvas**).
+  Server-rendered proportional tiles (`.viz-mosaic-plot`): column width ∝ that column's marginal
+  total (`.viz-mosaic-col`), stacked tile height ∝ within-column share (`.viz-mosaic-stack`/
+  `.viz-mosaic-tile`), shaded by the same 0→peak `.heat-N` ramp as the crosstab/correlation
+  matrix. Long tails fold into one muted "Other" column/tile (`.viz-mosaic-tile--other`) so
+  widths and heights still sum to the whole. Inherently screen-reader- and keyboard-friendly (real
+  HTML, not a canvas); the companion table is the unfolded crosstab.
+- **Pair plot (SPLOM)** (Phase D4). Reuses the correlation matrix's numeric-subset picker,
+  hard-capped at **5** columns (tighter than the matrix's 8, for the render-time budget). A k×k
+  grid of small square panels (`.viz-pairplot`/`.viz-pair-grid`, one Chart.js instance per panel,
+  horizontally scrollable on narrow screens via a `min-width` floor): off-diagonal panels are
+  2D-binned scatter (never raw points), diagonal panels are histograms. Column/row headers show
+  the mono column code. Companion table = the correlation matrix for the same subset.
 - Grid lines `--color-border`, labels `--color-text-muted`, font from `--font-base` at
   `--fs-xs`. Tooltips on; animations off (data tool, not a dashboard demo).
 - Every chart is a *companion* to a table that carries the same numbers — the chart is never
@@ -474,7 +553,8 @@ static/
     views.css         ← per-view layout (workbench shell, lesson dock, landing)
   js/
     vendor/htmx.min.js, chart.umd.min.js, chartjs-chart-treemap.min.js,
-           chartjs-chart-geo.min.js, VERSIONS.md   ← pinned, never hand-edited
+           chartjs-chart-geo.min.js, chartjs-chart-boxplot.min.js,
+           VERSIONS.md   ← pinned, never hand-edited
     theme.js          ← toggle + FOUC guard partner
     app.js            ← pickers, toasts, dialogs, table search (vanilla, no build step)
     otherbucket.js    ← reusable "Other"-cutoff slider (Explore bar + Visualize pie/treemap)

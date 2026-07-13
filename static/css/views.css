@@ -692,6 +692,171 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
   .visualize-layout { grid-template-columns: 1fr; }
 }
 
+/* ---------- Chart finder: gallery + info box (chart-library-expansion A1) ---------- */
+/* The flat chart-type <select> became a family-grouped, searchable card gallery. Radios are
+   visually hidden but focusable; the .viz-card-body is the card surface, so :checked/:focus-visible
+   on the input drive the card's selected/focus states. The no-JS path is the plain grouped list;
+   the search box is .js-only. */
+.viz-gallery-search { margin-bottom: var(--space-2); }
+.viz-gallery {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.viz-gallery-group { min-width: 0; }
+.viz-gallery-group[hidden] { display: none; }
+.viz-gallery-family {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--color-text-muted);
+}
+.viz-gallery-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.viz-card-item { margin: 0; }
+.viz-card-item[hidden] { display: none; }
+.viz-card { display: block; cursor: pointer; }
+/* the real radio stays in the tab order (focusable) but is visually hidden; its :checked /
+   :focus-visible state styles the adjacent card body */
+.viz-card > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  margin: 0;
+  pointer-events: none;
+}
+.viz-card-body {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  transition: border-color 120ms var(--ease), background-color 120ms var(--ease);
+}
+.viz-card:hover .viz-card-body { border-color: var(--color-accent); }
+.viz-card > input:checked + .viz-card-body {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+.viz-card > input:focus-visible + .viz-card-body {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.viz-card-label { display: block; font-weight: 500; color: var(--color-text); }
+.viz-card-blurb {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+.viz-gallery-empty {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+/* Legacy group: a collapsed <details> at the bottom of the finder (mosaic, ECDF — kept for
+   reference, de-emphasized). The summary reuses the family-heading look but is clickable, with
+   a hand-drawn caret (the default disclosure triangle is hidden). */
+.viz-gallery-collapsed > summary.viz-gallery-family {
+  margin: 0;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.viz-gallery-collapsed > summary.viz-gallery-family::-webkit-details-marker { display: none; }
+.viz-gallery-collapsed > summary.viz-gallery-family::before {
+  content: "\25B8";                 /* ▸ */
+  font-size: 0.9em;
+  transition: transform 120ms var(--ease);
+}
+.viz-gallery-collapsed[open] > summary.viz-gallery-family::before { transform: rotate(90deg); }
+.viz-gallery-collapsed[open] > summary.viz-gallery-family { margin-bottom: var(--space-2); }
+.viz-gallery-legacy-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: var(--color-text-faint);
+}
+
+/* Info box (builder) + "About this chart" (results): shows / best_for / watch_out. */
+.viz-info {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-sidebar);
+}
+.viz-info[hidden] { display: none; }
+.viz-info-eyebrow {
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--color-text-muted);
+}
+.viz-info-title {
+  margin: 2px 0 var(--space-2);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.viz-info-list { margin: 0; }
+.viz-info-row { margin-bottom: var(--space-2); }
+.viz-info-row:last-child { margin-bottom: 0; }
+.viz-info-row dt {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--color-text-muted);
+}
+.viz-info-watch dt { color: var(--color-warning); }
+.viz-info-row dd {
+  margin: 2px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+/* results "About this chart" disclosure: the same info content in a native <details> */
+.viz-about {
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.viz-about > summary {
+  cursor: pointer;
+  padding: var(--space-2) var(--space-3);
+  font-weight: 500;
+  color: var(--color-text);
+}
+.viz-about > summary:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.viz-about-chart { color: var(--color-text-muted); font-weight: 400; }
+.viz-about .viz-info-list { padding: 0 var(--space-3) var(--space-3); }
+
 /* a rendered chart + its companion value table fill the canvas width */
 .viz-result {
   width: 100%;
@@ -760,6 +925,120 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
 @media (max-width: 767px) {
   .viz-scatter-box { height: 360px; }
 }
+
+/* categorical-series family (Phase C1): one box for all seven variants — horizontal bar /
+   lollipop / dot (tall enough for ~20 categories), the donut (roughly square), and the
+   grouped / stacked bars. Positioned for Chart.js responsive sizing like the other viz boxes. */
+.viz-catseries-box {
+  height: 480px;
+  margin-top: var(--space-3);
+}
+@media (max-width: 767px) {
+  .viz-catseries-box { height: 380px; }
+}
+
+/* line family (Phase C2): one box for all five modes — line / area (single series), stacked
+   area, slope (two ticks + end labels), and bump (rank lines + end labels). Wide and
+   rectangular; positioned for Chart.js responsive sizing like the other viz boxes. */
+.viz-line-box {
+  height: 440px;
+  margin-top: var(--space-3);
+}
+@media (max-width: 767px) {
+  .viz-line-box { height: 340px; }
+}
+
+/* animated time-series (Phase D5): the same multi-line box as the line family, plus a player
+   (play/pause + year scrubber) below it. Wide and rectangular; positioned for Chart.js
+   responsive sizing like the other viz boxes. */
+.viz-animated-box {
+  height: 440px;
+  margin-top: var(--space-3);
+}
+@media (max-width: 767px) {
+  .viz-animated-box { height: 340px; }
+}
+/* the player row: a play/pause button beside a keyboard-accessible year scrubber (js-only —
+   no-JS falls back to the companion table). Reduced motion disables the tween + the button
+   (visualize.js), leaving the scrubber for manual stepping. */
+.viz-player {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.viz-player-scrub {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 240px;
+  min-width: 200px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--color-text);
+}
+.viz-player-scrub output {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.viz-player-scrub input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-accent); /* themes track + thumb in both light and dark */
+  cursor: pointer;
+}
+.viz-player .field-hint { margin: 0; flex-basis: 100%; }
+.viz-player-reduced { color: var(--color-text-muted); }
+
+/* distribution family (Phase C3): the histogram (native bars over the B2 bins, re-binned by the
+   bin slider) and the ECDF (native stepped line). Wide and rectangular; positioned for Chart.js
+   responsive sizing like the other viz boxes. */
+.viz-distribution-box {
+  height: 420px;
+  margin-top: var(--space-3);
+}
+@media (max-width: 767px) {
+  .viz-distribution-box { height: 320px; }
+}
+
+/* box / violin (Phase D1): per-group distribution shape — box (vendored boxplot plugin, from B2's
+   precomputed five-number summary) or violin (hand-rolled mirrored KDE area over B2's shared grid).
+   Wide and rectangular with room for several groups side by side; positioned for Chart.js
+   responsive sizing like the other viz boxes. */
+.viz-boxviolin-box {
+  height: 440px;
+  margin-top: var(--space-3);
+}
+@media (max-width: 767px) {
+  .viz-boxviolin-box { height: 340px; }
+}
+/* density curve / KDE (Phase D2): a smoothed density line/area over the B2 grid, re-convolved by
+   the bandwidth slider. Wide and rectangular; positioned for Chart.js responsive sizing like the
+   other viz boxes. */
+.viz-kde-box {
+  height: 420px;
+  margin-top: var(--space-3);
+}
+@media (max-width: 767px) {
+  .viz-kde-box { height: 320px; }
+}
+/* the KDE's loud honesty guardrail (Phase D2): a warning callout, always shown when the mass
+   clusters on a few exact values (the round-number pattern a KDE smooths away). Reuses the
+   .alert / .alert-warning component; only the spacing is view-specific. */
+.viz-spiky-note {
+  margin-top: var(--space-3);
+}
+
+/* the compact five-number-summary line under the distribution note (median / middle half /
+   range / outlier count) — the numeric read the chart can't carry precisely */
+.chart-summary {
+  margin-top: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.chart-summary strong { color: var(--color-text); font-weight: 600; }
 
 /* ---------- Choropleth map (Phase 8) ---------- */
 /* MN is elongated N–S; the plugin fits the geometry to this box (Chart.js responsive sizing
@@ -841,6 +1120,95 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
   width: fit-content;
   max-width: 100%;
 }
+
+/* variant toggle (chart-library merges): lollipop⇄dot plot, stacked counts⇄100%, line⇄area,
+   slope⇄bump. Reuses the .segmented component + the grain toggle's spacing. */
+.viz-variant {
+  margin: var(--space-3) 0 var(--space-2);
+  width: fit-content;
+  max-width: 100%;
+}
+
+/* ---------- Mosaic (chart-library-expansion Phase D3) ----------
+   A server-rendered proportional grid (no canvas — the correlation-matrix precedent). The plot
+   is a flex row of columns; column widths come from inline flex-basis percents, tile heights
+   from inline height percents. box-sizing: border-box keeps every box exactly its proportional
+   size while the 1px separators (drawn in --color-surface, the card behind) read as thin gutters.
+   Tiles shade on the shared .heat-1..8 ramp; the muted "Other" tiles/columns use neutral tokens
+   (they aren't single combinations). Colors are all tokens — nothing hardcoded. */
+.viz-mosaic-figure { margin: var(--space-4) 0 0; }
+.viz-mosaic-plot {
+  display: flex;
+  align-items: stretch;
+  height: clamp(300px, 46vh, 440px);
+  width: 100%;
+}
+.viz-mosaic-col {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;          /* width is the inline flex-basis; never grow/shrink off it */
+  min-width: 0;
+  box-sizing: border-box;
+}
+.viz-mosaic-col + .viz-mosaic-col { border-left: 1px solid var(--color-surface); }
+.viz-mosaic-stack {
+  flex: 1 1 auto;
+  min-height: 0;           /* let percentage tile heights resolve against the stack */
+  display: flex;
+  flex-direction: column;
+}
+.viz-mosaic-tile {
+  box-sizing: border-box;
+  overflow: hidden;
+  border-bottom: 1px solid var(--color-surface);
+  padding: 2px var(--space-1);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1.15;
+  color: var(--color-text);
+  /* No background here: real tiles carry a .heat-1..8 class (components.css) for their shade, and
+     views.css loads AFTER components.css, so a plain background on this base rule would win the
+     equal-specificity tie and flatten every tile. The muted "Other" tiles get their fill from
+     .viz-mosaic-tile--other below; a (degenerate) heat-0 real tile falls through to the card. */
+}
+/* on the darkest steps the fill is the solid accent, so flip the text like the crosstab does */
+.viz-mosaic-tile.heat-7,
+.viz-mosaic-tile.heat-8 { color: var(--color-on-accent); }
+/* muted folded remainder ("Other" tile, or any tile in the "Other" column): neutral, not shaded */
+.viz-mosaic-tile--other {
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  background-image: repeating-linear-gradient(45deg,
+    transparent 0, transparent 5px,
+    color-mix(in srgb, var(--color-text-muted) 22%, transparent) 5px,
+    color-mix(in srgb, var(--color-text-muted) 22%, transparent) 6px);
+}
+.viz-mosaic-tile-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.viz-mosaic-tile-pct {
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+.viz-mosaic-col-label {
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-1) 0;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.viz-mosaic-legend { margin-top: var(--space-3); }
 
 /* ---------- Reusable "Other"-cutoff slider (Phase 4) ---------- */
 .bucket-slider {
@@ -987,6 +1355,47 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
   line-height: 0;
 }
 .corr-flag-key { white-space: nowrap; }
+
+/* ---------- Pair plot / SPLOM (chart-library-expansion Phase D4) ----------
+   A k×k grid of small canvas panels (off-diagonal = binned scatter, diagonal = histogram). The
+   grid is `auto` (row-header column) + k equal panel columns; each panel cell is square via
+   aspect-ratio, positioned so Chart.js can size responsively (like the other viz boxes). A
+   min-width floors the panel size and lets the grid scroll horizontally on narrow screens rather
+   than crushing the panels. Column/row headers carry the column codes; colors are all tokens. */
+.viz-pairplot {
+  margin: var(--space-4) 0 0;
+  overflow-x: auto;
+}
+.viz-pair-grid {
+  display: grid;
+  grid-template-columns: auto repeat(var(--pair-k, 3), minmax(0, 1fr));
+  gap: 2px;
+  align-items: center;
+  min-width: calc(var(--pair-k, 3) * 96px + 2rem);
+}
+/* .viz-pair-corner is the empty top-left grid cell above the row headers — no styling needed. */
+.viz-pair-colhead,
+.viz-pair-rowhead {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viz-pair-colhead { text-align: center; padding-bottom: 2px; }
+.viz-pair-rowhead { text-align: right; padding-right: var(--space-1); }
+.viz-pair-cell {
+  position: relative;      /* Chart.js responsive sizing needs a positioned box */
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+/* the diagonal (histogram) panels read slightly apart from the scatter panels */
+.viz-pair-diag { background: var(--color-bg); }
+.viz-pair-cell canvas { display: block; }
 
 /* ---------- Lessons: catalog + overview (Phase 5) ---------- */
 .lesson-grid {

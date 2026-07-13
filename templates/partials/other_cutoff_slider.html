@@ -4,6 +4,8 @@
      slider      – the bucket payload (sliderMin / sliderMax / cutoff)
      slider_id   – unique id fragment (one slider per view)
      slider_noun – what the values are ("values", "counties", …); defaults to "values"
+     slider_hint – optional hint under the control; defaults to the "grouped as Other" copy
+                   (a top-N truncation with no "Other" bucket passes its own honest wording)
    Renders nothing when there is nothing to slide (one or two distinct values). #}
 {% if slider and slider['sliderMax'] > slider['sliderMin'] %}
 <div class="bucket-slider js-only" data-bucket-slider-wrap>
@@ -14,6 +16,6 @@
            min="{{ slider['sliderMin'] }}" max="{{ slider['sliderMax'] }}"
            value="{{ slider['cutoff'] }}" step="1"
            aria-describedby="bucket-hint-{{ slider_id }}">
-    <span class="field-hint" id="bucket-hint-{{ slider_id }}">The rest are grouped as “Other”.</span>
+    <span class="field-hint" id="bucket-hint-{{ slider_id }}">{{ slider_hint or 'The rest are grouped as “Other”.' }}</span>
 </div>
 {% endif %}

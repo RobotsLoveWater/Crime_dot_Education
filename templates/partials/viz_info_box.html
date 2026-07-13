@@ -1,0 +1,20 @@
+{# Shared chart info content (chart-library-expansion Phase A1): the selected chart's
+   shows / best_for / watch_out, drawn from its VIZ_CHART_TYPES `info`. Included in two places:
+   the builder info panel (#viz-info, repopulated live by visualize.js as the card changes) and
+   the results "About this chart" disclosure (static). Expects `chart` (a registry entry) in
+   context; renders empty slots when it's None so the builder box can be filled in by JS. The
+   data-info-field hooks are read by visualize.js only inside #viz-info. #}
+<dl class="viz-info-list">
+    <div class="viz-info-row">
+        <dt>Shows</dt>
+        <dd data-info-field="shows">{{ chart['info']['shows'] if chart else '' }}</dd>
+    </div>
+    <div class="viz-info-row">
+        <dt>Best for</dt>
+        <dd data-info-field="best_for">{{ chart['info']['best_for'] if chart else '' }}</dd>
+    </div>
+    <div class="viz-info-row viz-info-watch">
+        <dt>Watch out</dt>
+        <dd data-info-field="watch_out">{{ chart['info']['watch_out'] if chart else '' }}</dd>
+    </div>
+</dl>

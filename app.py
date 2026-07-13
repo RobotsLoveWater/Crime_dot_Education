@@ -42,7 +42,7 @@ import lessons
 import analytics
 import geo
 
-from data import Data
+from data import Data, _fd_bin_count
 
 import cache
 from cache import get_data, get_moc_options, _execute, history_text_to_item, history_item_to_text
@@ -1568,22 +1568,492 @@ def download():
 # history yet (that starts with the real charts).
 # ---------------------------------------------------------------------------
 
-# The chart-type registry. `status` gates the canvas: 'coming' shows the placeholder,
-# flipped to 'ready' as each tier lands. Order = builder display order.
+# The chart-type registry — the SINGLE SOURCE OF TRUTH the whole Visualize workbench reads
+# from (chart-library-expansion Phase A0). Each entry is a full descriptor; the builder form's
+# picker show/hide, the JS render dispatch, the finder (Phase A1), and the info boxes (A1/A2)
+# all read off these fields instead of hard-coding a per-chart branch. Adding chart #7 becomes
+# a new entry here plus a renderer-family branch — not a bespoke build_*/render* pair. The six
+# wave-1 charts are migrated onto the registry UNCHANGED (same builder output, same URLs).
+#
+# Fields:
+#   id / label / blurb  — identity + the one-line picker hint (blurb kept for the builder + the
+#                         empty-state copy; the richer `info` below feeds the A1 info box).
+#   family              — Comparison | Composition | Distribution | Trend | Relationship |
+#                         Geography — the finder's purpose grouping (Phase A1).
+#   synonyms / tags     — alternate names + purpose keywords the finder searches (A1).
+#   info{shows,best_for,watch_out} — the info-box teaching copy (rendered A1, authored A2; the
+#                         `watch_out` carries the data-fit honesty, CHART_LIBRARY_EXPANSION.md §8).
+#   inputs              — the builder pickers this chart uses (column | column2 | measure |
+#                         aggregate | subset | grain | cutoff | bins | bandwidth). The
+#                         data-viz-fields attribute on each show/hide field is DERIVED from these
+#                         (VIZ_FIELD_CHARTS below), so a new entry lights up the right pickers with
+#                         no template edit. `grain` (a hidden input, always present) and the
+#                         result-card controls `cutoff` (Other-slider), `bins` (histogram bin
+#                         slider), and `bandwidth` (KDE bandwidth slider) are documented here but
+#                         aren't show/hide builder fields.
+#   aggregates          — the VALID_AGGREGATES subset this chart allows (metadata this wave; the
+#                         resolve_* validators still enforce it — the aggregate picker is not yet
+#                         filtered by it, matching wave-1 behavior).
+#   column_types        — per-slot column-type constraint (any | categorical | numeric | geo) —
+#                         descriptive for now; the resolve_*/_viz_column_ok checks still enforce.
+#   renderer            — the render-family key. For the six shipped charts it matches the JS
+#                         payload `kind` (RENDERERS map in static/js/visualize.js); 'server-html'
+#                         means no canvas (correlation is a server-rendered .heat-N table).
+#   status              — 'ready' gates the canvas (kept from wave 1).
+# Order = builder display order.
 VIZ_CHART_TYPES = [
-    {'id': 'pie',         'label': 'Pie',                'status': 'ready',
-     'blurb': 'Share of cases across one categorical column.'},
-    {'id': 'treemap',     'label': 'Treemap',            'status': 'ready',
-     'blurb': 'Two columns nested as proportional areas.'},
-    {'id': 'waterfall',   'label': 'Waterfall',          'status': 'ready',
-     'blurb': 'Year-over-year change in a count, mean, or median across sentencing years.'},
-    {'id': 'choropleth',  'label': 'Map (choropleth)',   'status': 'ready',
-     'blurb': 'Minnesota counties shaded by case count, mean, median, or mode.'},
-    {'id': 'scatter',     'label': 'Scatter / bubble',   'status': 'ready',
-     'blurb': 'Two numeric columns as an aggregated lattice; case count sizes the dots.'},
+    {'id': 'pie', 'label': 'Pie', 'status': 'ready',
+     'blurb': 'Share of cases across one categorical column.',
+     'family': 'Composition',
+     'synonyms': ['pie chart', 'circle chart'],
+     'tags': ['proportion', 'share', 'part of whole', 'composition', 'percent'],
+     'info': {
+         'shows': 'The share of cases across the values of one column, as slices of a whole.',
+         'best_for': 'A quick read of which few categories dominate when there are only a handful of them.',
+         'watch_out': 'Many similar slices are hard to compare — fold the long tail into “Other” with '
+                      'the cutoff slider. Slices are shares, not counts; the table below carries the Ns.'},
+     'inputs': ['column', 'cutoff'],
+     'aggregates': ['count'],
+     'column_types': {'column': 'any'},
+     'renderer': 'pie'},
+    {'id': 'treemap', 'label': 'Treemap', 'status': 'ready',
+     'blurb': 'Two columns nested as proportional areas.',
+     'family': 'Composition',
+     'synonyms': ['tree map', 'nested rectangles', 'mosaic areas'],
+     'tags': ['proportion', 'share', 'part of whole', 'composition', 'hierarchy', 'nested'],
+     'info': {
+         'shows': 'Two columns nested as proportional areas — each block splits by the second column.',
+         'best_for': 'Part-of-whole across two levels at once, where a pie would have too many slices.',
+         'watch_out': 'Area is hard to judge precisely and tiny cells fold into “Other”. Read the '
+                      'companion table for exact values.'},
+     'inputs': ['column', 'column2', 'measure', 'aggregate', 'cutoff'],
+     'aggregates': ['count', 'mean', 'median'],
+     'column_types': {'column': 'any', 'column2': 'any', 'measure': 'numeric'},
+     'renderer': 'treemap'},
+    {'id': 'waterfall', 'label': 'Waterfall', 'status': 'ready',
+     'blurb': 'Year-over-year change in a count, mean, or median across sentencing years.',
+     'family': 'Trend',
+     'synonyms': ['bridge chart', 'cascade chart', 'year over year'],
+     'tags': ['change', 'over time', 'trend', 'year over year', 'running total'],
+     'info': {
+         'shows': 'Year-over-year change in a count, mean, or median across sentencing years, '
+                  'as a running total.',
+         'best_for': 'Seeing where a trend stepped up or down — e.g. the 2016 Drug Sentencing Reform break.',
+         'watch_out': 'Reads change, not the level within a single year; a mode or a non-time column '
+                      'has no meaningful running total.'},
+     'inputs': ['measure', 'aggregate'],
+     'aggregates': ['count', 'mean', 'median'],
+     'column_types': {'measure': 'numeric'},
+     'renderer': 'waterfall'},
+    {'id': 'choropleth', 'label': 'Map (choropleth)', 'status': 'ready',
+     'blurb': 'Minnesota counties shaded by case count, mean, median, or mode.',
+     'family': 'Geography',
+     'synonyms': ['map', 'heat map', 'geographic map', 'shaded map'],
+     'tags': ['geography', 'map', 'county', 'district', 'region', 'spatial', 'location'],
+     'info': {
+         'shows': 'Minnesota geography shaded by a per-area count, mean, median, or mode over the '
+                  'current data state.',
+         'best_for': 'Spotting where cases or sentences run high or low across counties, judicial '
+                     'districts, or regions.',
+         'watch_out': 'Thin samples mislead — areas under 10 cases are hatched, not shaded. Larger '
+                      'areas catch the eye regardless of case count; read the table.'},
+     'inputs': ['measure', 'aggregate', 'grain'],
+     'aggregates': ['count', 'mean', 'median', 'mode'],
+     'column_types': {'measure': 'numeric', 'grain': 'geo'},
+     'renderer': 'choropleth'},
+    {'id': 'scatter', 'label': 'Scatter / bubble', 'status': 'ready',
+     'blurb': 'Two numeric columns as an aggregated lattice; case count sizes the dots.',
+     'family': 'Relationship',
+     'synonyms': ['bubble chart', 'scatterplot', 'x y plot'],
+     'tags': ['relationship', 'correlation', 'two numeric', 'x y', 'lattice', 'spread'],
+     'info': {
+         'shows': 'Two numeric columns aggregated to a lattice — one bubble per value pair, sized '
+                  'by case count.',
+         'best_for': 'The rough shape of how two numeric measures move together, without overplotting '
+                     '294k rows.',
+         'watch_out': 'Bubbles are aggregated cells, not individual cases, and discrete columns land '
+                      'on a grid. A pattern here is not causation.'},
+     'inputs': ['column', 'column2'],
+     'aggregates': ['count'],
+     'column_types': {'column': 'numeric', 'column2': 'numeric'},
+     'renderer': 'scatter'},
     {'id': 'correlation', 'label': 'Correlation matrix', 'status': 'ready',
-     'blurb': 'Pearson correlations across a numeric subset, drawn as a heatmap.'},
+     'blurb': 'Pearson correlations across a numeric subset, drawn as a heatmap.',
+     'family': 'Relationship',
+     'synonyms': ['correlation heatmap', 'r matrix', 'pearson matrix'],
+     'tags': ['relationship', 'correlation', 'pearson', 'strength', 'association'],
+     'info': {
+         'shows': 'Pearson correlation for every pair of a chosen numeric subset, shaded by strength.',
+         'best_for': 'A fast scan of which numeric columns move together across the current cases.',
+         'watch_out': 'Correlation is not causation, and grid-derived columns correlate near 1.0 by '
+                      'construction (flagged). The sign lives in the number, not the shade.'},
+     'inputs': ['subset'],
+     'aggregates': [],
+     'column_types': {'subset': 'numeric'},
+     'renderer': 'server-html'},
+
+    # --- Wave-2 charts (chart-library-expansion), status 'coming' until their renderer lands in
+    # Tier C/D. Full descriptors now so the finder (A1) lists all 26 with info boxes and the info
+    # copy (the A2 deliverable) reads for each; picking one shows its info + the "coming soon"
+    # canvas. Display order is derived by family (VIZ_CHART_GALLERY), so within a family these read
+    # after the shipped ones. The inputs/aggregates/column_types are the intended shape — Tier C/D
+    # finalizes them when building the renderer and flips status to 'ready'. The info copy is
+    # FLAGGED FOR AUTHOR (Dr. Vigesaa / Dr. Clifford) REVIEW. ---
+
+    # Comparison — compare magnitudes across categories.
+    {'id': 'bar', 'label': 'Bar', 'status': 'ready',
+     'blurb': 'A measure across one column’s values, compared as bars.',
+     'family': 'Comparison',
+     'synonyms': ['bar chart', 'column chart'],
+     'tags': ['comparison', 'compare', 'ranking', 'category', 'count', 'magnitude'],
+     'info': {
+         'shows': 'A measure across the values of one column, as bars you compare by length.',
+         'best_for': 'Ranking categories by case count or by a numeric summary — the workhorse comparison.',
+         'watch_out': 'Long category lists get unwieldy; the cutoff slider trims the tail. Bar length '
+                      'reads from zero, so a truncated axis would exaggerate small gaps.'},
+     'inputs': ['column', 'measure', 'aggregate', 'cutoff'],
+     'aggregates': ['count', 'mean', 'median', 'mode'],
+     'column_types': {'column': 'any', 'measure': 'numeric'},
+     'renderer': 'categorical-series',
+     'variant': {'series': 'single', 'mark': 'bar', 'stacking': None}},
+    {'id': 'lollipop', 'label': 'Lollipop', 'status': 'ready',
+     'blurb': 'The bar comparison drawn as stems and dots.',
+     'family': 'Comparison',
+     'synonyms': ['lollipop chart', 'stem plot', 'dot plot', 'dot', 'cleveland dot plot'],
+     'tags': ['comparison', 'compare', 'ranking', 'category', 'magnitude'],
+     'info': {
+         'shows': 'The same category comparison as a bar, drawn as a stem and a dot to lighten the ink.',
+         'best_for': 'Comparing many categories where full bars would look heavy or crowded.',
+         'watch_out': 'The dot marks the value, not the stem alone — read it against the axis. Same '
+                      'long-tail limit as the bar: cap categories or filter first.'},
+     'inputs': ['column', 'measure', 'aggregate', 'cutoff'],
+     'aggregates': ['count', 'mean', 'median', 'mode'],
+     'column_types': {'column': 'any', 'measure': 'numeric'},
+     'renderer': 'categorical-series',
+     'variant': {'series': 'single', 'mark': 'lollipop', 'stacking': None}},
+    {'id': 'dot-plot', 'label': 'Dot plot', 'status': 'ready', 'finder': False,
+     'blurb': 'One dot per category on a shared value scale.',
+     'family': 'Comparison',
+     'synonyms': ['dot plot', 'cleveland dot plot'],
+     'tags': ['comparison', 'compare', 'ranking', 'category', 'magnitude'],
+     'info': {
+         'shows': 'One dot per category at its value on a shared scale — a lightweight ranking.',
+         'best_for': 'Comparing values across many categories at a glance, especially when they’re close.',
+         'watch_out': 'Dots on nearly equal values can overlap and hide ties; the table disambiguates. '
+                      'There’s no zero baseline, so judge position on the axis, not distance from an edge.'},
+     'inputs': ['column', 'measure', 'aggregate', 'cutoff'],
+     'aggregates': ['count', 'mean', 'median', 'mode'],
+     'column_types': {'column': 'any', 'measure': 'numeric'},
+     'renderer': 'categorical-series',
+     'variant': {'series': 'single', 'mark': 'dot', 'stacking': None}},
+    {'id': 'grouped-bar', 'label': 'Grouped bar', 'status': 'ready',
+     'blurb': 'One column split into side-by-side bars by a second.',
+     'family': 'Comparison',
+     'synonyms': ['grouped bar', 'clustered bar', 'side by side bar'],
+     'tags': ['comparison', 'compare', 'two categories', 'subgroup', 'category'],
+     'info': {
+         'shows': 'A measure across one column, split into side-by-side bars by a second column.',
+         'best_for': 'Comparing subgroups within each category — e.g. a measure by offense type, split by sex.',
+         'watch_out': 'Too many groups turn into a picket fence; keep the second column small. Side-by-side '
+                      'bars compare within a category, not the totals — the table carries those.'},
+     'inputs': ['column', 'column2', 'measure', 'aggregate'],
+     'aggregates': ['count', 'mean', 'median'],
+     'column_types': {'column': 'any', 'column2': 'any', 'measure': 'numeric'},
+     'renderer': 'categorical-series',
+     'variant': {'series': 'two', 'mark': 'bar', 'stacking': None}},
+
+    # Composition — part-of-whole (join the shipped pie + treemap in this family).
+    {'id': 'donut', 'label': 'Donut', 'status': 'ready',
+     'blurb': 'Share of cases across one column, as a ring.',
+     'family': 'Composition',
+     'synonyms': ['donut chart', 'doughnut chart', 'ring chart'],
+     'tags': ['proportion', 'share', 'part of whole', 'composition', 'percent'],
+     'info': {
+         'shows': 'The share of cases across one column’s values, as a ring — a pie with the middle open.',
+         'best_for': 'The same part-of-whole read as a pie when you want a lighter, centered look.',
+         'watch_out': 'Angles and arcs are hard to compare precisely; the cutoff caps the slices. It shows '
+                      'shares, not counts — read the table for the Ns.'},
+     'inputs': ['column', 'cutoff'],
+     'aggregates': ['count'],
+     'column_types': {'column': 'any'},
+     'renderer': 'categorical-series',
+     'variant': {'series': 'single', 'mark': 'donut', 'stacking': None}},
+    {'id': 'stacked-bar', 'label': 'Stacked bar', 'status': 'ready',
+     'blurb': 'Counts per category, split into stacked segments by a second column.',
+     'family': 'Composition',
+     'synonyms': ['stacked bar', 'stacked column', '100% stacked bar', 'percent stacked', 'proportional bar'],
+     'tags': ['composition', 'part of whole', 'two categories', 'breakdown', 'share'],
+     'info': {
+         'shows': 'Counts across one column, each bar split into segments by a second column.',
+         'best_for': 'Seeing both the total per category and how it breaks down, in one bar.',
+         'watch_out': 'Only counts stack meaningfully — means and medians don’t add up, so this is '
+                      'count-only. Middle segments are hard to compare because they don’t share a baseline.'},
+     'inputs': ['column', 'column2'],
+     'aggregates': ['count'],
+     'column_types': {'column': 'any', 'column2': 'any'},
+     'renderer': 'categorical-series',
+     'variant': {'series': 'two', 'mark': 'bar', 'stacking': 'stack'}},
+    {'id': 'stacked-bar-100', 'label': '100% stacked bar', 'status': 'ready', 'finder': False,
+     'blurb': 'Each category’s mix as a full-height 100% bar.',
+     'family': 'Composition',
+     'synonyms': ['100% stacked bar', 'percent stacked bar', 'proportional bar'],
+     'tags': ['composition', 'part of whole', 'share', 'percent', 'two categories', 'proportion'],
+     'info': {
+         'shows': 'Each category’s composition as a full-height bar — segments are shares that sum to 100%.',
+         'best_for': 'Comparing the mix within categories when the totals differ a lot.',
+         'watch_out': 'Normalizing to 100% hides the absolute case counts — a thin category and a huge one '
+                      'look the same size. The companion table restores the real Ns.'},
+     'inputs': ['column', 'column2'],
+     'aggregates': ['count'],
+     'column_types': {'column': 'any', 'column2': 'any'},
+     'renderer': 'categorical-series',
+     'variant': {'series': 'two', 'mark': 'bar', 'stacking': 'percent'}},
+    {'id': 'mosaic', 'label': 'Mosaic', 'status': 'ready', 'legacy': True,
+     'blurb': 'Two columns as proportional tiles — a visual crosstab.',
+     'family': 'Composition',
+     'synonyms': ['mosaic plot', 'marimekko', 'spine plot'],
+     'tags': ['composition', 'two categories', 'crosstab', 'proportion', 'joint', 'share'],
+     'info': {
+         'shows': 'Two columns as a grid of tiles — column widths and tile heights are proportional to '
+                  'case shares.',
+         'best_for': 'Reading the joint composition of two categoricals — which combinations are common or rare.',
+         'watch_out': 'Area encodes share, not count, so small groups shrink to slivers; the crosstab '
+                      'underneath carries exact Ns. Many categories make a busy grid — filter or coarsen first.'},
+     'inputs': ['column', 'column2'],
+     'aggregates': ['count'],
+     'column_types': {'column': 'any', 'column2': 'any'},
+     'renderer': 'server-html'},
+
+    # Distribution — the shape and spread of one numeric column.
+    {'id': 'histogram', 'label': 'Histogram', 'status': 'ready',
+     'blurb': 'How one numeric column is distributed, in bins.',
+     'family': 'Distribution',
+     'synonyms': ['histogram', 'frequency distribution'],
+     'tags': ['distribution', 'spread', 'shape', 'bins', 'frequency', 'numeric'],
+     'info': {
+         'shows': 'How one numeric column is distributed, as counts of cases in each value range (bin).',
+         'best_for': 'Seeing the shape of a numeric variable — where it peaks, its spread, and its skew.',
+         'watch_out': 'Bin width changes the story; try a few. Sentence lengths pile up on round numbers '
+                      '(12, 24, 36 months), so bins that straddle those spikes can smooth a real pattern away.'},
+     'inputs': ['column', 'bins'],
+     'aggregates': [],
+     'column_types': {'column': 'numeric'},
+     'renderer': 'distribution',
+     'variant': {'mode': 'histogram'}},
+    {'id': 'ecdf', 'label': 'ECDF', 'status': 'ready', 'legacy': True,
+     'blurb': 'The share of cases at or below each value.',
+     'family': 'Distribution',
+     'synonyms': ['ecdf', 'empirical cdf', 'cumulative distribution'],
+     'tags': ['distribution', 'cumulative', 'percentile', 'spread', 'numeric'],
+     'info': {
+         'shows': 'The share of cases at or below each value — a curve climbing from 0 to 1 (the empirical CDF).',
+         'best_for': 'Reading percentiles directly and comparing distributions without picking a bin width.',
+         'watch_out': 'It answers “what fraction is below X,” not “how many are exactly X” — round-number '
+                      'clustering shows up as vertical jumps, not bars. Less familiar to students than a histogram.'},
+     'inputs': ['column'],
+     'aggregates': [],
+     'column_types': {'column': 'numeric'},
+     'renderer': 'distribution',
+     'variant': {'mode': 'ecdf'}},
+    {'id': 'kde', 'label': 'Density (KDE)', 'status': 'ready',
+     'blurb': 'A smoothed density curve for one numeric column.',
+     'family': 'Distribution',
+     'synonyms': ['kde', 'density plot', 'kernel density'],
+     'tags': ['distribution', 'density', 'shape', 'smooth', 'numeric'],
+     'info': {
+         'shows': 'A smoothed curve estimating the shape of a numeric column’s distribution.',
+         'best_for': 'A clean silhouette of a distribution when a histogram looks jagged.',
+         'watch_out': 'Smoothing invents values between the data and erases the round-number clustering that '
+                      'defines sentence lengths — on spiky data the histogram is the honest view. Bandwidth '
+                      'changes the shape.'},
+     'inputs': ['column', 'bandwidth'],
+     'aggregates': [],
+     'column_types': {'column': 'numeric'},
+     'renderer': 'kde'},
+    {'id': 'box', 'label': 'Box plot', 'status': 'ready',
+     'blurb': 'Median, quartiles, and range per group.',
+     'family': 'Distribution',
+     'synonyms': ['box plot', 'box and whisker'],
+     'tags': ['distribution', 'spread', 'quartiles', 'median', 'compare groups', 'numeric'],
+     'info': {
+         'shows': 'A numeric column’s median, quartiles, and range as a box with whiskers — optionally one '
+                  'box per group.',
+         'best_for': 'Comparing the center and spread of a measure across groups side by side.',
+         'watch_out': 'A box hides the shape within it — two very different distributions can share a box. '
+                      'On discrete, round-number data the quartiles land on those same round values.'},
+     'inputs': ['column', 'column2'],
+     'aggregates': [],
+     'column_types': {'column': 'numeric', 'column2': 'any'},
+     'renderer': 'plugin',
+     'variant': {'mode': 'box'}},
+    {'id': 'violin', 'label': 'Violin', 'status': 'ready',
+     'blurb': 'Distribution shape per group, mirrored.',
+     'family': 'Distribution',
+     'synonyms': ['violin plot', 'density comparison'],
+     'tags': ['distribution', 'density', 'shape', 'compare groups', 'spread', 'numeric'],
+     'info': {
+         'shows': 'A group’s distribution shape mirrored into a violin, showing where cases concentrate.',
+         'best_for': 'Comparing distribution shapes across groups when a box is too coarse.',
+         'watch_out': 'The smooth outline erases the round-number spikes in sentence data — it can suggest a '
+                      'gentle mound where the truth is a few tall pillars. Read it beside the histogram.'},
+     'inputs': ['column', 'column2'],
+     'aggregates': [],
+     'column_types': {'column': 'numeric', 'column2': 'any'},
+     'renderer': 'plugin',
+     'variant': {'mode': 'violin'}},
+
+    # Trend — change over time (join the shipped waterfall in this family).
+    {'id': 'line', 'label': 'Line', 'status': 'ready',
+     'blurb': 'A measure over sentencing years, as a line.',
+     'family': 'Trend',
+     'synonyms': ['line chart', 'time series', 'area', 'area chart', 'filled line'],
+     'tags': ['trend', 'over time', 'time series', 'change', 'year'],
+     'info': {
+         'shows': 'A measure across sentencing years, connected as a line to show the trend.',
+         'best_for': 'Tracking how a count or a numeric summary moves over time.',
+         'watch_out': 'A connected line implies continuity between years — the points are yearly summaries, '
+                      'not a smooth process. Watch the axis start; a cropped y-axis exaggerates the wiggles.'},
+     'inputs': ['column', 'measure', 'aggregate'],
+     'aggregates': ['count', 'mean', 'median'],
+     'column_types': {'column': 'any', 'measure': 'numeric'},
+     'renderer': 'line',
+     'variant': {'mode': 'line', 'series': 'single'}},
+    {'id': 'area', 'label': 'Area', 'status': 'ready', 'finder': False,
+     'blurb': 'A trend over years with the area filled.',
+     'family': 'Trend',
+     'synonyms': ['area chart', 'filled line'],
+     'tags': ['trend', 'over time', 'time series', 'magnitude', 'year'],
+     'info': {
+         'shows': 'A trend over sentencing years with the space under the line filled in.',
+         'best_for': 'Emphasizing the magnitude of a single series over time.',
+         'watch_out': 'The fill draws the eye to volume, not the exact line — the table has the numbers. One '
+                      'filled area reads fine; several overlapping ones don’t (use stacked area or lines).'},
+     'inputs': ['column', 'measure', 'aggregate'],
+     'aggregates': ['count', 'mean', 'median'],
+     'column_types': {'column': 'any', 'measure': 'numeric'},
+     'renderer': 'line',
+     'variant': {'mode': 'area', 'series': 'single'}},
+    {'id': 'stacked-area', 'label': 'Stacked area', 'status': 'ready',
+     'blurb': 'Group counts over years, stacked to the total.',
+     'family': 'Trend',
+     'synonyms': ['stacked area', 'area band chart'],
+     'tags': ['trend', 'over time', 'composition', 'time series', 'breakdown', 'year'],
+     'info': {
+         'shows': 'Several groups’ counts over time, stacked so the bands add up to the total.',
+         'best_for': 'Seeing both an overall trend and how its composition shifts across years.',
+         'watch_out': 'Only the bottom band sits on a flat baseline — the ones above are hard to read '
+                      'precisely. Only counts stack, and a big band can visually swamp small but changing ones.'},
+     'inputs': ['column', 'column2'],
+     'aggregates': ['count'],
+     'column_types': {'column': 'any', 'column2': 'any'},
+     'renderer': 'line',
+     'variant': {'mode': 'stacked-area', 'series': 'two'}},
+    {'id': 'slope', 'label': 'Slope', 'status': 'ready',
+     'blurb': 'Each category’s change between two years.',
+     'family': 'Trend',
+     'synonyms': ['slope chart', 'slopegraph', 'before after', 'bump', 'bump chart', 'rank chart'],
+     'tags': ['trend', 'over time', 'change', 'before after', 'two periods'],
+     'info': {
+         'shows': 'Each category’s value at two time points, connected by a line — up or down between them.',
+         'best_for': 'A clean before/after: which categories rose or fell between two years.',
+         'watch_out': 'It shows only the endpoints, not the path between them — a straight rise could hide a '
+                      'dip. Crossing lines get tangled when many categories move, so keep it short.'},
+     'inputs': ['column', 'column2', 'measure', 'aggregate'],
+     'aggregates': ['count', 'mean', 'median'],
+     'column_types': {'column': 'any', 'column2': 'any', 'measure': 'numeric'},
+     'renderer': 'line',
+     'variant': {'mode': 'slope', 'series': 'two'}},
+    {'id': 'bump', 'label': 'Bump', 'status': 'ready', 'finder': False,
+     'blurb': 'How categories’ ranks shift over time.',
+     'family': 'Trend',
+     'synonyms': ['bump chart', 'rank chart'],
+     'tags': ['trend', 'over time', 'rank', 'ranking', 'change'],
+     'info': {
+         'shows': 'How categories’ ranks change across periods — lines that rise and fall by position, not value.',
+         'best_for': 'Following who leads and who overtakes whom over time.',
+         'watch_out': 'Rank hides magnitude — first and second can be a whisker or a mile apart. With many '
+                      'categories the lines spaghetti, so it caps to the top few.'},
+     'inputs': ['column', 'column2', 'measure', 'aggregate'],
+     'aggregates': ['count', 'mean', 'median'],
+     'column_types': {'column': 'any', 'column2': 'any', 'measure': 'numeric'},
+     'renderer': 'line',
+     'variant': {'mode': 'bump', 'series': 'two'}},
+    {'id': 'animated', 'label': 'Animated time-series', 'status': 'ready',
+     'blurb': 'A year-by-year trend you can scrub through.',
+     'family': 'Trend',
+     'synonyms': ['animated time series', 'year scrubber', 'playback'],
+     'tags': ['trend', 'over time', 'animation', 'time series', 'year', 'playback'],
+     'info': {
+         'shows': 'A trend played across years with a scrubber, one frame per sentencing year.',
+         'best_for': 'Walking through change year by year as a teaching aid.',
+         'watch_out': 'Motion dramatizes ordinary year-to-year noise and can imply momentum that isn’t there. '
+                      'It never autoplays and honors reduced-motion; the static multi-line chart and the table '
+                      'are the record.'},
+     'inputs': ['column', 'measure', 'aggregate'],
+     'aggregates': ['count', 'mean', 'median'],
+     'column_types': {'column': 'any', 'measure': 'numeric'},
+     'renderer': 'animated'},
+
+    # Relationship — how two (or more) numerics move together (join the shipped scatter + correlation).
+    {'id': 'pair-plot', 'label': 'Pair plot', 'status': 'ready',
+     'blurb': 'A scatter panel for every pair of a numeric set.',
+     'family': 'Relationship',
+     'synonyms': ['pair plot', 'splom', 'scatter matrix'],
+     'tags': ['relationship', 'correlation', 'scatter matrix', 'numeric', 'pairwise'],
+     'info': {
+         'shows': 'A grid of scatter panels for every pair in a small set of numeric columns, with each '
+                  'column’s distribution on the diagonal.',
+         'best_for': 'Scanning several relationships at once — the shapes behind a correlation matrix.',
+         'watch_out': 'Panels are binned summaries, not individual cases, and the grid grows fast — it caps to '
+                      'a handful of columns. A shape here is a pattern, not a cause.'},
+     'inputs': ['subset'],
+     'aggregates': [],
+     'column_types': {'subset': 'numeric'},
+     'renderer': 'tiled'},
 ]
+
+# The builder pickers whose visibility toggles with the selected chart (each maps to one field
+# in templates/partials/visualize_view.html). `grain` (a hidden input, always present) and
+# `cutoff` (a result-card control) are legitimate chart `inputs` but not show/hide fields, so
+# they are not listed here.
+VIZ_BUILDER_SLOTS = ('column', 'column2', 'measure', 'aggregate', 'subset')
+
+# slot -> space-joined chart ids (in registry order) that declare the slot in `inputs`. This is
+# the data-viz-fields attribute for each builder field, DERIVED from the registry so the picker
+# show/hide is registry-driven (the template no longer hard-codes the per-field lists). With the
+# six shipped charts this reproduces the old hard-coded strings exactly ("pie treemap scatter",
+# "treemap scatter", "treemap waterfall choropleth", "correlation"); a new entry updates it for free.
+VIZ_FIELD_CHARTS = {
+    slot: ' '.join(ct['id'] for ct in VIZ_CHART_TYPES if slot in ct['inputs'])
+    for slot in VIZ_BUILDER_SLOTS
+}
+
+# The finder's purpose families, in display order (chart-library-expansion Phase A1). The chart
+# gallery groups the registry under these headings; a family with no charts yet (Comparison and
+# Distribution until Tier C/D land) is simply skipped, so the grouping fills out as new entries
+# arrive with no template change. `family` on each registry entry must be one of these.
+VIZ_CHART_FAMILIES = ('Comparison', 'Composition', 'Distribution', 'Trend',
+                      'Relationship', 'Geography')
+
+# [{name, charts:[registry entries]}] for each non-empty family, in VIZ_CHART_FAMILIES order and
+# builder order within a family — the data the searchable card gallery renders from.
+def _viz_in_finder(ct):
+    # A chart shows as a finder card unless it was merged into a sibling (finder=False — still
+    # reachable by URL and by that sibling's variant toggle) or moved to Legacy (rendered in a
+    # collapsed group at the bottom). Both stay in VIZ_CHART_TYPES so their URLs/renderers work.
+    return ct.get('finder', True) and not ct.get('legacy', False)
+
+VIZ_CHART_GALLERY = [
+    {'name': fam, 'charts': [ct for ct in VIZ_CHART_TYPES if ct['family'] == fam and _viz_in_finder(ct)]}
+    for fam in VIZ_CHART_FAMILIES
+    if any(ct['family'] == fam and _viz_in_finder(ct) for ct in VIZ_CHART_TYPES)
+]
+
+# Legacy charts (kept for old URLs + author choice, de-emphasized) get their own collapsed group
+# at the bottom of the finder — the "Legacy folder" the designer asked for.
+_VIZ_LEGACY_CHARTS = [ct for ct in VIZ_CHART_TYPES if ct.get('legacy', False)]
+if _VIZ_LEGACY_CHARTS:
+    VIZ_CHART_GALLERY.append({'name': 'Legacy', 'charts': _VIZ_LEGACY_CHARTS, 'collapsed': True})
 
 # Aggregate picker options: student-facing labels over Phase 1's Data.VALID_AGGREGATES.
 VIZ_AGGREGATE_OPTIONS = [
@@ -1940,6 +2410,125 @@ def build_correlation(frame, columns):
     }
 
 
+# The pair plot / SPLOM (chart-library-expansion Phase D4) is the scatter-matrix companion to the
+# correlation matrix — "see the shapes behind the r's". It reuses the correlation matrix's numeric-
+# subset picker, but hard-caps the subset TIGHTER (2..5, not 2..8): a SPLOM draws k*k tiled canvases,
+# so each added column adds a whole ROW and COLUMN of panels and the render cost grows quadratically.
+# Five columns already means a 5×5 = 25-panel grid; past that the panels shrink below readability and
+# the canvas count hurts. One documented cap, in the spirit of the correlation bounds above.
+PAIRPLOT_MIN_COLS = 2
+PAIRPLOT_MAX_COLS = 5
+
+
+def resolve_pairplot_columns(cols, data, errors):
+    # Validate the user-picked numeric subset for the pair plot: same documented / non-excluded /
+    # numeric (float64) / de-duplicated-in-pick-order filter as the correlation matrix, but bounded
+    # 2..PAIRPLOT_MAX_COLS. Appends a user-facing message + returns [] when the pick can't drive a grid.
+    seen = []
+    for c in cols or []:
+        if c in seen:
+            continue
+        # the checkbox UI only offers documented numeric columns; a stray non-numeric pick can only
+        # come from a hand-crafted URL, so drop it silently and let the count checks below produce
+        # the actionable message.
+        if c not in data['numeric'] or c in data['excluded'] or not CODEBOOK.codebook.get(c):
+            continue
+        seen.append(c)
+    if len(seen) < PAIRPLOT_MIN_COLS:
+        errors.append('Pick at least %d numeric columns for a pair plot — choose them from the '
+                      'list.' % PAIRPLOT_MIN_COLS)
+        return []
+    if len(seen) > PAIRPLOT_MAX_COLS:
+        errors.append('Pick at most %d numeric columns — a pair plot draws a panel for every pair, '
+                      'so the grid stays readable up to %d. Deselect a few.'
+                      % (PAIRPLOT_MAX_COLS, PAIRPLOT_MAX_COLS))
+        return []
+    return seen
+
+
+def _pairplot_points(x_edges, y_edges, counts):
+    # Reshape one 2D histogram (counts[xi][yi] over x_edges / y_edges, from Data.bin2d) into the
+    # aggregated-lattice bubble list a SPLOM off-diagonal panel draws: one point at each NON-EMPTY
+    # bin's center, carrying its case count — never one mark per row (the whole point of the binned
+    # panel). Empty edges (an all-NaN pair) yield an empty panel. Mirrors build_scatter's shape.
+    points = []
+    max_count = 0
+    total = 0
+    for xi, row in enumerate(counts):
+        xc = (x_edges[xi] + x_edges[xi + 1]) / 2.0
+        for yi, cnt in enumerate(row):
+            if cnt:
+                yc = (y_edges[yi] + y_edges[yi + 1]) / 2.0
+                points.append({'x': xc, 'y': yc, 'n': int(cnt)})
+                if cnt > max_count:
+                    max_count = cnt
+                total += cnt
+    return {'points': points, 'maxCount': int(max_count), 'n': int(total)}
+
+
+def build_pairplot(frame, columns):
+    # Pair plot / SPLOM (chart-library-expansion Phase D4): a k×k grid of small panels over a user-
+    # picked numeric subset (2..5 columns). The OFF-diagonal panels are 2D-binned scatters (B3
+    # Data.bin2d — one np.histogram2d each, discrete columns on their natural lattice, capped bins,
+    # NEVER raw rows); the DIAGONAL panels are the column's own histogram (B2
+    # Data.distribution_stats). The companion table IS the correlation matrix (build_correlation) —
+    # the pair plot shows the shapes behind those r's. Cell (row=r, col=c) plots columns[c] on the
+    # horizontal axis and columns[r] on the vertical, the standard SPLOM orientation.
+    #
+    # Computed FRESH over the active slice and NEVER disk-cached (like the crosstab / correlation).
+    # Read-only over the shared base: bin2d / distribution_stats / .corr() each return NEW objects and
+    # never mutate frame.df (guarded by test_base_immutability.py, which already exercises all three).
+    #
+    # Each UNORDERED pair is binned once and its mirror panel is the transpose, so np.histogram2d
+    # runs k*(k-1)/2 times rather than k*(k-1) — the SPLOM is symmetric, and the O(k²) canvas count
+    # is exactly why the subset is capped at PAIRPLOT_MAX_COLS.
+    k = len(columns)
+    labels = [CODEBOOK.codebook[c] for c in columns]
+
+    # diagonal: one histogram per column (B2). Only the shared bin edges + overall counts feed a
+    # SPLOM diagonal (it shows shape, not the five-number/KDE payload distribution_stats also carries).
+    diagonals = []
+    for c in columns:
+        stats = frame.distribution_stats(c)
+        diagonals.append({'edges': stats['bin_edges'],
+                          'counts': stats['overall']['hist_counts'],
+                          'n': stats['overall']['n']})
+
+    # off-diagonal: bin each unordered pair (a < b) once, then fill BOTH mirror cells from it.
+    panels = [[None] * k for _ in range(k)]
+    for a in range(k):
+        for b in range(a + 1, k):
+            g = frame.bin2d(columns[a], columns[b])          # x = columns[a], y = columns[b]
+            # cell (row=b, col=a): x=columns[a], y=columns[b] -> the grid as binned
+            panels[b][a] = _pairplot_points(g['x_edges'], g['y_edges'], g['counts'])
+            # cell (row=a, col=b): x=columns[b], y=columns[a] -> axes + counts transposed
+            counts_t = [list(col) for col in zip(*g['counts'])] if g['counts'] else []
+            panels[a][b] = _pairplot_points(g['y_edges'], g['x_edges'], counts_t)
+
+    grid = []
+    for r in range(k):
+        line = []
+        for c in range(k):
+            if r == c:
+                d = diagonals[r]
+                line.append({'row': r, 'col': c, 'diag': True,
+                             'edges': d['edges'], 'counts': d['counts'], 'n': d['n']})
+            else:
+                p = panels[r][c]
+                line.append({'row': r, 'col': c, 'diag': False,
+                             'points': p['points'], 'maxCount': p['maxCount'], 'n': p['n']})
+        grid.append(line)
+
+    return {
+        'columns': list(columns),
+        'labels': labels,
+        'k': k,
+        'sliceN': len(frame.df),
+        'grid': grid,
+        'correlation': build_correlation(frame, columns),   # the companion table
+    }
+
+
 def build_scatter(sheet, x_col, y_col):
     # Reshape data.get_table's nested sheet[x][y] = {'N': count} (d_col=None -> count only) into
     # an aggregated-lattice bubble payload: one point per (x, y) cell with cases, at the numeric
@@ -2226,6 +2815,904 @@ def build_choropleth(session, aggregate, measure, measure_col, grain='county'):
     }
 
 
+# --- Categorical-series family (chart-library-expansion Phase C1) ----------------------
+# One renderer, seven registry variants: bar / lollipop / dot plot / donut (single-series, read
+# through Data.aggregate_by_group) and grouped / stacked / 100%-stacked bar (two-group, read
+# through the B1 Data.aggregate_by_two matrix). Each registry entry's `variant`
+# {series, mark, stacking} fully drives the draw in static/js/visualize.js, so no chart forks a
+# renderer. Every variant ships a companion value table (the a11y / no-JS honesty twin), and all
+# values are computed FRESH over the active slice and NEVER disk-cached (like the crosstab).
+#
+# Single-series COUNT charts (donut, and bar/lollipop/dot with the count aggregate) reuse the
+# EXACT pie path -- get_data(...)['column_info']['each'] -> bucket_payload -- so their counts and
+# their "Other"-cutoff slider reconcile with the Explore distribution byte-for-byte. Numeric
+# single-series (mean/median/mode) read aggregate_by_group for the value plus a second count pass
+# for the per-group N; there is no summable "Other" bucket, so the slider truncates to the top-N
+# most prevalent categories and the table carries the rest.
+CATSERIES_TWO_MAX_CATEGORIES = 20   # x-axis categories drawn for a two-group chart (table has all)
+CATSERIES_TWO_MAX_SERIES = 12       # datasets drawn; count charts fold the tail into an "Other" series
+
+
+def _english_or(options):
+    # "count", "count or mean", "count, mean, or median" — a small oxford-comma joiner for the
+    # aggregate-not-allowed message below.
+    opts = list(options)
+    if len(opts) <= 1:
+        return opts[0] if opts else ''
+    if len(opts) == 2:
+        return opts[0] + ' or ' + opts[1]
+    return ', '.join(opts[:-1]) + ', or ' + opts[-1]
+
+
+def resolve_catseries_measure(measure, aggregate, allowed, data, errors):
+    # Resolve a categorical-series chart's (measure, aggregate) into the numeric measure column
+    # aggregate_by_group / aggregate_by_two reads. count -> None (count of cases); mean/median/mode
+    # -> a validated numeric column. `allowed` is the chart's registry `aggregates` set, so a
+    # count-only chart (donut / stacked / 100%-stacked) rejects a numeric aggregate cleanly and a
+    # grouped bar rejects mode. Mirrors resolve_treemap_measure / resolve_waterfall_measure.
+    if aggregate == 'count':
+        return None, True
+    if aggregate not in allowed:
+        allowed_labels = [a for a in ('count', 'mean', 'median', 'mode') if a in allowed]
+        errors.append('This chart summarizes by %s — %s isn’t available for it.'
+                      % (_english_or(allowed_labels), aggregate))
+        return None, False
+    if measure == Data.COUNT_MEASURE or measure not in data['numeric'] \
+            or measure in data['excluded'] or not CODEBOOK.codebook.get(measure):
+        errors.append('Mean, median, and mode need a numeric measure — pick one from the '
+                      'Measure list.')
+        return None, False
+    return measure, True
+
+
+def build_catseries_single(session, chart, column, measure, measure_col, aggregate, override=None):
+    # Single-series payload (bar / lollipop / dot / donut) + companion rows. See the family note
+    # above: COUNT reuses the pie/Explore path (exact parity + reuse of the "Other" slider); a
+    # numeric aggregate reads aggregate_by_group. Rows are unified to {label, value, n}: `value` is
+    # the aggregate (None for count, which has no separate measure), `n` the case count.
+    variant = chart['variant']
+    is_donut = variant['mark'] == 'donut'
+    default_cutoff, hard_cap = (PIE_DEFAULT_CUTOFF, PIE_HARD_CAP) if is_donut \
+        else (BAR_DEFAULT_CUTOFF, BAR_HARD_CAP)
+
+    if aggregate == 'count':
+        # identical source to the pie and the Explore distribution bar, so counts + the slider's
+        # "Other" bucket reconcile with Explore exactly.
+        info = get_data(session, column, 'occurrence', override)['column_info']
+        payload = bucket_payload(info['each'], default_cutoff, hard_cap)
+        payload.update({
+            'kind': 'categorical-series', 'variant': variant, 'aggregate': 'count',
+            'hasOther': True, 'header': CODEBOOK.codebook[column],
+            'measureLabel': 'cases', 'aggLabel': 'Count', 'totalN': payload['total'],
+            'sliderNoun': 'slices' if is_donut else 'bars',
+        })
+        rows = [{'label': display_value(e['value']), 'value': None, 'n': e['num']}
+                for e in sorted(info['each'], key=lambda e: e['num'], reverse=True)]
+        return payload, rows
+
+    # numeric aggregate: value per group + a second pass for the per-group case count
+    frame = _execute(session, override)
+    value_map = frame.aggregate_by_group(column, measure, aggregate)
+    count_map = frame.aggregate_by_group(column, Data.COUNT_MEASURE, 'count')
+
+    groups = []
+    for val, v in value_map.items():
+        if val != val:                              # drop NaN group key
+            continue
+        n = int(count_map.get(val, 0))
+        fv = None if (v is None or v != v) else float(v)
+        if n <= 0 or fv is None:
+            continue
+        groups.append({'label': display_value(val), 'value': fv, 'n': n})
+    groups.sort(key=lambda g: g['n'], reverse=True)  # top-N cutoff = most prevalent categories
+
+    capped = groups[:hard_cap]
+    slider_max = len(capped)
+    slider_min = min(3, slider_max)
+    cutoff = max(slider_min, min(default_cutoff, slider_max))
+    total_n = sum(g['n'] for g in groups)
+
+    payload = {
+        'kind': 'categorical-series', 'variant': variant, 'aggregate': aggregate,
+        'hasOther': False,
+        'values': capped,                           # client-sliceable head {label, value, n}
+        'total': total_n, 'totalN': total_n,
+        'tailGroups': len(groups) - len(capped),
+        'cutoff': cutoff, 'sliderMin': slider_min, 'sliderMax': slider_max,
+        'header': CODEBOOK.codebook[column],
+        'measureLabel': CODEBOOK.codebook[measure_col], 'aggLabel': aggregate.capitalize(),
+        'sliderNoun': 'bars',
+        # a top-N truncation, not an "Other" fold, so the slider hint must not promise "Other"
+        'sliderHint': 'The rest are left off the chart — the table below carries every value.',
+    }
+    return payload, groups            # the table carries ALL groups (not just the drawn head)
+
+
+def build_catseries_two(count_matrix, value_matrix, variant, aggregate, measure_col, a_col, b_col):
+    # Two-group payload (grouped / stacked / 100%-stacked bar) + flat companion rows, from the B1
+    # aggregate_by_two matrices. count_matrix is the {a:{b:n}} case-count matrix (== value_matrix
+    # for a count chart); value_matrix carries the mean/median for a grouped bar. Categories
+    # (a-values) order by total N desc and cap at CATSERIES_TWO_MAX_CATEGORIES; series (b-values)
+    # order by total N desc and cap at CATSERIES_TWO_MAX_SERIES. For a COUNT chart the capped-out
+    # series fold into one exact "Other" series (their counts sum); a grouped mean/median can't be
+    # summed, so its extra series are simply left off the draw (the table keeps every cell).
+    a_totals, b_totals = {}, {}
+    for a, brow in count_matrix.items():
+        if a != a:                                  # drop NaN a-key
+            continue
+        for b, n in brow.items():
+            if b != b:                              # drop NaN b-key
+                continue
+            ni = int(n)
+            a_totals[a] = a_totals.get(a, 0) + ni
+            b_totals[b] = b_totals.get(b, 0) + ni
+
+    a_order = sorted(a_totals, key=lambda a: a_totals[a], reverse=True)
+    a_kept = a_order[:CATSERIES_TWO_MAX_CATEGORIES]
+    b_order = sorted(b_totals, key=lambda b: b_totals[b], reverse=True)
+    b_kept = b_order[:CATSERIES_TWO_MAX_SERIES]
+    b_tail = b_order[CATSERIES_TWO_MAX_SERIES:]
+    fold_other = (aggregate == 'count') and bool(b_tail)   # exact only for summable counts
+
+    def cell_n(a, b):
+        return int(count_matrix.get(a, {}).get(b, 0))
+
+    def cell_value(a, b):
+        if aggregate == 'count':
+            return cell_n(a, b)
+        v = value_matrix.get(a, {}).get(b)
+        return None if (v is None or v != v) else float(v)
+
+    series = []
+    for b in b_kept:
+        series.append({
+            'label': display_value(b),
+            'values': [cell_value(a, b) for a in a_kept],
+            'ns': [cell_n(a, b) for a in a_kept],
+        })
+    if fold_other:
+        series.append({
+            'label': 'Other (%d)' % len(b_tail),
+            'values': [sum(cell_n(a, b) for b in b_tail) for a in a_kept],
+            'ns': [sum(cell_n(a, b) for b in b_tail) for a in a_kept],
+            'isOther': True,
+        })
+
+    payload = {
+        'kind': 'categorical-series', 'variant': variant, 'aggregate': aggregate,
+        'categories': [display_value(a) for a in a_kept],
+        'series': series,
+        'aLabel': CODEBOOK.codebook[a_col], 'bLabel': CODEBOOK.codebook[b_col],
+        'measureLabel': 'cases' if aggregate == 'count' else CODEBOOK.codebook[measure_col],
+        'aggLabel': aggregate.capitalize(),
+        'totalN': sum(a_totals.values()),
+        'catTail': len(a_order) - len(a_kept),           # categories left off the draw
+        'seriesTail': 0 if fold_other else len(b_tail),  # series left off (grouped mean/median)
+    }
+
+    # flat companion table: every (a, b) cell with cases across the WHOLE matrix, heaviest first
+    rows = []
+    for a in a_order:
+        for b, n in count_matrix.get(a, {}).items():
+            if b != b:
+                continue
+            ni = int(n)
+            if ni <= 0:
+                continue
+            rows.append({'a': display_value(a), 'b': display_value(b),
+                         'n': ni, 'value': cell_value(a, b)})
+    rows.sort(key=lambda r: r['n'], reverse=True)
+    return payload, rows
+
+
+# --- Mosaic (chart-library-expansion Phase D3) -----------------------------------------
+# A two-categorical proportional view — a Marimekko / mosaic — SERVER-RENDERED as nested
+# HTML/CSS rectangles (no canvas: the correlation-matrix precedent). It reads the B1
+# aggregate_by_two COUNT matrix (mosaic is count-only — only counts compose to a whole) and
+# decomposes the entire slice: each COLUMN is a value of `column` (a) with width ∝ its case
+# total, and within a column each TILE is a value of `column2` (b) with height ∝ that value's
+# share OF THAT COLUMN (the conditional split). Area therefore ∝ the joint case count, so the
+# tiles tile the whole. Tiles shade on the SAME .heat-1..8 ramp the crosstab / correlation use,
+# keyed to each combination's case count on a 0→peak scale (build_crosstab's ramp) — the shade
+# answers "which combinations are common or rare" (the info box's best_for), a signal geometry
+# reads poorly because area is hard to compare across columns of different widths. The long
+# tails fold into an exact "Other" column / "Other" tile so the areas keep summing to the whole
+# (honest only because counts are summable); those folded tiles are muted (they aren't single
+# combinations, so they don't set the shade scale or carry a magnitude shade). The companion
+# table below carries EVERY (a, b) cell unfolded — the crosstab the watch_out points to.
+MOSAIC_MAX_COLUMNS = 12   # a-values drawn as columns; the smaller rest fold into one "Other" column
+MOSAIC_MAX_SEGMENTS = 12  # b-values drawn as tiles per column; the smaller rest fold into "Other"
+MOSAIC_HEAT_STEPS = 8
+
+
+def build_mosaic(count_matrix, a_col, b_col):
+    # count_matrix: {a: {b: n}} from Data.aggregate_by_two(a, b, '#', 'count') — observed
+    # combos only, NaN keys already dropped by the engine's dropna default (the a != a / b != b
+    # guards below are belt-and-suspenders). Returns (payload, companion rows).
+    a_totals, b_totals = {}, {}
+    for a, brow in count_matrix.items():
+        if a != a:                                  # drop a NaN a-key
+            continue
+        for b, n in brow.items():
+            if b != b:                              # drop a NaN b-key
+                continue
+            ni = int(n)
+            if ni <= 0:
+                continue
+            a_totals[a] = a_totals.get(a, 0) + ni
+            b_totals[b] = b_totals.get(b, 0) + ni
+    grand = sum(a_totals.values())
+
+    # column order: a-values by case total desc; keep the top few, fold the rest into "Other"
+    # so the widths still sum to the whole slice.
+    a_order = sorted(a_totals, key=lambda a: a_totals[a], reverse=True)
+    if len(a_order) > MOSAIC_MAX_COLUMNS:
+        a_kept, a_folded = a_order[:MOSAIC_MAX_COLUMNS - 1], a_order[MOSAIC_MAX_COLUMNS - 1:]
+    else:
+        a_kept, a_folded = a_order, []
+
+    # segment order: b-values by GLOBAL case total desc — one consistent tile order used in every
+    # column, so the grid aligns and a segment is traceable across columns. Top few kept; the
+    # rest fold into one "Other" tile per column (so each column's tiles still sum to it).
+    b_order = sorted(b_totals, key=lambda b: b_totals[b], reverse=True)
+    if len(b_order) > MOSAIC_MAX_SEGMENTS:
+        b_kept, b_folded = b_order[:MOSAIC_MAX_SEGMENTS - 1], b_order[MOSAIC_MAX_SEGMENTS - 1:]
+    else:
+        b_kept, b_folded = b_order, []
+    has_seg_other = bool(b_folded)
+
+    # shade scale = the peak joint count over the REAL tiles (one a-value × one kept b-value).
+    # The "Other" column and the "Other" tile aggregate many combinations, so they neither set
+    # the scale nor carry a shade (they render muted). Matches the crosstab's 0→peak ramp.
+    peak = 0
+    for a in a_kept:
+        row = count_matrix.get(a, {})
+        for b in b_kept:
+            peak = max(peak, int(row.get(b, 0)))
+
+    def heat_for(n):
+        if peak <= 0 or n <= 0:
+            return 0
+        return min(MOSAIC_HEAT_STEPS, max(1, round(MOSAIC_HEAT_STEPS * n / peak)))
+
+    def cell_n(a_keys, b):
+        return sum(int(count_matrix.get(a, {}).get(b, 0)) for a in a_keys)
+
+    def build_column(label, a_keys, is_other, folded_count):
+        col_n = sum(a_totals[a] for a in a_keys)
+        segments = []
+        kept_sum = 0
+        for b in b_kept:
+            n = cell_n(a_keys, b)
+            if n <= 0:
+                continue
+            kept_sum += n
+            muted = is_other        # a tile in the "Other" column isn't a single combination
+            segments.append({
+                'label': display_value(b), 'n': n,
+                'height': 100.0 * n / col_n if col_n else 0.0,
+                'colShare': n / col_n if col_n else 0.0,
+                'overallShare': n / grand if grand else 0.0,
+                'heat': 0 if muted else heat_for(n), 'muted': muted})
+        other_n = col_n - kept_sum
+        if other_n > 0 and has_seg_other:
+            segments.append({
+                'label': 'Other (%d)' % len(b_folded), 'n': other_n,
+                'height': 100.0 * other_n / col_n if col_n else 0.0,
+                'colShare': other_n / col_n if col_n else 0.0,
+                'overallShare': other_n / grand if grand else 0.0,
+                'heat': 0, 'muted': True})
+        return {
+            'label': label, 'n': col_n,
+            'width': 100.0 * col_n / grand if grand else 0.0,
+            'colShare': col_n / grand if grand else 0.0,
+            'isOther': is_other, 'foldedCount': folded_count, 'segments': segments}
+
+    columns = [build_column(display_value(a), [a], False, 0) for a in a_kept]
+    if a_folded:
+        columns.append(build_column('Other (%d)' % len(a_folded), a_folded, True, len(a_folded)))
+
+    payload = {
+        'aLabel': CODEBOOK.codebook[a_col], 'bLabel': CODEBOOK.codebook[b_col],
+        'grandTotal': grand, 'columns': columns,
+        'colTail': len(a_folded), 'segTail': len(b_folded), 'peak': peak,
+    }
+
+    # companion table = the crosstab, UNFOLDED: every (a, b) cell with cases, heaviest first —
+    # the honest Ns the "Other" folding hides in the tiles. Mirrors catseries_rows / scatter_rows.
+    rows = []
+    for a in a_order:
+        for b, n in count_matrix.get(a, {}).items():
+            if b != b:
+                continue
+            ni = int(n)
+            if ni <= 0:
+                continue
+            rows.append({'a': display_value(a), 'b': display_value(b), 'n': ni,
+                         'share': 100.0 * ni / grand if grand else 0.0})
+    rows.sort(key=lambda r: r['n'], reverse=True)
+    return payload, rows
+
+
+# --- Line family (chart-library-expansion Phase C2) ------------------------------------
+# One renderer, five registry variants keyed by variant['mode']:
+#   single-series (read through Data.aggregate_by_group):
+#     line   — a measure over an ordered x column (typically sentyear), connected;
+#     area   — the same, with the space under the line filled.
+#   two-group (read through the B1 Data.aggregate_by_two matrix):
+#     stacked-area — group COUNTS over x, stacked to the total (count-only, like the
+#                    stacked bar — only counts add up);
+#     slope        — each category's value at the FIRST and LAST x period, connected;
+#     bump         — each category's RANK per period (rank transform below), top-N.
+# Every variant's `column` is the horizontal (x / time) axis and `column2` (two-group only)
+# is the series/category split. Values are computed FRESH over the active slice and NEVER
+# disk-cached (like the crosstab); the shared base is read-only (aggregate_by_group/two return
+# new objects — guarded by test_base_immutability.py). The x-range is read from the data, never
+# hardcoded, and x is sorted numerically when the column is float64 (e.g. sentyear is 2001.0,
+# NOT an int) else lexically. Every variant ships a companion value table (the a11y / no-JS twin).
+STACKED_AREA_MAX_SERIES = 12   # bands drawn for a stacked area (the tail folds into an exact "Other")
+# slope/bump spaghetti fast, so they cap tighter — the top-N categories by case count. The table
+# carries the rest (slope) / notes them (bump, whose ranks are only meaningful among the shown set).
+SLOPE_BUMP_MAX_SERIES = 8
+
+# Animated time-series (Phase D5): a multi-line trend whose lines REVEAL year by year under a
+# play/pause + scrubber. Time is the fixed x-axis (WATERFALL_GROUP = sentyear, like the
+# waterfall — the user picks the SERIES column, not the timeline), read from whatever year range
+# the current slice holds. More than a handful of lines spaghetti under motion, so it caps to the
+# top-N by case count like slope/bump; the companion per-year matrix carries every value and the
+# tail is noted (never silently dropped). Motion is a teaching aid — it never autoplays and honors
+# prefers-reduced-motion (STYLEGUIDE); the static multi-line chart (all years) is the resting
+# state + export truth.
+ANIMATED_TIME_GROUP = WATERFALL_GROUP     # the fixed period axis (sentyear)
+ANIMATED_MAX_SERIES = SLOPE_BUMP_MAX_SERIES
+
+
+def _sorted_periods(keys, numeric):
+    # Order the x-axis (period) keys for a line chart, dropping NaN keys (a case missing the x
+    # column). Numeric (float64) columns sort by value so 2001.0 < 2019.0 reads chronologically;
+    # anything else sorts lexically. Returns the RAW keys (display_value formats them for labels).
+    ks = [k for k in keys if k == k]
+    if numeric:
+        return sorted(ks, key=lambda k: float(k))
+    return sorted(ks, key=lambda k: str(k))
+
+
+def build_line_single(session, chart, column, measure, measure_col, aggregate, numeric, override=None):
+    # line / area: one series of (x, value) points over the ordered `column`, via
+    # aggregate_by_group. COUNT walks the case count per period (value == n); a numeric aggregate
+    # reads the measure plus a second count pass for each period's N. Points are in period order
+    # (a time series reads left-to-right), and that same list doubles as the companion table.
+    variant = chart['variant']
+    is_count = (aggregate == 'count')
+    frame = _execute(session, override)
+    value_map = frame.aggregate_by_group(column, measure, aggregate)
+    count_map = value_map if is_count else frame.aggregate_by_group(
+        column, Data.COUNT_MEASURE, 'count')
+
+    points = []
+    for k in _sorted_periods(value_map.keys(), numeric):
+        n = int(count_map.get(k, 0))
+        if n <= 0:
+            continue
+        if is_count:
+            fv = float(n)                       # count series: the value IS the case count
+        else:
+            raw = value_map.get(k)
+            if raw is None or raw != raw:        # NaN aggregate (all-missing within this period)
+                continue
+            fv = float(raw)
+        points.append({'x': display_value(k), 'value': fv, 'n': n})
+
+    payload = {
+        'kind': 'line', 'mode': variant['mode'], 'variant': variant,
+        'aggregate': aggregate,
+        'points': points,
+        'header': CODEBOOK.codebook[column],
+        'xLabel': CODEBOOK.codebook[column],
+        'measureLabel': 'cases' if is_count else CODEBOOK.codebook[measure_col],
+        'aggLabel': 'Count' if is_count else aggregate.capitalize(),
+        'totalN': sum(p['n'] for p in points),
+    }
+    return payload, list(points)                # the table lists every period (same objects)
+
+
+def build_line_two(session, chart, column, column2, measure, measure_col, aggregate, numeric, override=None):
+    # stacked-area / slope / bump: read the B1 two-group matrix (x = column, series = column2)
+    # and reshape per mode. Returns (payload, rows) or (None, None) when there is nothing to draw
+    # (an empty slice, or fewer than two periods for a slope). count_matrix is the {x:{series:n}}
+    # case-count matrix (== value_matrix for a count chart); value_matrix carries a numeric
+    # aggregate for slope/bump. NOT groupby.agg (see aggregate_by_two) — read-only, never cached.
+    variant = chart['variant']
+    mode = variant['mode']
+    is_count = (aggregate == 'count')
+    frame = _execute(session, override)
+    count_matrix = frame.aggregate_by_two(column, column2, Data.COUNT_MEASURE, 'count')
+    value_matrix = count_matrix if is_count else \
+        frame.aggregate_by_two(column, column2, measure, aggregate)
+
+    periods = _sorted_periods(count_matrix.keys(), numeric)
+    if not periods:
+        return None, None
+
+    def cell(p, b):
+        # (value, n) for series b at period p. count -> value is the count (None when empty);
+        # a numeric aggregate -> value from value_matrix (None when the cell has no cases).
+        n = int(count_matrix.get(p, {}).get(b, 0))
+        if is_count:
+            return (float(n) if n > 0 else None), n
+        raw = value_matrix.get(p, {}).get(b)
+        return (None if (raw is None or raw != raw) else float(raw)), n
+
+    def series_totals(period_list):
+        # total case count per series (column2 value) across the given periods -> the top-N order
+        totals = {}
+        for p in period_list:
+            for b, n in count_matrix.get(p, {}).items():
+                if b != b:                       # drop NaN series key
+                    continue
+                totals[b] = totals.get(b, 0) + int(n)
+        return totals
+
+    x_labels = [display_value(p) for p in periods]
+    common = {
+        'kind': 'line', 'mode': mode, 'variant': variant, 'aggregate': aggregate,
+        'xLabel': CODEBOOK.codebook[column],
+        'seriesLabel': CODEBOOK.codebook[column2],
+        'measureLabel': 'cases' if is_count else CODEBOOK.codebook[measure_col],
+        'aggLabel': 'Count' if is_count else aggregate.capitalize(),
+    }
+
+    if mode == 'stacked-area':
+        totals = series_totals(periods)
+        order = sorted(totals, key=lambda b: totals[b], reverse=True)
+        kept, tail = order[:STACKED_AREA_MAX_SERIES], order[STACKED_AREA_MAX_SERIES:]
+        series = []
+        for b in kept:
+            vals, ns = [], []
+            for p in periods:
+                _, n = cell(p, b)
+                vals.append(n)                   # stacked area: absent period = 0, not a gap
+                ns.append(n)
+            series.append({'label': display_value(b), 'values': vals, 'ns': ns})
+        if tail:                                 # counts sum exactly -> one honest "Other" band
+            vals = [sum(int(count_matrix.get(p, {}).get(b, 0)) for b in tail) for p in periods]
+            series.append({'label': 'Other (%d)' % len(tail), 'values': vals, 'ns': list(vals),
+                           'isOther': True})
+        payload = dict(common, periods=x_labels, series=series,
+                       totalN=sum(totals.values()), seriesTail=len(tail))
+        rows = _line_two_rows(periods, count_matrix, cell, is_count, order, mode)
+        return payload, rows
+
+    if mode == 'slope':
+        if len(periods) < 2:                     # a slope needs a before AND an after
+            return None, None
+        first, last = periods[0], periods[-1]
+        totals = series_totals([first, last])
+        order = sorted(totals, key=lambda b: totals[b], reverse=True)
+        kept = order[:SLOPE_BUMP_MAX_SERIES]
+        series = []
+        for b in kept:
+            v0, n0 = cell(first, b)
+            v1, n1 = cell(last, b)
+            series.append({'label': display_value(b), 'values': [v0, v1], 'ns': [n0, n1]})
+        payload = dict(common, periods=[display_value(first), display_value(last)],
+                       series=series, totalN=sum(totals.values()),
+                       seriesTail=len(order) - len(kept),
+                       firstPeriod=display_value(first), lastPeriod=display_value(last))
+        rows = _line_two_rows([first, last], count_matrix, cell, is_count, order, mode)
+        return payload, rows
+
+    # bump: rank the top-N categories within EACH period (rank 1 = highest value/count),
+    # server-side (never in JS). Ranks are computed AMONG the kept top-N only, so the chart shows
+    # a clean 1..N bump; ties break by label so the transform is deterministic and hand-checkable.
+    totals = series_totals(periods)
+    order = sorted(totals, key=lambda b: totals[b], reverse=True)
+    kept = order[:SLOPE_BUMP_MAX_SERIES]
+    values = {b: [] for b in kept}
+    ns = {b: [] for b in kept}
+    ranks = {b: [] for b in kept}
+    for p in periods:
+        rankable = []
+        for b in kept:
+            v, n = cell(p, b)
+            values[b].append(v)
+            ns[b].append(n)
+            basis = n if is_count else v         # rank by count, or by the numeric aggregate
+            if n > 0 and basis is not None:
+                rankable.append((b, basis))
+        rankable.sort(key=lambda t: (-t[1], display_value(t[0])))
+        rankmap = {b: i + 1 for i, (b, _basis) in enumerate(rankable)}
+        for b in kept:
+            ranks[b].append(rankmap.get(b))       # None -> a gap in that category's rank line
+    series = [{'label': display_value(b), 'ranks': ranks[b],
+               'values': values[b], 'ns': ns[b]} for b in kept]
+    payload = dict(common, periods=x_labels, series=series, totalN=sum(totals.values()),
+                   seriesTail=len(order) - len(kept), maxRank=len(kept))
+    rows = _line_two_rows(periods, count_matrix, cell, is_count, kept, mode,
+                          ranks=ranks)
+    return payload, rows
+
+
+def _line_two_rows(periods, count_matrix, cell, is_count, series_keys, mode, ranks=None):
+    # Flat companion rows for a two-group line chart: one {period, label, value, n, rank} per
+    # non-empty (period, series) cell, in chronological order then heaviest-first within a period.
+    # stacked-area/slope list every series (honest full table); bump lists the kept top-N with
+    # their ranks (a rank is only defined among the shown set). `series_keys` is the series order
+    # to include (all-by-total, or the kept top-N for bump).
+    rows = []
+    key_set = set(series_keys)
+    for pi, p in enumerate(periods):
+        bucket = []
+        for b in series_keys if mode == 'bump' else count_matrix.get(p, {}):
+            if b != b or b not in key_set:
+                continue
+            v, n = cell(p, b)
+            if n <= 0:
+                continue
+            row = {'period': display_value(p), 'label': display_value(b),
+                   'value': None if is_count else v, 'n': n}
+            if ranks is not None:
+                row['rank'] = ranks.get(b, [None] * len(periods))[pi]
+            bucket.append(row)
+        if mode == 'bump':                       # within a period, order by rank (1 first)
+            bucket.sort(key=lambda r: (r.get('rank') is None, r.get('rank') or 0))
+        else:
+            bucket.sort(key=lambda r: r['n'], reverse=True)
+        rows.extend(bucket)
+    return rows
+
+
+def build_animated(session, chart, column, measure, measure_col, aggregate, override=None):
+    # Animated time-series (Phase D5): a multi-line trend over the FIXED sentencing-year axis
+    # (ANIMATED_TIME_GROUP, like the waterfall) with the user-picked `column` split into lines,
+    # driven client-side by a play/pause + year scrubber that REVEALS the lines up to a year.
+    # Reads the B1 two-group matrix (year × column) — one aggregate_by_two count pass (+ a
+    # numeric pass for mean/median), NOT groupby.agg — read-only over the active slice, never
+    # disk-cached. Returns (payload, rows) or (None, None) when the slice carries no year data.
+    #
+    # The chart's resting state shows EVERY year (the static multi-line chart is the fallback +
+    # export truth); the reveal and the top-N cap are a teaching layer, so the companion `rows`
+    # carry the WHOLE per-year matrix (every series, not just the drawn top-N).
+    frame = _execute(session, override)
+    count_matrix = frame.aggregate_by_two(ANIMATED_TIME_GROUP, column, Data.COUNT_MEASURE, 'count')
+    is_count = (aggregate == 'count')
+    value_matrix = count_matrix if is_count else \
+        frame.aggregate_by_two(ANIMATED_TIME_GROUP, column, measure, aggregate)
+
+    # sentyear is float64, so order chronologically (2001.0 < 2019.0); display_value renders the
+    # integral floats as "2001". An empty slice (no year survives the filter) draws nothing.
+    periods = _sorted_periods(count_matrix.keys(), True)
+    if not periods:
+        return None, None
+
+    def cell(p, b):
+        # (value, n) for series b in year p — identical contract to build_line_two.cell: count ->
+        # value is the case count (None when the cell is empty); a numeric aggregate -> value from
+        # value_matrix (None when the cell has no cases).
+        n = int(count_matrix.get(p, {}).get(b, 0))
+        if is_count:
+            return (float(n) if n > 0 else None), n
+        raw = value_matrix.get(p, {}).get(b)
+        return (None if (raw is None or raw != raw) else float(raw)), n
+
+    # total case count per series (column value) across every year -> the top-N order (heaviest
+    # lines first; NaN series key dropped). The chart draws the kept top-N; the table lists all.
+    totals = {}
+    for p in periods:
+        for b, n in count_matrix.get(p, {}).items():
+            if b != b:                           # drop NaN series key
+                continue
+            totals[b] = totals.get(b, 0) + int(n)
+    order = sorted(totals, key=lambda b: totals[b], reverse=True)
+    kept = order[:ANIMATED_MAX_SERIES]
+
+    series = []
+    for b in kept:
+        vals, ns = [], []
+        for p in periods:
+            v, n = cell(p, b)
+            vals.append(v)                        # None -> a gap (that year had no such case)
+            ns.append(n)
+        series.append({'label': display_value(b), 'values': vals, 'ns': ns})
+
+    # a fixed y-axis top across every frame so a revealing line doesn't rescale the axis as it
+    # grows (which would dramatize noise + break comparability). Max finite value among the drawn
+    # series; the JS sets it as suggestedMax so the axis top stays constant through the reveal.
+    finite = [v for s in series for v in s['values'] if v is not None]
+    y_max = max(finite) if finite else 0.0
+
+    payload = {
+        'kind': 'animated', 'aggregate': aggregate,
+        'periods': [display_value(p) for p in periods],
+        'series': series,
+        'header': CODEBOOK.codebook[column],
+        'xLabel': CODEBOOK.codebook[ANIMATED_TIME_GROUP],
+        'seriesLabel': CODEBOOK.codebook[column],
+        'measureLabel': 'cases' if is_count else CODEBOOK.codebook[measure_col],
+        'aggLabel': 'Count' if is_count else aggregate.capitalize(),
+        'totalN': sum(totals.values()),
+        'seriesTail': len(order) - len(kept),
+        'yMax': y_max,
+    }
+    # companion table = the WHOLE per-year matrix (every series, chronological then heaviest-first
+    # within a year), reusing the two-group row builder; 'animated' takes its non-bump branch.
+    rows = _line_two_rows(periods, count_matrix, cell, is_count, order, 'animated')
+    return payload, rows
+
+
+# --- Distribution family (Phase C3): histogram + ECDF ---------------------------------
+# The two honest single-numeric-column distribution charts, both `renderer: 'distribution'`
+# and dispatched by variant['mode']. They read the numpy-only B2 engine (Data.distribution_stats)
+# over the active slice via _execute -- the same fresh-per-request, never-disk-cached, read-only
+# path the other Tier-C builders use. No raw per-row values ever leave the server (B2 ships
+# summarized histogram bins + a downsampled ECDF), so the client only re-slices pre-binned
+# server counts -- never bins 294k raw rows itself.
+#
+# HIST_FINE_BINS is the resolution of the FINE base histogram the server ships once; the
+# bin-width slider then merges adjacent fine bins entirely client-side (no refetch), the same
+# "re-slice a server payload without a round-trip" idiom the "Other"-cutoff slider uses. B2
+# caps any bin request at HISTOGRAM_MAX_BINS, so a larger value here is silently clamped there.
+HIST_FINE_BINS = 80
+
+# Box/violin display cap (Phase D1). A group column with many categories (county has 87) would
+# draw an unreadable picket fence of boxes, so beyond this many observed groups we reject with a
+# "filter to fewer groups first" message rather than render a wall — the same spirit as the
+# scatter lattice guard. Below the engine's own DISTRIBUTION_MAX_GROUPS (100) payload guard, so
+# the display cap always bites first with a friendlier message.
+BOXVIOLIN_MAX_GROUPS = 24
+
+
+def _merge_histogram(edges, counts, m):
+    # Merge every `m` adjacent fine bins of a histogram into one coarse bin -> a list of
+    # {lo, hi, n} (bin span + case count). ONE algorithm, mirrored EXACTLY in visualize.js's
+    # histogramMerge, so the server-rendered companion table (merged at the default width) and
+    # the client-drawn chart (merged at the slider's width) agree cell-for-cell at the default.
+    # Every fine bin lands in exactly one coarse bin, so the merged counts sum to the same N as
+    # the fine ones (the "bars sum to N" guarantee holds at any width). Widths are uniform m*dx
+    # except a possibly-narrower final bin (when len(counts) isn't a multiple of m).
+    m = max(1, int(m))
+    n_fine = len(counts)
+    out = []
+    lo = 0
+    while lo < n_fine:
+        hi = min(lo + m, n_fine)
+        out.append({'lo': edges[lo], 'hi': edges[hi], 'n': sum(counts[lo:hi])})
+        lo = hi
+    return out
+
+
+def build_distribution(session, chart, column, override=None):
+    # Histogram or ECDF payload + companion rows for one numeric column, over the active slice.
+    # Returns (payload, rows) or (None, None) when the column carries no cases here (an empty
+    # chart would read as broken). variant['mode'] picks histogram vs ECDF; both are single
+    # numeric columns (no measure/aggregate), so the caller validates only that `column` is
+    # numeric before we reach the float64-gated engine.
+    mode = chart['variant']['mode']
+    header = CODEBOOK.codebook[column]
+    # one frame for the (optional) distinct-count probe + the engine read -- read-only over the
+    # shared slice (rides the slice LRU), like the other Tier-C builders' _execute(session) reads.
+    frame = _execute(session, override)
+
+    if mode == 'ecdf':
+        # ECDF: the cumulative share at each distinct value, from B2's value_counts cumsum
+        # (distinct values only, already downsampled to ECDF_MAX_POINTS -- never 294k points).
+        stats = frame.distribution_stats(column)
+        block = stats['overall']
+        ecdf = block['ecdf']
+        if not stats['n'] or not ecdf['values']:
+            return None, None
+        points = [{'x': v, 'y': c} for v, c in zip(ecdf['values'], ecdf['cumulative'])]
+        payload = {
+            'kind': 'distribution', 'mode': 'ecdf',
+            'header': header, 'xLabel': header,
+            'n': stats['n'], 'points': points,
+            'summary': _distribution_summary(block),
+        }
+        # rows: value + cumulative share (the no-JS / a11y twin of the climbing curve)
+        rows = [{'x': p['x'], 'cumulative': p['y']} for p in points]
+        return payload, rows
+
+    # histogram: ship a FINE base + a default bin width; the slider merges it client-side.
+    # A DISCRETE column (few distinct values) bins at its natural resolution -- one bin per value,
+    # roughly -- rather than a fine grid: Freedman-Diaconis over 294k rows picks a tiny width that
+    # scatters a discrete column (sentencing year, criminal-history score) into a sparse picket
+    # fence of mostly-empty bins. Mirrors bin2d's discrete/continuous split (distinct_counts is the
+    # same cardinality measure); a continuous column keeps the HIST_FINE_BINS grid for a smooth shape.
+    n_distinct = frame.distinct_counts(column)[0]
+    n_fine = min(HIST_FINE_BINS, max(1, n_distinct))
+    fine = frame.distribution_stats(column, bins=n_fine)
+    block = fine['overall']
+    edges = fine['bin_edges']
+    counts = block['hist_counts']
+    if not fine['n'] or not edges or not counts:
+        return None, None
+    n_fine = len(counts)
+    # the Freedman-Diaconis bin COUNT is the principled default view (the same rule B2 applies at
+    # bins=None), clamped into [1, n_fine] -- we can't show finer than the fine base, and a discrete
+    # column's fine base is already its natural resolution, so its default is one-bin-per-value.
+    fd_k = max(1, min(_fd_bin_count(fine['n'], block['q1'], block['q3'],
+                                    block['min'], block['max']), n_fine))
+    # the slider picks a bin count; internally it snaps to a merge factor m so bins stay uniform.
+    # default m realizes ~fd_k bins. min bin count keeps at least a readable handful.
+    default_m = max(1, round(n_fine / fd_k))
+    k_min = min(3, n_fine)
+    payload = {
+        'kind': 'distribution', 'mode': 'histogram',
+        'header': header, 'xLabel': header,
+        'n': fine['n'],
+        'fineEdges': edges, 'fineCounts': counts, 'nFine': n_fine,
+        'defaultM': default_m, 'kMin': k_min,
+        'summary': _distribution_summary(block),
+    }
+    # companion table = the fine bins merged at the DEFAULT width (matches the chart on load);
+    # every bin's range + count + share, summing to N. The slider re-bins the chart, not the
+    # table -- a note in the card points at the table as the underlying-bin reference.
+    merged = _merge_histogram(edges, counts, default_m)
+    payload['defaultK'] = len(merged)   # coarse-bin count of the default view (slider start)
+    total = fine['n']
+    rows = [{'lo': b['lo'], 'hi': b['hi'], 'n': b['n'],
+             'share': (100.0 * b['n'] / total if total else 0.0)} for b in merged]
+    return payload, rows
+
+
+def _distribution_summary(block):
+    # The compact five-number-summary block both distribution charts surface (median/quartiles
+    # for the ECDF's percentile read; spread for the histogram). Raw floats -- the template
+    # rounds for display. std is None for a single-value block (B2's sample-std guard).
+    return {'min': block['min'], 'q1': block['q1'], 'median': block['median'],
+            'q3': block['q3'], 'max': block['max'], 'mean': block['mean'],
+            'std': block['std'], 'nOutliers': block['n_outliers']}
+
+
+# The KDE bandwidth slider spans [bandwidthMin, min(bandwidthMax, auto * KDE_BW_SLIDER_MULT)] so
+# the Silverman default sits comfortably inside with headroom to smooth further, without stretching
+# all the way to the (much larger) physical grid-fit cap. The client hard-clamps any bandwidth into
+# the physical [min, max] before convolving, so this bound is presentation only.
+KDE_BW_SLIDER_MULT = 6.0
+
+
+def build_kde(session, chart, column, override=None):
+    # Smooth density-curve payload + companion rows for one numeric column, over the active slice
+    # (chart-library-expansion Phase D2) -- the chart with the loudest honesty guardrail in the
+    # library. Reads the numpy-only engine (cache.kde_density): the shared KDE grid + the
+    # pre-convolution linear-binned WEIGHTS (the client convolves them with a Gaussian kernel at any
+    # bandwidth, no refetch -- the "re-slice a server payload" idiom), the Silverman default +
+    # physical bandwidth bounds, the Freedman-Diaconis histogram (the companion table, i.e. "the
+    # underlying histogram"), and the spikiness flag driving the "read the histogram instead" nudge.
+    # No raw per-row values leave the server. Returns (payload, rows), or (None, None) when the
+    # column carries no cases in this slice (an empty chart reads as broken). A column with cases but
+    # no spread (single distinct value) returns a payload with grid/weights None -- the view drops
+    # the curve, keeps the histogram, and the nudge fires (a one-point column is maximally spiky).
+    # Fresh over the active slice, read-only over the shared base, never disk-cached.
+    header = CODEBOOK.codebook[column]
+    stats = _execute(session, override).kde_density(column)   # rides the slice LRU; read-only over the base
+    if not stats['n']:
+        return None, None
+
+    auto = stats['bandwidth']
+    bw_max = stats['bandwidth_max']
+    # slider upper bound (see KDE_BW_SLIDER_MULT): the default sits inside with room to over-smooth,
+    # never past the physical grid-fit cap. None when the column is degenerate (no curve to draw).
+    slider_max = None
+    if auto is not None and bw_max is not None:
+        slider_max = min(bw_max, max(auto * KDE_BW_SLIDER_MULT, auto * 1.5))
+
+    # nudge target: the SAME column on the histogram chart, so "read the histogram" is one click.
+    hist_url = url_for('visualize', chart='histogram', column=column)
+
+    payload = {
+        'kind': 'kde',
+        'header': header, 'xLabel': header,
+        'n': stats['n'],
+        'domain': stats['domain'],
+        'grid': stats['kde_grid'],              # None when degenerate (no spread)
+        'weights': stats['kde_weights'],        # None when degenerate; else sums to ~1
+        'bandwidth': auto,                      # Silverman default (effective)
+        'bandwidthMin': stats['bandwidth_min'], # physical floor (JS hard-clamps to this)
+        'bandwidthMax': bw_max,                 # physical grid-fit cap (JS hard-clamps to this)
+        'sliderMax': slider_max,                # slider's upper bound (presentation only)
+        'spiky': stats['spiky'],
+        'topShare': stats['top_share'],
+        'topK': stats['top_k'],
+        'topValues': stats['top_values'],       # [{value, share}] naming the round-number pillars
+        'nDistinct': stats['n_distinct'],
+        'histUrl': hist_url,
+        'summary': {'min': stats['min'], 'q1': stats['q1'], 'median': stats['median'],
+                    'q3': stats['q3'], 'max': stats['max'], 'mean': stats['mean'],
+                    'std': stats['std'], 'nOutliers': stats['n_outliers']},
+    }
+    # companion table = the underlying Freedman-Diaconis histogram (case counts per bin): the honest,
+    # un-smoothed twin of the curve and the a11y / no-JS record. Bars sum to N.
+    edges, counts, total = stats['bin_edges'], stats['hist_counts'], stats['n']
+    rows = [{'lo': edges[i], 'hi': edges[i + 1], 'n': c,
+             'share': (100.0 * c / total if total else 0.0)} for i, c in enumerate(counts)]
+    return payload, rows
+
+
+def _boxviolin_group(label, block):
+    # One box/violin group's summary from a B2 distribution block: the five-number summary +
+    # 1.5*IQR Tukey whiskers (whiskerLow/High are the most extreme points still inside the
+    # fences; min/max are the true extremes, used for the value axis and the outlier tally).
+    # Outliers are SUMMARIZED AS COUNTS -- no raw outlier array leaves the server (B2 contract,
+    # CHART_LIBRARY_EXPANSION.md §8). `density` is the binned KDE aligned to the shared grid the
+    # payload carries (None for a degenerate/zero-spread group); the box mode ignores it.
+    return {
+        'label': label, 'n': block['n'],
+        'min': block['min'], 'max': block['max'],
+        'q1': block['q1'], 'median': block['median'], 'q3': block['q3'],
+        'whiskerLow': block['whisker_low'], 'whiskerHigh': block['whisker_high'],
+        'mean': block['mean'],
+        'nOutliers': block['n_outliers'],
+        'nOutLow': block['n_outliers_low'], 'nOutHigh': block['n_outliers_high'],
+        'density': block['kde'],            # violin: KDE on the shared grid; None if degenerate
+    }
+
+
+def build_boxviolin(session, chart, column, column2, override=None):
+    # Box-plot or violin payload + companion rows for one numeric column, optionally split by a
+    # (categorical or numeric) group column, over the active slice. Both read the numpy-only B2
+    # distribution engine (cache.distribution_stats): the BOX draws each group's five-number
+    # summary + 1.5*IQR whiskers (outliers summarized as counts); the VIOLIN draws the binned
+    # Gaussian KDE on a grid SHARED across groups so the shapes are directly comparable. No raw
+    # per-row values ever leave the server. variant['mode'] picks box vs violin. Returns
+    # (payload, rows) or (None, None) when nothing here can be summarized (an empty chart reads
+    # as broken). Fresh over the active slice, read-only over the shared base, never disk-cached.
+    mode = chart['variant']['mode']            # 'box' | 'violin'
+    frame = _execute(session, override)                  # rides the slice LRU; read-only over the base
+    # one engine pass: overall + (optionally) per observed group, all on one shared axis/grid.
+    stats = frame.distribution_stats(column, group_column=column2)
+    if not stats['n']:
+        return None, None
+
+    grouped = column2 is not None
+    # the blocks to draw, each labelled, in a deterministic neutral order. Ungrouped -> a single
+    # "All cases" block. Grouped -> one block per observed group that has cases, NaN key dropped,
+    # in the engine's sorted group-key order (groupby observed=True, sort default) -- not sorted
+    # by median, so the chart doesn't editorialize the disparity it's meant to let you read.
+    blocks = []                                # [(label, block)]
+    if grouped:
+        for gval, block in stats['groups'].items():
+            if gval != gval:                   # drop the NaN group key (missing this column)
+                continue
+            if not block['n']:                 # a group with no non-null values in this slice
+                continue
+            blocks.append((display_value(gval), block))
+    else:
+        blocks.append(('All cases', stats['overall']))
+
+    if not blocks:
+        return None, None
+
+    groups = [_boxviolin_group(label, block) for label, block in blocks]
+    # the KDE grid + per-group density are the violin's ingredients only — the box draws from the
+    # five-number summary alone, so drop that (up to KDE_GRID_MAX floats per group) from a box
+    # payload to keep it lean (the warm-payload budget, CHART_LIBRARY_EXPANSION.md §11).
+    is_violin = mode == 'violin'
+    if not is_violin:
+        for g in groups:
+            g['density'] = None
+
+    payload = {
+        'kind': 'plugin', 'mode': mode,
+        'header': CODEBOOK.codebook[column],
+        'valueLabel': CODEBOOK.codebook[column],
+        'groupLabel': (CODEBOOK.codebook[column2] if grouped else None),
+        'grouped': grouped,
+        'n': stats['n'],
+        'domain': stats['domain'],             # shared value range (whole column) for the axis
+        'grid': (stats['kde_grid'] if is_violin else None),  # shared KDE grid (violin only)
+        'groups': groups,
+    }
+    # companion table: the five-number summary + whiskers + outlier counts per group (the a11y /
+    # no-JS twin, and the honest numeric record behind either mark). Density never appears here.
+    rows = [{'label': g['label'], 'n': g['n'],
+             'min': g['min'], 'q1': g['q1'], 'median': g['median'], 'q3': g['q3'],
+             'max': g['max'], 'mean': g['mean'],
+             'whiskerLow': g['whiskerLow'], 'whiskerHigh': g['whiskerHigh'],
+             'nOutliers': g['nOutliers']} for g in groups]
+    return payload, rows
+
+
 def render_visualize(chart=None, form=None, error=None):
     # Shared renderer for the Visualize workbench (same pattern as render_explore /
     # render_compare / render_filter): full page normally, just the view fragment on htmx
@@ -2251,6 +3738,21 @@ def render_visualize(chart=None, form=None, error=None):
     scatter_payload = None  # aggregated-lattice bubble payload feeding the scatter/bubble chart
     scatter_rows = None     # scatter companion table (every drawn lattice cell)
     correlation_payload = None  # Pearson correlation matrix payload (numeric subset)
+    pairplot_payload = None      # pair-plot / SPLOM tiled-panel payload (numeric subset)
+    catseries_payload = None    # categorical-series payload (bar/lollipop/dot/donut/grouped/stacked)
+    catseries_rows = None       # categorical-series companion table rows
+    line_payload = None         # line-family payload (line/area/stacked-area/slope/bump)
+    line_rows = None            # line-family companion table rows
+    animated_payload = None     # animated time-series payload (multi-line + year scrubber)
+    animated_rows = None        # animated companion table rows (the per-year matrix)
+    distribution_payload = None  # distribution-family payload (histogram/ECDF)
+    distribution_rows = None     # distribution-family companion table rows
+    boxviolin_payload = None     # box/violin payload (plugin renderer)
+    boxviolin_rows = None        # box/violin companion table rows
+    kde_payload = None           # density-curve (KDE) payload
+    kde_rows = None              # KDE companion table rows (the underlying histogram)
+    mosaic_payload = None        # mosaic payload (server-rendered proportional tiles)
+    mosaic_rows = None           # mosaic companion table rows (the unfolded crosstab)
     selected_cols = form.get('cols') or []  # raw picked numeric columns (echoed to checkboxes)
 
     if chart and chart.get('status') == 'ready':
@@ -2374,11 +3876,251 @@ def render_visualize(chart=None, form=None, error=None):
             columns = resolve_correlation_columns(selected_cols, data, errors)
             if columns:
                 correlation_payload = build_correlation(_execute(session), columns)
+        elif chart['id'] == 'pair-plot':
+            # Pair plot / SPLOM (Phase D4): a k×k grid of tiled panels over a user-picked numeric
+            # subset (2..5 columns) — off-diagonal 2D-binned scatters (B3), diagonal histograms
+            # (B2), companion table = the correlation matrix. Computed fresh over the active slice
+            # via _execute — read-only over the shared base, NEVER disk-cached (like the crosstab /
+            # correlation). Reuses the correlation subset picker, with a tighter cap.
+            columns = resolve_pairplot_columns(selected_cols, data, errors)
+            if columns:
+                frame = _execute(session)
+                if len(frame.df) == 0:
+                    errors.append('No cases in the current data state — clear a filter and try '
+                                  'again.')
+                else:
+                    pairplot_payload = build_pairplot(frame, columns)
+        elif chart.get('renderer') == 'categorical-series':
+            # One renderer, seven variants (chart-library-expansion Phase C1). The registry
+            # `variant` picks single-series (bar/lollipop/dot/donut, via aggregate_by_group) vs
+            # two-group (grouped/stacked/100%-stacked, via the B1 aggregate_by_two matrix). All
+            # fresh over the active slice, read-only over the shared base, never disk-cached.
+            variant = chart['variant']
+            has_agg = 'aggregate' in chart['inputs']
+            aggregate = (form.get('aggregate') or 'count') if has_agg else 'count'
+            measure = form.get('measure') or Data.COUNT_MEASURE
+            allowed_aggs = set(chart['aggregates'])
+            if variant['series'] == 'single':
+                if column and _viz_column_ok(data, column, errors):
+                    measure_col, agg_ok = resolve_catseries_measure(
+                        measure, aggregate, allowed_aggs, data, errors)
+                    if agg_ok:
+                        header = CODEBOOK.codebook[column]
+                        catseries_payload, catseries_rows = build_catseries_single(
+                            session, chart, column, measure, measure_col, aggregate)
+                else:
+                    column = None
+            elif column and column2:
+                # two-group: needs both columns; missing ones fall through to the empty state
+                col_ok = _viz_column_ok(data, column, errors)
+                col2_ok = _viz_column_ok(data, column2, errors)
+                if column == column2:
+                    errors.append('Pick two different columns to compare.')
+                measure_col, agg_ok = resolve_catseries_measure(
+                    measure, aggregate, allowed_aggs, data, errors)
+                if col_ok and col2_ok and column != column2 and agg_ok:
+                    header = CODEBOOK.codebook[column]
+                    frame = _execute(session)
+                    count_matrix = frame.aggregate_by_two(
+                        column, column2, Data.COUNT_MEASURE, 'count')
+                    value_matrix = count_matrix if aggregate == 'count' else \
+                        frame.aggregate_by_two(column, column2, measure, aggregate)
+                    catseries_payload, catseries_rows = build_catseries_two(
+                        count_matrix, value_matrix, variant, aggregate,
+                        measure_col, column, column2)
+                    if not catseries_payload['series']:
+                        errors.append('No cases have a value for both columns in the current '
+                                      'data state — clear a filter and try again.')
+                        catseries_payload, catseries_rows = None, None
+                elif not col_ok:
+                    column = None
+        elif chart.get('renderer') == 'line':
+            # One renderer, five variants (chart-library-expansion Phase C2). The registry
+            # `variant` picks single-series (line/area, via aggregate_by_group) vs two-group
+            # (stacked-area/slope/bump, via the B1 aggregate_by_two matrix). `column` is the x
+            # (time) axis, `column2` the series split. All fresh over the active slice, read-only
+            # over the shared base, never disk-cached.
+            variant = chart['variant']
+            has_agg = 'aggregate' in chart['inputs']       # stacked-area is count-only (no picker)
+            aggregate = (form.get('aggregate') or 'count') if has_agg else 'count'
+            measure = form.get('measure') or Data.COUNT_MEASURE
+            allowed_aggs = set(chart['aggregates'])
+            if variant['series'] == 'single':
+                if column and _viz_column_ok(data, column, errors):
+                    measure_col, agg_ok = resolve_catseries_measure(
+                        measure, aggregate, allowed_aggs, data, errors)
+                    if agg_ok:
+                        header = CODEBOOK.codebook[column]
+                        line_payload, line_rows = build_line_single(
+                            session, chart, column, measure, measure_col, aggregate,
+                            column in data['numeric'])
+                        if not line_payload['points']:
+                            errors.append('No cases have a value for that column in the current '
+                                          'data state — clear a filter and try again.')
+                            line_payload, line_rows = None, None
+                else:
+                    column = None
+            elif column and column2:
+                # two-group: needs both columns; missing ones fall through to the empty state
+                col_ok = _viz_column_ok(data, column, errors)
+                col2_ok = _viz_column_ok(data, column2, errors)
+                if column == column2:
+                    errors.append('Pick two different columns to plot.')
+                measure_col, agg_ok = resolve_catseries_measure(
+                    measure, aggregate, allowed_aggs, data, errors)
+                if col_ok and col2_ok and column != column2 and agg_ok:
+                    header = CODEBOOK.codebook[column]
+                    line_payload, line_rows = build_line_two(
+                        session, chart, column, column2, measure, measure_col, aggregate,
+                        column in data['numeric'])
+                    if line_payload is None or not line_payload['series']:
+                        errors.append(
+                            'A slope needs at least two time periods in the current data state — '
+                            'clear a filter and try again.' if variant['mode'] == 'slope'
+                            else 'No cases have a value for both columns in the current data '
+                                 'state — clear a filter and try again.')
+                        line_payload, line_rows = None, None
+                elif not col_ok:
+                    column = None
+        elif chart.get('renderer') == 'animated':
+            # Animated time-series (Phase D5): a multi-line trend over the fixed sentencing-year
+            # axis (ANIMATED_TIME_GROUP, like the waterfall) with the user-picked `column` split
+            # into lines, plus a client-side play/pause + year scrubber. Reads the B1 two-group
+            # matrix (year × column) — fresh over the active slice, read-only, never disk-cached.
+            aggregate = form.get('aggregate') or 'count'
+            measure = form.get('measure') or Data.COUNT_MEASURE
+            allowed_aggs = set(chart['aggregates'])
+            if column and _viz_column_ok(data, column, errors):
+                if ANIMATED_TIME_GROUP not in data['column_list']:
+                    errors.append('The sentencing-year column isn’t available in this dataset.')
+                elif column == ANIMATED_TIME_GROUP:
+                    # the timeline can't also be the series split
+                    errors.append('Pick a column other than sentencing year to split into lines '
+                                  '— the years are already the timeline.')
+                    column = None
+                else:
+                    measure_col, agg_ok = resolve_catseries_measure(
+                        measure, aggregate, allowed_aggs, data, errors)
+                    if agg_ok:
+                        header = CODEBOOK.codebook[column]
+                        animated_payload, animated_rows = build_animated(
+                            session, chart, column, measure, measure_col, aggregate)
+                        if animated_payload is None or not animated_payload['series']:
+                            errors.append('No cases have a value for that column across '
+                                          'sentencing years in the current data state — clear a '
+                                          'filter and try again.')
+                            animated_payload, animated_rows = None, None
+            else:
+                column = None
+        elif chart.get('renderer') == 'distribution':
+            # One renderer, two modes (chart-library-expansion Phase C3): histogram and ECDF, both
+            # over a single NUMERIC column via the B1/B2 distribution engine (cache.distribution_
+            # stats). Fresh over the active slice, read-only over the shared base, never disk-cached.
+            # A distribution needs an ordered numeric axis, so a categorical column is rejected up
+            # front (before the engine's float64 gate would raise) with a clear message.
+            if column and _viz_column_ok(data, column, errors):
+                if column not in data['numeric']:
+                    errors.append('The %s needs a numeric column — “%s” isn’t numeric. Pick a '
+                                  'numeric column (sentence length, criminal-history score, …).'
+                                  % (chart['label'].lower(), CODEBOOK.codebook[column]))
+                else:
+                    header = CODEBOOK.codebook[column]
+                    distribution_payload, distribution_rows = build_distribution(
+                        session, chart, column)
+                    if distribution_payload is None:
+                        errors.append('No cases have a value for that column in the current data '
+                                      'state — clear a filter and try again.')
+            else:
+                column = None
+        elif chart.get('renderer') == 'plugin':
+            # Box plot or violin (chart-library-expansion Phase D1) over one NUMERIC column,
+            # optionally split by a group column (column2). Both read the numpy-only B2 engine
+            # (cache.distribution_stats): the box uses the vendored @sgratzl/chartjs-chart-boxplot
+            # precomputed-stats path, the violin is hand-rolled from B2's binned KDE — neither ships
+            # raw per-row arrays. A distribution needs an ordered numeric value axis, so a
+            # categorical value column is rejected up front (before the engine's float64 gate would
+            # raise). Fresh over the active slice, read-only, never disk-cached.
+            if column and _viz_column_ok(data, column, errors):
+                if column not in data['numeric']:
+                    errors.append('The %s needs a numeric value column — “%s” isn’t numeric. Pick '
+                                  'a numeric column (sentence length, criminal-history score, …).'
+                                  % (chart['label'].lower(), CODEBOOK.codebook[column]))
+                elif column2 and not _viz_column_ok(data, column2, errors):
+                    pass                       # bad group column — message already appended
+                elif column2 and column2 == column:
+                    errors.append('Pick a different column to group by — the value column and the '
+                                  'group column must differ.')
+                else:
+                    # cap the number of boxes/violins so a high-cardinality group column (county
+                    # has 87) can't draw an unreadable wall — reject early with a friendly nudge
+                    # (before the engine's own DISTRIBUTION_MAX_GROUPS payload guard), the same
+                    # spirit as the scatter lattice cardinality guard.
+                    n_groups = _execute(session).distinct_counts(column2)[0] if column2 else 1
+                    if n_groups > BOXVIOLIN_MAX_GROUPS:
+                        errors.append('“%s” has %s categories — too many to compare as %ss. Filter '
+                                      'to fewer groups first, or group by a column with fewer '
+                                      'categories.'
+                                      % (CODEBOOK.codebook[column2], '{:,}'.format(n_groups),
+                                         chart['id']))
+                    else:
+                        header = CODEBOOK.codebook[column]
+                        boxviolin_payload, boxviolin_rows = build_boxviolin(
+                            session, chart, column, column2)
+                        if boxviolin_payload is None:
+                            errors.append('No cases have a value for that column in the current '
+                                          'data state — clear a filter and try again.')
+            else:
+                column = None
+        elif chart.get('renderer') == 'kde':
+            # Density curve (chart-library-expansion Phase D2) over one NUMERIC column, via the
+            # numpy-only engine (cache.kde_density): the shared grid + pre-convolution weights (the
+            # client convolves at any bandwidth, no refetch) + the FD histogram companion + the
+            # spikiness nudge. A density needs an ordered numeric axis, so a categorical column is
+            # rejected up front (before the engine's float64 gate would raise) with a clear message.
+            # Fresh over the active slice, read-only over the shared base, never disk-cached.
+            if column and _viz_column_ok(data, column, errors):
+                if column not in data['numeric']:
+                    errors.append('The %s needs a numeric column — “%s” isn’t numeric. Pick a '
+                                  'numeric column (sentence length, criminal-history score, …).'
+                                  % (chart['label'].lower(), CODEBOOK.codebook[column]))
+                else:
+                    header = CODEBOOK.codebook[column]
+                    kde_payload, kde_rows = build_kde(session, chart, column)
+                    if kde_payload is None:
+                        errors.append('No cases have a value for that column in the current data '
+                                      'state — clear a filter and try again.')
+            else:
+                column = None
+        elif chart.get('renderer') == 'server-html' and column and column2:
+            # Mosaic (chart-library-expansion Phase D3): a two-categorical proportional view,
+            # SERVER-RENDERED as nested .heat-N tiles (no canvas — the correlation-matrix
+            # precedent; correlation itself is consumed by its own id-branch above, so this
+            # server-html branch is the mosaic's). Reads the B1 aggregate_by_two COUNT matrix
+            # (mosaic is count-only — only counts compose) and decomposes the whole slice into
+            # columns (width ∝ column total) of stacked tiles (height ∝ within-column share).
+            # Fresh over the active slice, read-only over the shared base, never disk-cached.
+            col_ok = _viz_column_ok(data, column, errors)
+            col2_ok = _viz_column_ok(data, column2, errors)
+            if column == column2:
+                errors.append('Pick two different columns to cross in a mosaic.')
+            if col_ok and col2_ok and column != column2:
+                header = CODEBOOK.codebook[column]
+                count_matrix = _execute(session).aggregate_by_two(
+                    column, column2, Data.COUNT_MEASURE, 'count')
+                mosaic_payload, mosaic_rows = build_mosaic(count_matrix, column, column2)
+                if not mosaic_payload['columns']:
+                    errors.append('No cases have a value for both columns in the current data '
+                                  'state — clear a filter and try again.')
+                    mosaic_payload, mosaic_rows = None, None
+            elif not col_ok:
+                column = None
 
     context = {
         'user': user, 'data': data, 'error': errors,
         'browser': build_column_browser(data), 'excluded_note': EXCLUDED_NOTE,
         'chart_types': VIZ_CHART_TYPES,
+        'chart_gallery': VIZ_CHART_GALLERY,       # family-grouped registry for the card gallery (A1)
+        'field_charts': VIZ_FIELD_CHARTS,         # slot -> "chart ids" for each field's data-viz-fields
         'choropleth_grains': CHOROPLETH_GRAINS,   # county / district / region grain toggle
         'axis_groups': axis_groups, 'numeric_measures': numeric,
         'aggregate_options': VIZ_AGGREGATE_OPTIONS,
@@ -2396,9 +4138,26 @@ def render_visualize(chart=None, form=None, error=None):
         'scatter_payload': scatter_payload,  # aggregated-lattice bubble payload, or None
         'scatter_rows': scatter_rows,        # scatter companion table rows, or None
         'correlation_payload': correlation_payload,  # Pearson correlation matrix, or None
+        'pairplot_payload': pairplot_payload,  # pair-plot / SPLOM tiled payload, or None
+        'catseries_payload': catseries_payload,  # categorical-series payload, or None
+        'catseries_rows': catseries_rows,        # categorical-series companion table rows, or None
+        'line_payload': line_payload,        # line-family payload, or None
+        'line_rows': line_rows,              # line-family companion table rows, or None
+        'animated_payload': animated_payload,  # animated time-series payload, or None
+        'animated_rows': animated_rows,        # animated companion table rows, or None
+        'distribution_payload': distribution_payload,  # histogram/ECDF payload, or None
+        'distribution_rows': distribution_rows,        # distribution companion table rows, or None
+        'boxviolin_payload': boxviolin_payload,  # box/violin payload (plugin renderer), or None
+        'boxviolin_rows': boxviolin_rows,        # box/violin companion table rows, or None
+        'kde_payload': kde_payload,          # density-curve (KDE) payload, or None
+        'kde_rows': kde_rows,                # KDE companion table rows (underlying histogram), or None
+        'mosaic_payload': mosaic_payload,    # mosaic proportional-tiles payload, or None
+        'mosaic_rows': mosaic_rows,          # mosaic companion table rows (unfolded crosstab), or None
         'selected_cols': selected_cols,      # raw picked numeric columns (checkbox state)
         'correlation_min': CORRELATION_MIN_COLS,
         'correlation_max': CORRELATION_MAX_COLS,
+        'pairplot_min': PAIRPLOT_MIN_COLS,
+        'pairplot_max': PAIRPLOT_MAX_COLS,
     }
 
     if wants_fragment():
@@ -3607,6 +5366,203 @@ def lesson_active_focus(module, step_index):
     return None
 
 
+# The Visualize payload variables the shared result partial (partials/viz_result.html) reads —
+# one is set for the pinned chart, the rest stay None. A lesson `chart` focus fills this dict over
+# the lesson sandbox so the same renderers/markup draw read-only in the docked lesson. The
+# choropleth pair is deliberately absent: the map-as-filter chart is not offered in a lesson (its
+# clicks/Keep-only would mutate history), so no choropleth payload is ever produced here.
+_LESSON_VIZ_PAYLOAD_KEYS = (
+    'chart_payload', 'share', 'treemap_payload', 'treemap_rows', 'waterfall_payload',
+    'scatter_payload', 'scatter_rows', 'correlation_payload', 'pairplot_payload',
+    'catseries_payload', 'catseries_rows', 'line_payload', 'line_rows',
+    'animated_payload', 'animated_rows', 'distribution_payload', 'distribution_rows',
+    'boxviolin_payload', 'boxviolin_rows', 'kde_payload', 'kde_rows',
+    'mosaic_payload', 'mosaic_rows',
+)
+
+
+def _lesson_chart_params(chart, column, column2, measure, aggregate, cols):
+    # The Visualize query params that reproduce this pinned chart on the real /visualize route —
+    # the "open this in the workbench" deep link (over the student's OWN data), the chart-focus
+    # sibling of the info/table focus deep links. Only meaningful inputs are carried.
+    params = {'chart': chart['id']}
+    if column:
+        params['column'] = column
+    if column2:
+        params['column2'] = column2
+    if 'measure' in chart['inputs'] and measure:
+        params['measure'] = measure
+    if 'aggregate' in chart['inputs'] and aggregate:
+        params['aggregate'] = aggregate
+    if cols:
+        params['cols'] = cols
+    return params
+
+
+def build_lesson_chart(focus, override, data):
+    # Read-only Visualize chart for a lesson `chart` focus, computed on the step's active lesson
+    # state (the `override` tokens) as a sandbox overlay on the base — session=None throughout, so
+    # the student's history is never read or mutated and no student cache slice is touched (the
+    # sandbox obeys the same immutability contract as the info/table focuses). Reuses the registry
+    # (VIZ_CHART_TYPES) and the SAME builder functions the live Visualize view uses, threading the
+    # lesson override into them; the shared partial + visualize.js renderers then draw it. This is a
+    # trusted, authored spec (not user form input), so an invalid/unsupported pick simply returns
+    # None -> the "no chart pinned" empty state, rather than surfacing validation errors.
+    #
+    # `data` is the sandbox summary (get_data(None, override)) — its column_list/numeric/excluded
+    # drive the same _viz_column_ok / resolve_* guards render_visualize uses. The choropleth is
+    # excluded on purpose (see _LESSON_VIZ_PAYLOAD_KEYS).
+    chart = next((c for c in VIZ_CHART_TYPES if c['id'] == focus.get('chart')), None)
+    if not chart or chart.get('status') != 'ready' or chart['id'] == 'choropleth':
+        return None
+
+    column = focus.get('column') or None
+    column2 = focus.get('column2') or None
+    measure = focus.get('measure') or Data.COUNT_MEASURE
+    aggregate = focus.get('aggregate') or 'count'
+    selected_cols = focus.get('cols') or []
+
+    errors = []                                  # authored input: any miss -> no chart (empty state)
+    payloads = {k: None for k in _LESSON_VIZ_PAYLOAD_KEYS}
+    header = None
+    cid = chart['id']
+    renderer = chart.get('renderer')
+
+    def two_cols_ok():
+        return (column and column2 and column != column2
+                and _viz_column_ok(data, column, errors) and _viz_column_ok(data, column2, errors))
+
+    if cid == 'pie':
+        if column and _viz_column_ok(data, column, errors):
+            header = CODEBOOK.codebook[column]
+            info = get_data(None, column, 'occurrence', override)['column_info']
+            payloads['chart_payload'] = bucket_payload(info['each'], PIE_DEFAULT_CUTOFF, PIE_HARD_CAP)
+            payloads['share'] = sorted(info['each'], key=lambda e: e['num'], reverse=True)
+    elif cid == 'treemap':
+        if two_cols_ok():
+            measure_col, agg_ok = resolve_treemap_measure(measure, aggregate, data, errors)
+            if agg_ok:
+                header = CODEBOOK.codebook[column]
+                sheet = _execute(None, override).get_table(measure_col, column, column2)
+                payloads['treemap_payload'], payloads['treemap_rows'] = build_treemap(
+                    sheet, aggregate, measure_col, column, column2)
+    elif cid == 'waterfall':
+        measure_col, agg_ok = resolve_waterfall_measure(measure, aggregate, data, errors)
+        if agg_ok and WATERFALL_GROUP in data['column_list']:
+            series = _execute(None, override).aggregate_by_group(WATERFALL_GROUP, measure, aggregate)
+            wf = build_waterfall(series, aggregate, measure_col)
+            payloads['waterfall_payload'] = wf if wf['steps'] else None
+    elif cid == 'scatter':
+        if two_cols_ok() and column in data['numeric'] and column2 in data['numeric']:
+            frame = _execute(None, override)
+            nx, ny = frame.distinct_counts(column, column2)
+            if nx * ny <= SCATTER_MAX_CELLS:
+                header = CODEBOOK.codebook[column]
+                sp, sr = build_scatter(frame.get_table(None, column, column2), column, column2)
+                if sp['points']:
+                    payloads['scatter_payload'], payloads['scatter_rows'] = sp, sr
+    elif cid == 'correlation':
+        columns = resolve_correlation_columns(selected_cols, data, errors)
+        if columns:
+            payloads['correlation_payload'] = build_correlation(_execute(None, override), columns)
+    elif cid == 'pair-plot':
+        columns = resolve_pairplot_columns(selected_cols, data, errors)
+        if columns:
+            frame = _execute(None, override)
+            if len(frame.df):
+                payloads['pairplot_payload'] = build_pairplot(frame, columns)
+    elif renderer == 'categorical-series':
+        variant = chart['variant']
+        agg = aggregate if 'aggregate' in chart['inputs'] else 'count'
+        allowed = set(chart['aggregates'])
+        if variant['series'] == 'single':
+            if column and _viz_column_ok(data, column, errors):
+                measure_col, agg_ok = resolve_catseries_measure(measure, agg, allowed, data, errors)
+                if agg_ok:
+                    header = CODEBOOK.codebook[column]
+                    payloads['catseries_payload'], payloads['catseries_rows'] = \
+                        build_catseries_single(None, chart, column, measure, measure_col, agg,
+                                               override=override)
+        elif two_cols_ok():
+            measure_col, agg_ok = resolve_catseries_measure(measure, agg, allowed, data, errors)
+            if agg_ok:
+                header = CODEBOOK.codebook[column]
+                frame = _execute(None, override)
+                count_matrix = frame.aggregate_by_two(column, column2, Data.COUNT_MEASURE, 'count')
+                value_matrix = count_matrix if agg == 'count' else \
+                    frame.aggregate_by_two(column, column2, measure, agg)
+                cp, cr = build_catseries_two(count_matrix, value_matrix, variant, agg,
+                                             measure_col, column, column2)
+                if cp['series']:
+                    payloads['catseries_payload'], payloads['catseries_rows'] = cp, cr
+    elif renderer == 'line':
+        variant = chart['variant']
+        agg = aggregate if 'aggregate' in chart['inputs'] else 'count'
+        allowed = set(chart['aggregates'])
+        if variant['series'] == 'single':
+            if column and _viz_column_ok(data, column, errors):
+                measure_col, agg_ok = resolve_catseries_measure(measure, agg, allowed, data, errors)
+                if agg_ok:
+                    header = CODEBOOK.codebook[column]
+                    lp, lr = build_line_single(None, chart, column, measure, measure_col, agg,
+                                               column in data['numeric'], override=override)
+                    if lp['points']:
+                        payloads['line_payload'], payloads['line_rows'] = lp, lr
+        elif two_cols_ok():
+            measure_col, agg_ok = resolve_catseries_measure(measure, agg, allowed, data, errors)
+            if agg_ok:
+                header = CODEBOOK.codebook[column]
+                lp, lr = build_line_two(None, chart, column, column2, measure, measure_col, agg,
+                                        column in data['numeric'], override=override)
+                if lp and lp['series']:
+                    payloads['line_payload'], payloads['line_rows'] = lp, lr
+    elif renderer == 'animated':
+        allowed = set(chart['aggregates'])
+        if (column and column != ANIMATED_TIME_GROUP and _viz_column_ok(data, column, errors)
+                and ANIMATED_TIME_GROUP in data['column_list']):
+            measure_col, agg_ok = resolve_catseries_measure(measure, aggregate, allowed, data, errors)
+            if agg_ok:
+                header = CODEBOOK.codebook[column]
+                ap, ar = build_animated(None, chart, column, measure, measure_col, aggregate,
+                                        override=override)
+                if ap and ap['series']:
+                    payloads['animated_payload'], payloads['animated_rows'] = ap, ar
+    elif renderer == 'distribution':
+        if column and _viz_column_ok(data, column, errors) and column in data['numeric']:
+            header = CODEBOOK.codebook[column]
+            dp, dr = build_distribution(None, chart, column, override=override)
+            if dp is not None:
+                payloads['distribution_payload'], payloads['distribution_rows'] = dp, dr
+    elif renderer == 'plugin':                   # box / violin
+        group_ok = (not column2) or (column2 != column and _viz_column_ok(data, column2, errors))
+        if column and _viz_column_ok(data, column, errors) and column in data['numeric'] and group_ok:
+            n_groups = _execute(None, override).distinct_counts(column2)[0] if column2 else 1
+            if n_groups <= BOXVIOLIN_MAX_GROUPS:
+                header = CODEBOOK.codebook[column]
+                bp, br = build_boxviolin(None, chart, column, column2 or None, override=override)
+                if bp is not None:
+                    payloads['boxviolin_payload'], payloads['boxviolin_rows'] = bp, br
+    elif renderer == 'kde':
+        if column and _viz_column_ok(data, column, errors) and column in data['numeric']:
+            header = CODEBOOK.codebook[column]
+            kp, kr = build_kde(None, chart, column, override=override)
+            if kp is not None:
+                payloads['kde_payload'], payloads['kde_rows'] = kp, kr
+    elif renderer == 'server-html':              # mosaic (correlation is consumed by its id-branch)
+        if two_cols_ok():
+            count_matrix = _execute(None, override).aggregate_by_two(
+                column, column2, Data.COUNT_MEASURE, 'count')
+            mp, mr = build_mosaic(count_matrix, column, column2)
+            if mp['columns']:
+                payloads['mosaic_payload'], payloads['mosaic_rows'] = mp, mr
+
+    if not any(payloads.values()):
+        return None
+
+    return dict(payloads, chart=chart, header=header, column=column, column2=column2,
+                params=_lesson_chart_params(chart, column, column2, measure, aggregate, selected_cols))
+
+
 def build_lesson_data(module_id, step, focus):
     # Read-only data view for the lesson main area, computed on the step's active lesson state
     # as a sandboxed override on the base dataset (session=None). The student's history is
@@ -3651,6 +5607,18 @@ def build_lesson_data(module_id, step, focus):
                 'table': table,
                 'deeplink': url_for('explore_table_view', dependant=dependant,
                                     x_axis=x_axis, y_axis=y_axis),
+            })
+
+    elif focus.get('view') == 'chart':
+        # A pinned Visualize chart (E1): reuse the registry + builders + renderers over the lesson
+        # sandbox. build_lesson_chart returns None for an invalid/unsupported (or choropleth) spec,
+        # which leaves kind=None -> the "no chart pinned" main-area nudge.
+        viz = build_lesson_chart(focus, override, summary)
+        if viz:
+            view.update({
+                'kind': 'chart', 'viz': viz,
+                'header': viz['header'], 'chart_label': viz['chart']['label'],
+                'deeplink': url_for('visualize', **viz['params']),
             })
 
     return view
