@@ -2,10 +2,21 @@
 {% block title %} — {{ module['title'] }}{% endblock %}
 
 {% block head %}
+{% if lesson_data['kind'] == 'chart' %}
+{# a pinned Visualize chart (E1): load the same vendored chart stack visualize.html uses so
+   visualize.js can draw it read-only from the lesson sandbox — minus the geo plugin / geomap.js,
+   since the choropleth (the only map chart) is not offered as a lesson chart focus. #}
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/vendor/chartjs-chart-treemap.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/vendor/chartjs-chart-boxplot.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/otherbucket.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/visualize.js') }}" defer></script>
+{% else %}
 {# reuse the explore chart + value-table behaviours for the read-only lesson data view #}
 <script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/otherbucket.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/explore.js') }}" defer></script>
+{% endif %}
 {% endblock %}
 
 {% block body %}
@@ -107,6 +118,14 @@
 
             {% if question['reveal'] is not none %}
             <p class="lesson-model"><em>Correct answer:</em> {{ question['reveal'] }}{% if question['type'] == 'numeric' and question['show_tolerance'] and question['tolerance'] is not none %} (&plusmn;{{ question['tolerance'] }}){% endif %}</p>
+            {% endif %}
+
+            {# authored "why this answer" text, surfaced after answering (policy-gated in build_question) #}
+            {% if question['explanation'] %}
+            <div class="lesson-explanation">
+                <p class="lesson-explanation-label">Why this answer</p>
+                <div class="lesson-explanation-body">{{ question['explanation']|lesson_body }}</div>
+            </div>
             {% endif %}
         {% endif %}
 

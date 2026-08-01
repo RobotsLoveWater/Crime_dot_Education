@@ -174,6 +174,47 @@
 
 </article>
 
+{% elif lesson_data['kind'] == 'chart' %}
+{% set viz = lesson_data['viz'] %}
+<article class="lesson-data" data-column="{{ viz['column'] or '' }}">
+
+    <header class="view-header">
+        <div class="view-heading">
+            <h1>{{ viz['header'] or viz['chart']['label'] }}</h1>
+            <p class="view-subtitle">{{ viz['chart']['label'] }} · built on this lesson's data</p>
+        </div>
+    </header>
+
+    {# Reuse the SAME Visualize chart markup (partials/viz_result.html) + visualize.js renderers,
+       read-only over the lesson sandbox. The wrapper carries id="visualize-view" so visualize.js
+       finds its root and wires the read-only controls (the "Other"-cutoff / bin / bandwidth
+       sliders, the value-table search) — it is never htmx-swapped here, so the chart renders once
+       on load and re-renders only on a theme flip. No builder form, no map-as-filter, no
+       history mutation. `choropleth_payload` is pinned to none: a lesson never produces one, so the
+       choropleth block (with its map-click / Keep-only filter POSTs) can't render in the sandbox. #}
+    <div id="visualize-view" class="visualize-view lesson-chart">
+        <div class="visualize-canvas">
+            {% with header=viz['header'], choropleth_payload=none,
+                    chart_payload=viz['chart_payload'], share=viz['share'],
+                    treemap_payload=viz['treemap_payload'], treemap_rows=viz['treemap_rows'],
+                    waterfall_payload=viz['waterfall_payload'],
+                    scatter_payload=viz['scatter_payload'], scatter_rows=viz['scatter_rows'],
+                    correlation_payload=viz['correlation_payload'],
+                    pairplot_payload=viz['pairplot_payload'],
+                    catseries_payload=viz['catseries_payload'], catseries_rows=viz['catseries_rows'],
+                    line_payload=viz['line_payload'], line_rows=viz['line_rows'],
+                    animated_payload=viz['animated_payload'], animated_rows=viz['animated_rows'],
+                    distribution_payload=viz['distribution_payload'], distribution_rows=viz['distribution_rows'],
+                    boxviolin_payload=viz['boxviolin_payload'], boxviolin_rows=viz['boxviolin_rows'],
+                    kde_payload=viz['kde_payload'], kde_rows=viz['kde_rows'],
+                    mosaic_payload=viz['mosaic_payload'], mosaic_rows=viz['mosaic_rows'] %}
+            {% include 'partials/viz_result.html' %}
+            {% endwith %}
+        </div>
+    </div>
+
+</article>
+
 {% else %}
 {# No focus (or a focus whose columns aren't available): show the sandbox size + a nudge. #}
 <article class="lesson-data">

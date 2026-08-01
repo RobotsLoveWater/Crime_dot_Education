@@ -28,16 +28,51 @@
   --color-focus:          #4F46E5;
   --overlay:              rgba(16, 19, 24, 0.45); /* drawer + dialog backdrops */
 
-  /* Chart palette (same in both themes) */
-  --chart-1: #6366F1;
-  --chart-2: #0EA5E9;
-  --chart-3: #10B981;
-  --chart-4: #F59E0B;
-  --chart-5: #EF4444;
-  --chart-6: #8B5CF6;
-  --chart-7: #14B8A6;
-  --chart-8: #F472B6;
+  /* Chart palette — same in both themes; validated visually distinct with the dataviz
+     skill's checker (worst-adjacent normal-vision ΔE 73.5, CVD ΔE 23.0). One hue family
+     per slot — blue, orange, green, red, cyan, gold, violet, pink — ordered so adjacent
+     and pie-wrap slots never share a family (the old set doubled up: indigo≈violet,
+     sky≈teal). The colorblind-safe alternate is the [data-palette="cb"] block below. */
+  --chart-1: #2563EB;
+  --chart-2: #F97316;
+  --chart-3: #059669;
+  --chart-4: #DC2626;
+  --chart-5: #0891B2;
+  --chart-6: #CA8A04;
+  --chart-7: #8B5CF6;
+  --chart-8: #DB2777;
+}
 
+/* ---------- Colorblind-safe chart palette ----------
+   Selected by the global "Chart colors" control (static/js/palette.js sets
+   data-palette="cb" on <html>). Theme-aware: the dark row is the same eight hues
+   stepped for the dark surface, not a separate palette. Validated with the dataviz
+   skill's checker — light worst-adjacent CVD ΔE 24.2, dark 10.3 (floor band, backed
+   by the per-line point-shapes / direct labels). Custom colors, when chosen, are
+   applied as inline --chart-N on <html> and win over these. */
+:root[data-palette="cb"] {
+  --chart-1: #2A78D6;
+  --chart-2: #1BAF7A;
+  --chart-3: #EDA100;
+  --chart-4: #008300;
+  --chart-5: #4A3AA7;
+  --chart-6: #E34948;
+  --chart-7: #E87BA4;
+  --chart-8: #EB6834;
+}
+:root[data-theme="dark"][data-palette="cb"] {
+  --chart-1: #3987E5;
+  --chart-2: #199E70;
+  --chart-3: #C98500;
+  --chart-4: #008300;
+  --chart-5: #9085E9;
+  --chart-6: #E66767;
+  --chart-7: #D55181;
+  --chart-8: #D95926;
+}
+
+/* ---------- Typography, spacing, and the rest of the base tokens ---------- */
+:root {
   /* Typography */
   --font-base: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;

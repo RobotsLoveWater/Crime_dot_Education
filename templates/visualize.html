@@ -11,6 +11,10 @@
 <script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/vendor/chartjs-chart-treemap.min.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/vendor/chartjs-chart-geo.min.js') }}" defer></script>
+{# boxplot plugin (Phase D1): self-registers the 'boxplot' type when loaded AFTER chart.umd.min.js,
+   like the treemap plugin. Only the box uses it (precomputed five-number stats); the violin is
+   hand-rolled from B2's KDE in visualize.js. #}
+<script src="{{ url_for('static', filename='js/vendor/chartjs-chart-boxplot.min.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/otherbucket.js') }}" defer></script>
 {# geomap.js: the shared TopoJSON fetch / plugin registration / dissolve plumbing used by
    BOTH map surfaces (this choropleth and the Filter view's map input) — one geometry

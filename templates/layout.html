@@ -12,13 +12,29 @@
         // document as JS-capable so CSS can gate the sidebar drawer (no-JS keeps
         // the sidebar in the page flow instead of behind a toggle).
         (function () {
+            var root = document.documentElement;
             var t = null;
             try { t = localStorage.getItem('theme'); } catch (e) {}
             if (t !== 'light' && t !== 'dark') {
                 t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
             }
-            document.documentElement.setAttribute('data-theme', t);
-            document.documentElement.classList.add('js');
+            root.setAttribute('data-theme', t);
+            root.classList.add('js');
+
+            // Chart palette (partner of static/js/palette.js): apply the saved mode + any
+            // custom colors before first paint — same FOUC-guard reason as the theme. The
+            // 'cb' (colorblind-safe) colors live in tokens.css ([data-palette="cb"]);
+            // 'custom' colors are inline --chart-N on <html>, which win over the tokens.
+            try {
+                var pmode = localStorage.getItem('palette');
+                if (pmode === 'cb' || pmode === 'custom') root.setAttribute('data-palette', pmode);
+                if (pmode === 'custom') {
+                    var pc = JSON.parse(localStorage.getItem('paletteColors') || '[]');
+                    for (var i = 0; i < 8 && i < pc.length; i++) {
+                        if (pc[i]) root.style.setProperty('--chart-' + (i + 1), pc[i]);
+                    }
+                }
+            } catch (e) { /* storage/JSON blocked — the default palette still renders */ }
         })();
     </script>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
@@ -28,6 +44,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/views.css') }}">
     <script src="{{ url_for('static', filename='js/vendor/htmx.min.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/theme.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/palette.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
     {% block head %}{% endblock %}
 </head>
@@ -71,6 +88,8 @@
     {% endif %}
     <div class="topbar-user">
         <button type="button" id="theme-toggle" class="theme-toggle">Theme</button>
+        <button type="button" id="palette-toggle" class="theme-toggle"
+                aria-haspopup="dialog" aria-controls="palette-dialog">Colors</button>
         {% if user %}
             <span class="user-identity">{{ user['username'] }}
                 {% if user['is_educator'] %}<span class="badge badge-educator">Educator</span>{% endif %}
@@ -271,6 +290,61 @@
         <div class="dialog-actions">
             <button type="button" class="btn btn-secondary" data-dialog-cancel>Cancel</button>
             <a href="#" class="btn btn-danger" id="confirm-accept">Confirm</a>
+        </div>
+    </div>
+</dialog>
+
+<!-- CHART COLORS DIALOG: opened by #palette-toggle, driven by static/js/palette.js.
+     Sets a device-wide categorical palette (Default / Colorblind-safe / Custom) applied
+     to every chart via the --chart-1..8 tokens. -->
+<dialog class="dialog" id="palette-dialog" aria-labelledby="palette-dialog-title">
+    <div class="dialog-body palette-dialog">
+        <h2 class="dialog-title" id="palette-dialog-title">Chart colors</h2>
+        <p class="dialog-message">How categorical chart series are colored. Applies to every
+            chart and is saved on this device.</p>
+        <fieldset class="palette-modes">
+            <legend class="visually-hidden">Palette</legend>
+            <label class="palette-mode">
+                <input type="radio" name="palette-mode" value="default">
+                <span class="palette-mode-text">
+                    <span class="palette-mode-name">Default</span>
+                    <span class="palette-mode-hint">The standard eight-color set.</span>
+                </span>
+            </label>
+            <label class="palette-mode">
+                <input type="radio" name="palette-mode" value="cb">
+                <span class="palette-mode-text">
+                    <span class="palette-mode-name">Colorblind-safe</span>
+                    <span class="palette-mode-hint">Stays distinct under common color-vision deficiencies.</span>
+                </span>
+            </label>
+            <label class="palette-mode">
+                <input type="radio" name="palette-mode" value="custom">
+                <span class="palette-mode-text">
+                    <span class="palette-mode-name">Custom</span>
+                    <span class="palette-mode-hint">Choose your own eight colors.</span>
+                </span>
+            </label>
+        </fieldset>
+
+        <div class="palette-custom" id="palette-custom" hidden>
+            <div class="palette-swatches" id="palette-swatches">
+                {% for i in range(1, 9) %}
+                <label class="palette-swatch">
+                    <span class="visually-hidden">Color {{ i }}</span>
+                    <input type="color" data-chart="{{ i }}" value="#000000">
+                </label>
+                {% endfor %}
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="palette-reset-custom">Reset to default colors</button>
+        </div>
+
+        <div class="palette-preview" id="palette-preview" aria-hidden="true">
+            {% for i in range(1, 9) %}<span class="palette-preview-swatch" style="background: var(--chart-{{ i }})"></span>{% endfor %}
+        </div>
+
+        <div class="dialog-actions">
+            <button type="button" class="btn btn-primary" data-dialog-cancel>Done</button>
         </div>
     </div>
 </dialog>

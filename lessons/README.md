@@ -51,11 +51,27 @@ Sets/deep-links a data state so the student can inspect a filtered dataset.
 | `state` | token[] | *(optional)* History tokens that define this step's dataset. Sets the module's **active state** (see "Active state" below). Omit to keep the current active state. |
 | `focus` | object | *(optional)* Deep-link target into an existing analysis view. |
 
-`focus.view` ∈ `info | table`:
+`focus.view` ∈ `info | table | chart`:
 - `info` → deep-links to `/info/<column>`. Requires `column`.
 - `table` → deep-links to the cross-tab view. Requires `dependant`, `x_axis`, `y_axis`
   (semantic roles; the wiring phase maps them to the route respecting the app's documented
   x/y axis flip). Use `"#"` for `dependant` to mean count-only.
+- `chart` → pins a **Visualize chart**, drawn read-only over the lesson's data state (E1). Uses
+  the same builder fields the Visualize workbench takes:
+
+  | Field | Meaning |
+  |-------|---------|
+  | `chart` | the chart-type id (`VIZ_CHART_TYPES`) — e.g. `pie`, `treemap`, `waterfall`, `scatter`, `correlation`, `histogram`, `ecdf`, `kde`, `box`, `violin`, `bar`, `grouped-bar`, `stacked-bar`, `line`, `area`, `slope`, `bump`, `mosaic`, `pair-plot`, `animated`. |
+  | `column` | primary column (chart-dependent; the x/value column, or the series split for `animated`). |
+  | `column2` | second column, for the two-column charts (treemap/scatter/grouped/stacked/mosaic; the optional group for box/violin). |
+  | `measure` | numeric measure column, or `"#"` for a count. |
+  | `aggregate` | `count | mean | median | mode` (chart-dependent). |
+  | `cols` | list of numeric columns for `correlation` / `pair-plot`. |
+
+  The chart is computed on the step's active state, exactly like `info`/`table`, and never mutates
+  the student's history. **`choropleth` (the map-as-filter chart) is not offered** — its map-click
+  and per-row "Keep only" controls apply filters, which a read-only lesson sandbox must not do; a
+  `choropleth` (or otherwise invalid) chart focus falls back to the "no chart pinned" nudge.
 
 ### `question`
 Poses a question with a gradeable `answer`. Fields: `title`, `body`, `answer`.
@@ -104,6 +120,16 @@ Not supported (renders as literal text — check before authoring): numbered lis
 | `numeric` | `compute` `{ "stat": ..., "column": ... }`, `tolerance` (number) | Expected value is **computed live** from the step's active state; correct if `abs(submitted - expected) <= tolerance`. **Never** store the expected value in the file. |
 | `choice` | `options` (string[]), `correct` (0-based index) | Correct if the submitted index equals `correct`. Graded server-side. |
 | `free` | `model_answer` (string, optional) | Not auto-graded; the response is stored and marked "submitted". `model_answer` may be shown afterward. |
+
+**Optional `explanation` (any answer type).** A `question.answer` may carry an
+`explanation` string — the "why this answer" teaching text (why the right option is right,
+why the tempting wrong ones are wrong). It renders through the same `lesson_body` markdown
+subset as step bodies, so `**bold**`/`*italic*`/`` `code` `` work. It is shown **after the
+student answers**: always on a correct answer, and on a miss only when the class's retake
+policy reveals answers after a miss (so it can't leak the correct option to a student who
+still has attempts left — the same gate the correct-answer reveal uses). It is redundant on
+`free` questions (which aren't graded — use `model_answer` there) and won't render for them.
+Educators also see every authored `explanation` on the module's computed answer key.
 
 `compute.stat` ∈ `mean | median | std | count`, resolved live via `data.py`:
 

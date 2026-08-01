@@ -1,0 +1,58 @@
+{# Correlation matrix body: the near-mechanical callout + the .heat-N Pearson-r table + the
+   footnote. Shared by the Correlation chart (its primary artifact) and the Pair plot (its
+   companion table — "the r's behind the shapes"). Expects `cp` = a build_correlation() payload.
+   Only one Visualize branch renders at a time (the elif chain), so the fixed ids below never
+   collide. #}
+{% if cp['mechanicalCount'] %}
+{# the teachable artifact: near-1.0 off-diagonal cells are the sentencing grid's own
+   arithmetic, not an empirical finding. Listed as text so the callout is the
+   accessible path to the annotation the per-cell marker/tooltip carries visually. #}
+<div class="corr-callout" role="note">
+    <p><strong>{{ cp['mechanicalCount'] }}</strong>
+       near-mechanical {{ 'pair' if cp['mechanicalCount'] == 1 else 'pairs' }}
+       (|r| ≥ {{ cp['mechanicalDisplay'] }}):
+       {% for p in cp['mechanicalPairs'] %}<span class="corr-pair">{{ p['a'] }} × {{ p['b'] }} ({{ p['display'] }})</span>{% if not loop.last %}, {% endif %}{% endfor %}.
+       Minnesota’s presumptive sentence is <em>read off the Sentencing Guidelines
+       grid</em> (offense severity × criminal-history score), so the grid’s own
+       outputs — presumptive time, its lower/upper range, grid-cell time — are
+       near-duplicates <em>by construction</em>. When those cells glow near 1.0
+       it’s the grid’s arithmetic showing through, not a pattern the data revealed.
+    </p>
+</div>
+{% endif %}
+
+<div class="table-wrapper table-scroll">
+    <table class="data-table corr-matrix" id="viz-corr-table">
+        <caption class="visually-hidden">Pearson correlation matrix across the selected
+            numeric columns; each cell is r for the row column against the column column,
+            and the diagonal is 1.00.</caption>
+        <thead>
+            <tr>
+                <th scope="col" class="corr-corner"><span class="visually-hidden">Column</span></th>
+                {% for label in cp['labels'] %}
+                <th scope="col" class="num" title="{{ label }} ({{ cp['codes'][loop.index0] }})">{{ cp['codes'][loop.index0] }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in cp['grid'] %}
+            {% set i = loop.index0 %}
+            <tr>
+                <th scope="row" title="{{ cp['codes'][i] }}">{{ cp['labels'][i] }}</th>
+                {% for cell in row %}
+                <td class="num corr-cell{% if cell['diag'] %} corr-diag{% endif %}{% if cell['mechanical'] %} corr-mechanical{% endif %}{% if cell['sign'] == 'neg' %} corr-neg{% endif %}{% if cell['heat'] %} heat-{{ cell['heat'] }}{% endif %}"
+                    {% if cell['mechanical'] %}title="Near-mechanical: {{ cp['labels'][i] }} and {{ cp['labels'][loop.index0] }} move together almost perfectly (r = {{ cell['display'] }}, {{ '{:,}'.format(cell['n']) }} cases) — the guidelines grid computing one from the other."{% elif cell['r'] is not none %}title="r = {{ cell['display'] }} ({{ '{:,}'.format(cell['n']) }} cases)"{% else %}title="Not enough shared data to compute r"{% endif %}>
+                    {{ cell['display'] }}{% if cell['mechanical'] %}<span class="corr-flag" aria-hidden="true">●</span>{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p class="table-note">
+    The diagonal is 1.00 (each column with itself). Cells are shaded on the same
+    scale as the Compare heatmap — strength only, so the sign lives in the number.{% if cp['mechanicalCount'] %}
+    <span class="corr-flag-key"><span class="corr-flag" aria-hidden="true">●</span> marks near-mechanical pairs.</span>{% endif %}
+    “—” means too few cases share both values to compute r.
+</p>

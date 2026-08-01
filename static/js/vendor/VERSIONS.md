@@ -9,6 +9,7 @@ artifact, replace the file, and update this manifest in the same commit.
 | `chart.umd.min.js` | Chart.js | 4.5.1 | https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js |
 | `chartjs-chart-treemap.min.js` | chartjs-chart-treemap | 3.1.0 | https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@3.1.0/dist/chartjs-chart-treemap.min.js |
 | `chartjs-chart-geo.min.js` | chartjs-chart-geo | 4.3.6 | https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4.3.6/build/index.umd.min.js |
+| `chartjs-chart-boxplot.min.js` | @sgratzl/chartjs-chart-boxplot | 4.4.5 | https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot@4.4.5/build/index.umd.min.js |
 
 `chartjs-chart-treemap` is a Chart.js 4 plugin (the Visualize **treemap**, `VISUALIZATION_EXPANSION.md`
 Phase 5). Its UMD build auto-registers `TreemapController`/`TreemapElement` when loaded **after**
@@ -20,6 +21,18 @@ global (`ChoroplethController`, `ProjectionScale`, `ColorScale`, `GeoFeature`, p
 `ChartGeo.topojson` for feature conversion) and does **not** self-register — the Visualize JS calls
 `Chart.register(...)` explicitly. Loaded only on the Visualize view (vendored in Phase 7; wired into
 the map render in Phase 8), after `chart.umd.min.js`.
+
+`chartjs-chart-boxplot` (`@sgratzl/chartjs-chart-boxplot`, MIT, peer `chart.js ^4.1.1`) is the
+Chart.js 4 plugin for the Visualize **box plot** (chart-library-expansion Phase D1). Its UMD build
+exposes the `ChartBoxPlot` global (`BoxPlotController`/`BoxAndWiskers`, `ViolinController`/`Violin`)
+and **self-registers** the `boxplot`/`violin` types on load (like the treemap plugin — it calls
+`registry.addControllers/addElements` itself), so it just loads after `chart.umd.min.js`. **Only the
+`boxplot` type is used** — fed B2's precomputed five-number summary + Tukey whiskers (`{min, max, q1,
+median, q3, mean, whiskerMin, whiskerMax, outliers: []}`), so no raw per-row arrays cross the wire.
+The **violin is NOT drawn by this plugin** (its `violin` type prefers raw `items` and couples to an
+internal `maxEstimate`/`coords` contract): the D1 spike chose a hand-rolled mirrored KDE-area render
+from B2's binned density (`static/js/visualize.js`) for cross-group-comparable width, exact token
+theming, and a guaranteed no-raw-array payload. Loaded only on the Visualize view.
 
 Related (outside this directory):
 

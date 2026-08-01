@@ -21,7 +21,7 @@ LESSONS_DIR = 'lessons'
 VALID_STEP_TYPES = {'read', 'explore', 'question', 'checkpoint'}
 VALID_ANSWER_TYPES = {'numeric', 'choice', 'free'}
 VALID_STATS = {'mean', 'median', 'std', 'count'}
-VALID_VIEWS = {'info', 'table'}
+VALID_VIEWS = {'info', 'table', 'chart'}
 
 # comparison operations, matching data.Data.filter
 VALID_OPS = {'eq', 'ne', 'gt', 'ge', 'lt', 'le'}
@@ -223,10 +223,22 @@ def _validate_focus(focus, where) -> None:
     if view == 'info':
         if not isinstance(focus.get('column'), str) or focus['column'] == '':
             raise LessonError(where + ": info view requires a 'column' string")
-    else:  # table
+    elif view == 'table':
         for key in ('dependant', 'x_axis', 'y_axis'):
             if not isinstance(focus.get(key), str) or focus[key] == '':
                 raise LessonError(where + ": table view requires a '" + key + "' string")
+    else:  # chart (E1): a pinned Visualize chart. Structural checks only — the app's
+           # build_lesson_chart resolves the chart against the live registry and degrades
+           # to the "no chart pinned" nudge on an unknown/invalid pick, so we don't couple
+           # this pure-stdlib validator to VIZ_CHART_TYPES.
+        if not isinstance(focus.get('chart'), str) or focus['chart'] == '':
+            raise LessonError(where + ": chart view requires a 'chart' type id (string)")
+        for key in ('column', 'column2', 'measure', 'aggregate'):
+            if key in focus and not isinstance(focus[key], str):
+                raise LessonError(where + ": chart view '" + key + "' must be a string")
+        if 'cols' in focus and not (isinstance(focus['cols'], list)
+                                    and all(isinstance(c, str) and c for c in focus['cols'])):
+            raise LessonError(where + ": chart view 'cols' must be a list of non-empty strings")
 
 
 def _validate_answer(answer, where) -> None:
@@ -237,6 +249,12 @@ def _validate_answer(answer, where) -> None:
     atype = answer.get('type')
     if atype not in VALID_ANSWER_TYPES:
         raise LessonError(where + ": invalid answer type " + repr(atype) + " (expected one of " + str(sorted(VALID_ANSWER_TYPES)) + ")")
+
+    # optional: a post-answer explanation, shown once the student has answered (any answer
+    # type may carry it, though it's most useful on 'choice'/'numeric'). Rendered read-only
+    # by the lesson step view; see lessons/README.md "Answer types".
+    if 'explanation' in answer and (not isinstance(answer['explanation'], str) or answer['explanation'] == ''):
+        raise LessonError(where + ": answer 'explanation' must be a non-empty string")
 
     if atype == 'numeric':
         compute = answer.get('compute')

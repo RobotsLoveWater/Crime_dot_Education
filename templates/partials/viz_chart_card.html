@@ -1,0 +1,19 @@
+{# One chart-finder card. Rendered per registry entry `ct` (with `picked_chart` in context) by
+   the family gallery in visualize_view.html — shared by the normal family groups and the
+   collapsed "Legacy" group so the card markup stays in one place. #}
+<li class="viz-card-item"
+    data-search="{{ (ct['label'] ~ ' ' ~ ct['synonyms']|join(' ') ~ ' ' ~ ct['tags']|join(' '))|lower }}">
+    <label class="viz-card">
+        <input type="radio" name="chart" value="{{ ct['id'] }}"
+               data-status="{{ ct['status'] }}"
+               data-info-label="{{ ct['label'] }}"
+               data-info-shows="{{ ct['info']['shows'] }}"
+               data-info-best="{{ ct['info']['best_for'] }}"
+               data-info-watch="{{ ct['info']['watch_out'] }}"
+               {% if picked_chart == ct['id'] %}checked{% endif %}>
+        <span class="viz-card-body">
+            <span class="viz-card-label">{{ ct['label'] }}</span>
+            <span class="viz-card-blurb">{{ ct['blurb'] }}</span>
+        </span>
+    </label>
+</li>
