@@ -1559,6 +1559,27 @@ a.browser-item:hover { background: var(--color-accent-subtle); }
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
 }
+/* authored "why this answer" explanation, shown after a question is answered. A neutral
+   accent callout (not the green/amber of the checkpoint pass/fail) so it reads as teaching
+   context rather than a correctness verdict. */
+.lesson-explanation {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-accent-subtle);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+}
+.lesson-explanation-label {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+}
+.lesson-explanation-body p { margin: 0; }
+.lesson-explanation-body p + p { margin-top: var(--space-2); }
 
 /* checkpoint pass/fail block */
 .checkpoint {

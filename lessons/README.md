@@ -121,6 +121,16 @@ Not supported (renders as literal text — check before authoring): numbered lis
 | `choice` | `options` (string[]), `correct` (0-based index) | Correct if the submitted index equals `correct`. Graded server-side. |
 | `free` | `model_answer` (string, optional) | Not auto-graded; the response is stored and marked "submitted". `model_answer` may be shown afterward. |
 
+**Optional `explanation` (any answer type).** A `question.answer` may carry an
+`explanation` string — the "why this answer" teaching text (why the right option is right,
+why the tempting wrong ones are wrong). It renders through the same `lesson_body` markdown
+subset as step bodies, so `**bold**`/`*italic*`/`` `code` `` work. It is shown **after the
+student answers**: always on a correct answer, and on a miss only when the class's retake
+policy reveals answers after a miss (so it can't leak the correct option to a student who
+still has attempts left — the same gate the correct-answer reveal uses). It is redundant on
+`free` questions (which aren't graded — use `model_answer` there) and won't render for them.
+Educators also see every authored `explanation` on the module's computed answer key.
+
 `compute.stat` ∈ `mean | median | std | count`, resolved live via `data.py`:
 
 | `stat` | Source (on the active state) |

@@ -45,6 +45,13 @@
             {% else %}
             <p class="muted-cell">Full dataset — no filters.</p>
             {% endif %}
+
+            {% if row['explanation'] %}
+            <div class="lesson-explanation">
+                <p class="lesson-explanation-label">Explanation shown to students</p>
+                <div class="lesson-explanation-body">{{ row['explanation']|lesson_body }}</div>
+            </div>
+            {% endif %}
         </li>
         {% endfor %}
     </ol>

@@ -250,6 +250,12 @@ def _validate_answer(answer, where) -> None:
     if atype not in VALID_ANSWER_TYPES:
         raise LessonError(where + ": invalid answer type " + repr(atype) + " (expected one of " + str(sorted(VALID_ANSWER_TYPES)) + ")")
 
+    # optional: a post-answer explanation, shown once the student has answered (any answer
+    # type may carry it, though it's most useful on 'choice'/'numeric'). Rendered read-only
+    # by the lesson step view; see lessons/README.md "Answer types".
+    if 'explanation' in answer and (not isinstance(answer['explanation'], str) or answer['explanation'] == ''):
+        raise LessonError(where + ": answer 'explanation' must be a non-empty string")
+
     if atype == 'numeric':
         compute = answer.get('compute')
         if not isinstance(compute, dict):

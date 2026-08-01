@@ -1,7 +1,7 @@
 {
   "id": "intro-explorer-basics",
   "title": "Driving the Explorer",
-  "description": "A guided tour of the Minnesota Sentencing Explorer itself: filter the data, read descriptive statistics, revert and clear your filter history, and read a cross-tabulation. No statistics background required.",
+  "description": "A guided tour of the Minnesota Sentencing Explorer itself: filter the data, read descriptive statistics, revert and clear your filter history, read a cross-tabulation, and turn a view into a chart. No statistics background required.",
   "author": "unmanaged",
   "order": 1,
   "objectives": [
@@ -10,7 +10,7 @@
     "Apply, chain, revert, and clear filters, and explain how the filter history works",
     "Locate the row count (N), mean, and median in a column summary",
     "Read a single cell of a cross-tabulation and explain what data it describes",
-    "Read a column's distribution as a chart in the Visualize tab"
+    "Read a column as a chart in the Visualize tab, and match a question to the right chart - a bar to compare, a line for change over time, a box for spread"
   ],
   "steps": [
     {
@@ -128,6 +128,43 @@
       }
     },
     {
+      "type": "explore",
+      "title": "Charts for comparing: the bar",
+      "body": "You have already met one chart - the **histogram** from the Visualize step, which showed the *shape* of a single numeric column. Different questions call for different charts, though, and the Visualize tab sorts them by the job they do. The most common job is **comparison**.\n\nClear your filters so you are back to the **whole dataset**, then ask a plain question: which offense categories show up most often? A **bar chart** answers it - one bar per `moc1` category, and the length of each bar is its case count. The longest bars are the most common offense types. When a column has a long tail of rare categories (this one has more than thirty), the **Other** cutoff slider folds the smallest ones together so the chart stays readable; the table underneath keeps every exact count.\n\nIn your other tab, open **Visualize**, pick **Bar**, and set the column to `moc1`.",
+      "state": [],
+      "focus": { "view": "chart", "chart": "bar", "column": "moc1", "measure": "#", "aggregate": "count" }
+    },
+    {
+      "type": "explore",
+      "title": "Charts for change over time: the line",
+      "body": "A second job is showing **change over time**. The question here: has the average presumptive sentence drifted up or down across the years?\n\nA **line chart** answers it. Each point is the **mean** of `time` for one `sentyear`, and the points are joined left to right so the trend is easy to follow. Read a line in two passes: first the overall direction across the whole span, then any single year where it turns. One caution the chart itself notes - the points are yearly *summaries*, not a smooth process, so read the broad trend rather than the jitter between two neighboring years.\n\nTry it yourself: in **Visualize**, pick **Line**, set the column to `sentyear`, the measure to `time`, and the aggregate to **mean**.",
+      "state": [],
+      "focus": { "view": "chart", "chart": "line", "column": "sentyear", "measure": "time", "aggregate": "mean" }
+    },
+    {
+      "type": "explore",
+      "title": "Charts for spread: the box plot",
+      "body": "A third job is comparing **spread**, not just averages. Two groups can share almost the same average sentence while one is far more spread out than the other - and an average alone hides that.\n\nA **box plot** shows it. This one draws `time` split by `sex`, comparing the two main groups of people - we have set aside a handful of corporate defendants, too few to picture. In each box, the line inside is the **median**, the box spans the middle half of cases (the 25th to the 75th percentile), and the whiskers reach most of the rest; unusually long sentences sit beyond them. Compare the two boxes side by side: is one group's *middle* higher, and is one group's *spread* wider?\n\nOne caution to carry with you: a visible gap between two groups is a **description** of the data, not an **explanation** of why it is there. A later module is devoted entirely to that distinction. For now, just practice reading the box.\n\nIn your other tab: **Visualize**, pick **Box plot**, set the column to `time` and the second column to `sex`.",
+      "state": ["f.sex.ne.corp"],
+      "focus": { "view": "chart", "chart": "box", "column": "time", "column2": "sex" }
+    },
+    {
+      "type": "question",
+      "title": "Which chart for which question?",
+      "body": "Suppose you want to know whether the **average** sentence length has risen or fallen since 2001. Which chart answers that most directly?",
+      "answer": {
+        "type": "choice",
+        "options": [
+          "A line chart of mean sentence length across the years",
+          "A bar chart of case counts by offense category",
+          "A histogram of sentence length",
+          "A box plot of sentence length by sex"
+        ],
+        "correct": 0,
+        "explanation": "*Risen or fallen since 2001* is a question about **change over time**, and a line chart shows it directly - the mean of `time` at each `sentyear`, read left to right. A bar compares categories, a histogram shows one column's overall shape with no time axis, and a box compares spread between groups. Matching the question to the chart's job is the whole skill."
+      }
+    },
+    {
       "type": "read",
       "title": "Cross-tabulation: comparing groups",
       "body": "A **cross-tabulation** (crosstab) splits the data by **two** grouping columns at once and reports, in every cell, the N, mean, median, and std of a third, numeric column. It answers questions shaped like: *how does presumptive sentence length differ across offense categories, year by year?*\n\nOne caution to carry with you from day one: a difference between two cells is a **description** of the data, not an **explanation** of why the difference exists. A later module is devoted entirely to that distinction.\n\nFor the next view we **clear** the history first (our second undo tool in action) and start fresh."
@@ -160,7 +197,7 @@
     {
       "type": "read",
       "title": "You can drive",
-      "body": "The five skills, in one breath: **filter** narrows the view and joins the history; **descriptive stats** summarize any column of the current view; **revert** steps the history back once; **clear** empties it; and a **crosstab** compares a numeric column across two groupings - where every cell is itself just a filtered view.\n\nOne last task, on your own. In your **other tab**, clear your history, then build this exact view from scratch:\n\n1. Filter `sentyear` **equals** `2018`.\n2. Drill the offense code into **Assault** (`moc1 == A`) - in that order.\n\nWhen your history matches, continue to the checkpoint below."
+      "body": "The tools, in one breath: **filter** narrows the view and joins the history; **descriptive stats** summarize any column of the current view; the **Visualize** tab turns a view into a chart - a bar to compare, a line to track change across the years, a histogram or box to read a distribution; **revert** steps the history back once and **clear** empties it; and a **crosstab** compares a numeric column across two groupings - where every cell is itself just a filtered view.\n\nOne last task, on your own. In your **other tab**, clear your history, then build this exact view from scratch:\n\n1. Filter `sentyear` **equals** `2018`.\n2. Drill the offense code into **Assault** (`moc1 == A`) - in that order.\n\nWhen your history matches, continue to the checkpoint below."
     },
     {
       "type": "checkpoint",

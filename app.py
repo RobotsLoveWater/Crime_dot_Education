@@ -5684,7 +5684,8 @@ def build_answer_key(module):
 
         answer = step['answer']
         state = resolve_module_state(module, i)
-        row = {'step': i, 'title': step['title'], 'type': answer['type'], 'chips': lesson_chips(state)}
+        row = {'step': i, 'title': step['title'], 'type': answer['type'], 'chips': lesson_chips(state),
+               'explanation': answer.get('explanation')}
 
         if answer['type'] == 'numeric':
             row['expected'] = compute_expected(module['id'], step, state=state)
@@ -5767,6 +5768,19 @@ def build_question(module_id, step_index, step, policy):
         elif answer['type'] == 'choice':
             reveal = answer['options'][answer['correct']]
 
+    # authored post-answer explanation (the "why this answer" teaching text): shown once the
+    # student has answered -- always on a correct answer, and on a miss only when the class
+    # policy already reveals the answer after a miss. Gating the miss case on reveal_after_miss
+    # keeps an explanation (which typically names the correct option) from leaking the answer
+    # and undercutting an educator's retake policy, exactly as `reveal` above is gated. 'free'
+    # answers aren't graded (correct is None), so their model_answer covers this role instead.
+    explanation = None
+    authored_explanation = answer.get('explanation')
+    if authored_explanation and prior is not None:
+        correct = prior.get('correct')
+        if correct is True or (correct is False and policy['reveal_after_miss']):
+            explanation = authored_explanation
+
     return {
         'type': answer['type'],
         'options': answer.get('options'),          # choice
@@ -5778,6 +5792,7 @@ def build_question(module_id, step_index, step, policy):
         'attempts_allowed': attempts_allowed,
         'locked': attempts_allowed is not None and attempts_used >= attempts_allowed,
         'reveal': reveal,
+        'explanation': explanation,                # post-answer "why" text, policy-gated above
         'show_tolerance': policy['show_tolerance'],
         'tolerance': answer.get('tolerance'),       # numeric
     }

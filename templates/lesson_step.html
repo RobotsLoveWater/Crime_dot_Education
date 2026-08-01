@@ -119,6 +119,14 @@
             {% if question['reveal'] is not none %}
             <p class="lesson-model"><em>Correct answer:</em> {{ question['reveal'] }}{% if question['type'] == 'numeric' and question['show_tolerance'] and question['tolerance'] is not none %} (&plusmn;{{ question['tolerance'] }}){% endif %}</p>
             {% endif %}
+
+            {# authored "why this answer" text, surfaced after answering (policy-gated in build_question) #}
+            {% if question['explanation'] %}
+            <div class="lesson-explanation">
+                <p class="lesson-explanation-label">Why this answer</p>
+                <div class="lesson-explanation-body">{{ question['explanation']|lesson_body }}</div>
+            </div>
+            {% endif %}
         {% endif %}
 
         {% elif step['type'] == 'checkpoint' and checkpoint %}
