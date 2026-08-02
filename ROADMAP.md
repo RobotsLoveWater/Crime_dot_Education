@@ -45,8 +45,9 @@ notes. This **subsumed the "Real authentication" item** under Platform hardening
 now verifies passwords and reads `secret_key` from config, since the portal exposes cross-account
 student data.
 
-Governed by two documents: **`EDUCATOR_PORTAL.md`** (scope & design authority) and
-**`EDUCATOR_PORTAL_PROMPTS.md`** (the 14-phase build order, 0–13). Delivered scope: auth + P0 + P1.
+Governed by two documents: the [educator portal design authority](docs/architecture/educator-portal.md)
+and its [archived implementation plan](docs/archive/plans/educator-portal-prompts.md) (the 14-phase
+build order, 0–13). Delivered scope: auth + P0 + P1.
 **Still deferred (P2 / grant scope):** fork-and-edit modules, standards-alignment tags, and a full
 authoring UI — see section 5. Residual auth hardening (rate-limiting, HTTPS, a real educator-role
 boundary) is also still open — see section 3.
@@ -63,9 +64,9 @@ filter typing it would, verified byte-identical at the cache-directory level
 (`test_map_filter_equivalence.py`). Also added `mode` as a descriptive statistic alongside mean/
 median everywhere they appear.
 
-Governed by two documents: **`VISUALIZATION_EXPANSION.md`** (scope & design authority) and
-**`VISUALIZATION_EXPANSION_PROMPTS.md`** (the 16-phase build order, 0–15, all done). **One tracked
-gap:** no shipped lesson uses a Visualize chart yet — `app.build_lesson_data` only supports `info`/
+Governed by the [visualization design authority](docs/design/visualization-expansion.md) and its
+[archived implementation plan](docs/archive/plans/visualization-expansion-prompts.md) (the 16-phase
+build order, 0–15, all done). **One tracked gap:** no shipped lesson uses a Visualize chart yet — `app.build_lesson_data` only supports `info`/
 `table` focus views; closing it needs a new chart focus-view plus an authored lesson step (folded
 into section 2's "grow the lesson library" item below, not a blocker on the tab itself).
 
@@ -93,8 +94,10 @@ into section 2's "grow the lesson library" item below, not a blocker on the tab 
   gap: `app.build_lesson_data` only renders `info`/`table` focus views, so no lesson can dock a
   Visualize chart (pie/treemap/waterfall/choropleth/scatter/correlation) yet. Needs a new focus
   type plus an authored step using it.
-- **Align the lesson docs.** `lessons/README.md` and `LEARNING_MODULES_PROMPTS.md` still read as
-  forward-looking plans; update them to the shipped implementation (as `CLAUDE.md` now is).
+- **Align the lesson docs.** [`content/lessons/README.md`](content/lessons/README.md) and the
+  [archived learning-modules plan](docs/archive/plans/learning-modules-prompts.md) still read as
+  forward-looking plans; update them to the shipped implementation (as the
+  [contributor guide](docs/architecture/contributor-guide.md) now is).
 
 ### 3. Platform hardening (prerequisites for real deployment)
 
@@ -127,13 +130,15 @@ into section 2's "grow the lesson library" item below, not a blocker on the tab 
   1.72 GiB → 0.22 GiB), load-once per process (base parse 4.2 s → ~0 on reuse), a typed Parquet
   base (231 MB → 23 MB on disk; cold load 4.2 s → 0.25 s), and gunicorn `--preload` so workers
   share one copy-on-write base instead of `workers ×`. Design authority:
-  **`BASE_DATAFRAME_OPTIMIZATION.md`**; build order: **`OPTIMIZATION_PROMPTS.md`** (Phases 0–4).
+  [base-DataFrame optimization design](docs/architecture/base-dataframe-optimization.md); build
+  order: [archived implementation plan](docs/archive/plans/base-dataframe-optimization-prompts.md)
+  (Phases 0–4).
 - Curated, possibly public (no-login) "research views" for dissemination beyond the classroom.
 
 ## Principles (carried forward)
 
 - **File-based, no database** — accounts as pickles, content as JSON/XML, results as a
-  regenerable disk cache. Keep authored content (`lessons/`) committable and private/large data
+  regenerable disk cache. Keep authored content (`content/lessons/`) committable and private/large data
   (`user/`, `cache/`) out of git.
 - **The data state is the substrate.** Filtering, stats, tables, and lessons are all
   deterministic functions of a filter *history*; reuse that model rather than forking it.

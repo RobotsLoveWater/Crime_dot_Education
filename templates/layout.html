@@ -22,17 +22,39 @@
             root.classList.add('js');
 
             // Chart palette (partner of static/js/palette.js): apply the saved mode + any
-            // custom colors before first paint — same FOUC-guard reason as the theme. The
-            // 'cb' (colorblind-safe) colors live in tokens.css ([data-palette="cb"]);
-            // 'custom' colors are inline --chart-N on <html>, which win over the tokens.
+            // custom colors before first paint — same FOUC-guard reason as the theme.
+            // Named palettes live in tokens.css; Custom colors are inline --chart-N values.
             try {
                 var pmode = localStorage.getItem('palette');
-                if (pmode === 'cb' || pmode === 'custom') root.setAttribute('data-palette', pmode);
-                if (pmode === 'custom') {
-                    var pc = JSON.parse(localStorage.getItem('paletteColors') || '[]');
-                    for (var i = 0; i < 8 && i < pc.length; i++) {
-                        if (pc[i]) root.style.setProperty('--chart-' + (i + 1), pc[i]);
+                var paletteModes = ['default', 'universal', 'protan', 'deutan', 'tritan', 'mono', 'custom'];
+                var hex6 = /^#[0-9a-f]{6}$/i;
+                // The former Colorblind-safe mode becomes the recommended general option.
+                if (pmode === 'cb') {
+                    pmode = 'universal';
+                    localStorage.setItem('palette', pmode);
+                }
+                var pc = JSON.parse(localStorage.getItem('paletteColors') || '[]');
+                var validCustom = Array.isArray(pc) && pc.length === 8 &&
+                    pc.every(function (color) { return typeof color === 'string' && hex6.test(color); });
+                // Preserve a valid saved custom set for its card preview even when a named
+                // palette is active. Do not partially apply a damaged saved palette.
+                if (validCustom) {
+                    for (var i = 0; i < 8; i++) {
+                        root.style.setProperty('--palette-custom-' + (i + 1), pc[i]);
                     }
+                }
+                if (pmode === 'custom') {
+                    if (validCustom) {
+                        root.setAttribute('data-palette', 'custom');
+                        for (var i = 0; i < 8; i++) {
+                            root.style.setProperty('--chart-' + (i + 1), pc[i]);
+                        }
+                    } else {
+                        pmode = 'default';
+                        localStorage.setItem('palette', pmode);
+                    }
+                } else if (paletteModes.indexOf(pmode) !== -1 && pmode !== 'default') {
+                    root.setAttribute('data-palette', pmode);
                 }
             } catch (e) { /* storage/JSON blocked — the default palette still renders */ }
         })();
@@ -295,36 +317,109 @@
 </dialog>
 
 <!-- CHART COLORS DIALOG: opened by #palette-toggle, driven by static/js/palette.js.
-     Sets a device-wide categorical palette (Default / Colorblind-safe / Custom) applied
-     to every chart via the --chart-1..8 tokens. -->
-<dialog class="dialog" id="palette-dialog" aria-labelledby="palette-dialog-title">
-    <div class="dialog-body palette-dialog">
+     Sets a device-wide categorical palette applied to every chart via --chart-1..8. -->
+<dialog class="dialog palette-dialog" id="palette-dialog" aria-labelledby="palette-dialog-title">
+    <div class="dialog-body">
         <h2 class="dialog-title" id="palette-dialog-title">Chart colors</h2>
-        <p class="dialog-message">How categorical chart series are colored. Applies to every
-            chart and is saved on this device.</p>
+        <p class="dialog-message">Choose the set that makes chart series easiest for you to distinguish.
+            It applies to every chart and is saved on this device.</p>
         <fieldset class="palette-modes">
-            <legend class="visually-hidden">Palette</legend>
-            <label class="palette-mode">
-                <input type="radio" name="palette-mode" value="default">
-                <span class="palette-mode-text">
-                    <span class="palette-mode-name">Default</span>
-                    <span class="palette-mode-hint">The standard eight-color set.</span>
-                </span>
-            </label>
-            <label class="palette-mode">
-                <input type="radio" name="palette-mode" value="cb">
-                <span class="palette-mode-text">
-                    <span class="palette-mode-name">Colorblind-safe</span>
-                    <span class="palette-mode-hint">Stays distinct under common color-vision deficiencies.</span>
-                </span>
-            </label>
-            <label class="palette-mode">
-                <input type="radio" name="palette-mode" value="custom">
-                <span class="palette-mode-text">
-                    <span class="palette-mode-name">Custom</span>
-                    <span class="palette-mode-hint">Choose your own eight colors.</span>
-                </span>
-            </label>
+            <legend class="visually-hidden">Chart color palette</legend>
+            <div class="palette-group" role="group" aria-labelledby="palette-standard-title">
+                <p class="palette-group-title" id="palette-standard-title">Standard</p>
+                <label class="palette-mode palette-mode--default">
+                    <input type="radio" name="palette-mode" value="default">
+                    <span class="palette-mode-content">
+                        <span class="palette-mode-text">
+                            <span class="palette-mode-name">Standard</span>
+                            <span class="palette-mode-hint">The familiar eight-color set.</span>
+                        </span>
+                        <span class="palette-option-preview" aria-hidden="true">
+                            {% for i in range(1, 9) %}<span class="palette-option-swatch palette-option-swatch-{{ i }}"></span>{% endfor %}
+                        </span>
+                    </span>
+                </label>
+            </div>
+
+            <div class="palette-group" role="group" aria-labelledby="palette-vision-title">
+                <p class="palette-group-title" id="palette-vision-title">Color vision</p>
+                <label class="palette-mode palette-mode--universal">
+                    <input type="radio" name="palette-mode" value="universal">
+                    <span class="palette-mode-content">
+                        <span class="palette-mode-text">
+                            <span class="palette-mode-name">General colorblind-safe <span class="palette-recommended">Recommended</span></span>
+                            <span class="palette-mode-hint">A strong general choice when you are unsure which colors work best for you.</span>
+                        </span>
+                        <span class="palette-option-preview" aria-hidden="true">
+                            {% for i in range(1, 9) %}<span class="palette-option-swatch palette-option-swatch-{{ i }}"></span>{% endfor %}
+                        </span>
+                    </span>
+                </label>
+                <label class="palette-mode palette-mode--protan">
+                    <input type="radio" name="palette-mode" value="protan">
+                    <span class="palette-mode-content">
+                        <span class="palette-mode-text">
+                            <span class="palette-mode-name">Red-weak</span>
+                            <span class="palette-mode-hint">Designed for difficulty distinguishing reds.</span>
+                        </span>
+                        <span class="palette-option-preview" aria-hidden="true">
+                            {% for i in range(1, 9) %}<span class="palette-option-swatch palette-option-swatch-{{ i }}"></span>{% endfor %}
+                        </span>
+                    </span>
+                </label>
+                <label class="palette-mode palette-mode--deutan">
+                    <input type="radio" name="palette-mode" value="deutan">
+                    <span class="palette-mode-content">
+                        <span class="palette-mode-text">
+                            <span class="palette-mode-name">Green-weak</span>
+                            <span class="palette-mode-hint">Designed for difficulty distinguishing greens.</span>
+                        </span>
+                        <span class="palette-option-preview" aria-hidden="true">
+                            {% for i in range(1, 9) %}<span class="palette-option-swatch palette-option-swatch-{{ i }}"></span>{% endfor %}
+                        </span>
+                    </span>
+                </label>
+                <label class="palette-mode palette-mode--tritan">
+                    <input type="radio" name="palette-mode" value="tritan">
+                    <span class="palette-mode-content">
+                        <span class="palette-mode-text">
+                            <span class="palette-mode-name">Blue–yellow</span>
+                            <span class="palette-mode-hint">Designed for difficulty distinguishing blues and yellows.</span>
+                        </span>
+                        <span class="palette-option-preview" aria-hidden="true">
+                            {% for i in range(1, 9) %}<span class="palette-option-swatch palette-option-swatch-{{ i }}"></span>{% endfor %}
+                        </span>
+                    </span>
+                </label>
+                <label class="palette-mode palette-mode--mono">
+                    <input type="radio" name="palette-mode" value="mono">
+                    <span class="palette-mode-content">
+                        <span class="palette-mode-text">
+                            <span class="palette-mode-name">Monochrome</span>
+                            <span class="palette-mode-hint">Uses lightness and contrast instead of hue.</span>
+                        </span>
+                        <span class="palette-option-preview" aria-hidden="true">
+                            {% for i in range(1, 9) %}<span class="palette-option-swatch palette-option-swatch-{{ i }}"></span>{% endfor %}
+                        </span>
+                    </span>
+                </label>
+            </div>
+
+            <div class="palette-group" role="group" aria-labelledby="palette-custom-title">
+                <p class="palette-group-title" id="palette-custom-title">Custom</p>
+                <label class="palette-mode palette-mode--custom">
+                    <input type="radio" name="palette-mode" value="custom">
+                    <span class="palette-mode-content">
+                        <span class="palette-mode-text">
+                            <span class="palette-mode-name">Custom</span>
+                            <span class="palette-mode-hint">Choose your own eight colors.</span>
+                        </span>
+                        <span class="palette-option-preview" aria-hidden="true">
+                            {% for i in range(1, 9) %}<span class="palette-option-swatch palette-option-swatch-{{ i }}"></span>{% endfor %}
+                        </span>
+                    </span>
+                </label>
+            </div>
         </fieldset>
 
         <div class="palette-custom" id="palette-custom" hidden>
@@ -337,10 +432,6 @@
                 {% endfor %}
             </div>
             <button type="button" class="btn btn-secondary btn-sm" id="palette-reset-custom">Reset to default colors</button>
-        </div>
-
-        <div class="palette-preview" id="palette-preview" aria-hidden="true">
-            {% for i in range(1, 9) %}<span class="palette-preview-swatch" style="background: var(--chart-{{ i }})"></span>{% endfor %}
         </div>
 
         <div class="dialog-actions">

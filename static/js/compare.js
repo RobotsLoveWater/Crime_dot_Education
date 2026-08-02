@@ -17,6 +17,35 @@
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
 
+  // The palette modes use stable textures alongside hue for grouped bars. Standard and Custom
+  // remain visually unchanged; CanvasPattern is native and needs no new chart dependency.
+  var ACCESSIBILITY_PALETTES = ['universal', 'protan', 'deutan', 'tritan', 'mono'];
+  function usesAccessibilityCues() {
+    return ACCESSIBILITY_PALETTES.indexOf(document.documentElement.getAttribute('data-palette')) !== -1;
+  }
+
+  function cuePattern(canvas, color, index) {
+    if (!usesAccessibilityCues()) return color;
+    var tile = document.createElement('canvas');
+    tile.width = tile.height = 12;
+    var g = tile.getContext('2d');
+    g.fillStyle = color;
+    g.fillRect(0, 0, 12, 12);
+    g.strokeStyle = cssVar('--color-surface');
+    g.fillStyle = cssVar('--color-surface');
+    g.lineWidth = 1.5;
+    var cue = index % 8;
+    g.beginPath();
+    if (cue === 0 || cue === 4) { g.moveTo(-3, 12); g.lineTo(12, -3); }
+    if (cue === 1 || cue === 4) { g.moveTo(-3, 0); g.lineTo(12, 15); }
+    if (cue === 2 || cue === 6) { g.moveTo(3, 0); g.lineTo(3, 12); g.moveTo(9, 0); g.lineTo(9, 12); }
+    if (cue === 3 || cue === 6) { g.moveTo(0, 3); g.lineTo(12, 3); g.moveTo(0, 9); g.lineTo(12, 9); }
+    if (cue === 5) { g.arc(3, 3, 1.25, 0, 2 * Math.PI); g.arc(9, 9, 1.25, 0, 2 * Math.PI); }
+    if (cue === 7) { g.fillRect(1, 1, 3, 3); g.fillRect(7, 7, 3, 3); }
+    if (cue !== 5 && cue !== 7) g.stroke(); else g.fill();
+    return canvas.getContext('2d').createPattern(tile, 'repeat') || color;
+  }
+
   function currentStat() {
     var table = document.getElementById('crosstab');
     if (!table) return 'n';
@@ -56,7 +85,9 @@
           return {
             label: String(name),
             data: values[index],
-            backgroundColor: cssVar('--chart-' + (index % 8 + 1)),
+            backgroundColor: cuePattern(canvas, cssVar('--chart-' + (index % 8 + 1)), index),
+            borderColor: cssVar('--chart-' + (index % 8 + 1)),
+            borderWidth: usesAccessibilityCues() ? 1 : 0,
             borderRadius: 2,
             maxBarThickness: 32
           };

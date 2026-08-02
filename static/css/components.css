@@ -255,30 +255,188 @@ a.chip:hover {
 }
 
 /* ---------- Chart colors dialog (global palette control, palette.js) ---------- */
-.palette-dialog { width: min(460px, calc(100vw - 2 * var(--space-4))); }
+.palette-dialog {
+  width: min(780px, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow: hidden;
+}
+.palette-dialog .dialog-body {
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .palette-modes {
   border: 0;
   padding: 0;
   margin: 0 0 var(--space-4);
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.palette-group {
+  display: grid;
+  align-content: start;
   gap: var(--space-2);
 }
+.palette-group:nth-of-type(2) { grid-column: 1 / -1; }
+.palette-group-title {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.palette-group:nth-of-type(2) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.palette-group:nth-of-type(2) .palette-group-title { grid-column: 1 / -1; }
 .palette-mode {
+  --palette-preview-1: var(--chart-1);
+  --palette-preview-2: var(--chart-2);
+  --palette-preview-3: var(--chart-3);
+  --palette-preview-4: var(--chart-4);
+  --palette-preview-5: var(--chart-5);
+  --palette-preview-6: var(--chart-6);
+  --palette-preview-7: var(--chart-7);
+  --palette-preview-8: var(--chart-8);
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 44px;
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  background: var(--color-surface);
   cursor: pointer;
+  transition: border-color 120ms var(--ease), background 120ms var(--ease);
 }
 .palette-mode:hover { border-color: var(--color-border-strong); }
-.palette-mode:focus-within { border-color: var(--color-accent); }
-.palette-mode input { margin-top: 2px; accent-color: var(--color-accent); }
+.palette-mode:focus-within {
+  border-color: var(--color-accent);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.palette-mode:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+.palette-mode input {
+  flex: none;
+  margin: 3px 0 0;
+  accent-color: var(--color-accent);
+}
+.palette-mode-content {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: var(--space-2);
+}
 .palette-mode-text { display: flex; flex-direction: column; gap: 2px; }
 .palette-mode-name { font-weight: 600; }
 .palette-mode-hint { color: var(--color-text-muted); font-size: var(--fs-sm); }
+.palette-recommended {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  vertical-align: 1px;
+}
+.palette-option-preview {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+}
+.palette-option-swatch {
+  display: block;
+  height: 10px;
+  min-width: 0;
+  border-radius: var(--radius-full);
+}
+.palette-option-swatch-1 { background: var(--palette-preview-1); }
+.palette-option-swatch-2 { background: var(--palette-preview-2); }
+.palette-option-swatch-3 { background: var(--palette-preview-3); }
+.palette-option-swatch-4 { background: var(--palette-preview-4); }
+.palette-option-swatch-5 { background: var(--palette-preview-5); }
+.palette-option-swatch-6 { background: var(--palette-preview-6); }
+.palette-option-swatch-7 { background: var(--palette-preview-7); }
+.palette-option-swatch-8 { background: var(--palette-preview-8); }
+
+/* Preview tokens are defined in tokens.css so the gallery reflects each palette,
+   rather than whichever palette happens to be selected on the document root. */
+.palette-mode--default {
+  --palette-preview-1: var(--palette-default-1, var(--chart-1));
+  --palette-preview-2: var(--palette-default-2, var(--chart-2));
+  --palette-preview-3: var(--palette-default-3, var(--chart-3));
+  --palette-preview-4: var(--palette-default-4, var(--chart-4));
+  --palette-preview-5: var(--palette-default-5, var(--chart-5));
+  --palette-preview-6: var(--palette-default-6, var(--chart-6));
+  --palette-preview-7: var(--palette-default-7, var(--chart-7));
+  --palette-preview-8: var(--palette-default-8, var(--chart-8));
+}
+.palette-mode--universal {
+  --palette-preview-1: var(--palette-universal-1, var(--chart-1));
+  --palette-preview-2: var(--palette-universal-2, var(--chart-2));
+  --palette-preview-3: var(--palette-universal-3, var(--chart-3));
+  --palette-preview-4: var(--palette-universal-4, var(--chart-4));
+  --palette-preview-5: var(--palette-universal-5, var(--chart-5));
+  --palette-preview-6: var(--palette-universal-6, var(--chart-6));
+  --palette-preview-7: var(--palette-universal-7, var(--chart-7));
+  --palette-preview-8: var(--palette-universal-8, var(--chart-8));
+}
+.palette-mode--protan {
+  --palette-preview-1: var(--palette-protan-1, var(--chart-1));
+  --palette-preview-2: var(--palette-protan-2, var(--chart-2));
+  --palette-preview-3: var(--palette-protan-3, var(--chart-3));
+  --palette-preview-4: var(--palette-protan-4, var(--chart-4));
+  --palette-preview-5: var(--palette-protan-5, var(--chart-5));
+  --palette-preview-6: var(--palette-protan-6, var(--chart-6));
+  --palette-preview-7: var(--palette-protan-7, var(--chart-7));
+  --palette-preview-8: var(--palette-protan-8, var(--chart-8));
+}
+.palette-mode--deutan {
+  --palette-preview-1: var(--palette-deutan-1, var(--chart-1));
+  --palette-preview-2: var(--palette-deutan-2, var(--chart-2));
+  --palette-preview-3: var(--palette-deutan-3, var(--chart-3));
+  --palette-preview-4: var(--palette-deutan-4, var(--chart-4));
+  --palette-preview-5: var(--palette-deutan-5, var(--chart-5));
+  --palette-preview-6: var(--palette-deutan-6, var(--chart-6));
+  --palette-preview-7: var(--palette-deutan-7, var(--chart-7));
+  --palette-preview-8: var(--palette-deutan-8, var(--chart-8));
+}
+.palette-mode--tritan {
+  --palette-preview-1: var(--palette-tritan-1, var(--chart-1));
+  --palette-preview-2: var(--palette-tritan-2, var(--chart-2));
+  --palette-preview-3: var(--palette-tritan-3, var(--chart-3));
+  --palette-preview-4: var(--palette-tritan-4, var(--chart-4));
+  --palette-preview-5: var(--palette-tritan-5, var(--chart-5));
+  --palette-preview-6: var(--palette-tritan-6, var(--chart-6));
+  --palette-preview-7: var(--palette-tritan-7, var(--chart-7));
+  --palette-preview-8: var(--palette-tritan-8, var(--chart-8));
+}
+.palette-mode--mono {
+  --palette-preview-1: var(--palette-mono-1, var(--chart-1));
+  --palette-preview-2: var(--palette-mono-2, var(--chart-2));
+  --palette-preview-3: var(--palette-mono-3, var(--chart-3));
+  --palette-preview-4: var(--palette-mono-4, var(--chart-4));
+  --palette-preview-5: var(--palette-mono-5, var(--chart-5));
+  --palette-preview-6: var(--palette-mono-6, var(--chart-6));
+  --palette-preview-7: var(--palette-mono-7, var(--chart-7));
+  --palette-preview-8: var(--palette-mono-8, var(--chart-8));
+}
+.palette-mode--custom {
+  --palette-preview-1: var(--palette-custom-1, var(--chart-1));
+  --palette-preview-2: var(--palette-custom-2, var(--chart-2));
+  --palette-preview-3: var(--palette-custom-3, var(--chart-3));
+  --palette-preview-4: var(--palette-custom-4, var(--chart-4));
+  --palette-preview-5: var(--palette-custom-5, var(--chart-5));
+  --palette-preview-6: var(--palette-custom-6, var(--chart-6));
+  --palette-preview-7: var(--palette-custom-7, var(--chart-7));
+  --palette-preview-8: var(--palette-custom-8, var(--chart-8));
+}
 
 .palette-custom { margin-bottom: var(--space-4); }
 .palette-swatches {
@@ -298,15 +456,11 @@ a.chip:hover {
   cursor: pointer;
 }
 
-.palette-preview {
-  display: flex;
-  gap: var(--space-1);
-  margin-bottom: var(--space-5);
-}
-.palette-preview-swatch {
-  flex: 1;
-  height: 10px;
-  border-radius: var(--radius-full);
+@media (max-width: 767px) {
+  .palette-dialog { width: min(100%, calc(100vw - 2 * var(--space-3))); }
+  .palette-modes,
+  .palette-group:nth-of-type(2) { grid-template-columns: 1fr; }
+  .palette-group:nth-of-type(2) .palette-group-title { grid-column: auto; }
 }
 
 /* ---------- Inline alerts (form/validation errors stay inline, not toasts) ---------- */

@@ -84,9 +84,27 @@ slots never share a family — validated visually distinct with the dataviz skil
 · `--chart-5` `#0891B2` · `--chart-6` `#CA8A04` · `--chart-7` `#8B5CF6` · `--chart-8` `#DB2777`
 
 A device-wide **"Chart colors"** control (top bar → Colors; `static/js/palette.js`) swaps these
-tokens app-wide between **Default**, a **Colorblind-safe** set (`[data-palette="cb"]` in
-`tokens.css`, theme-aware), and **Custom** (eight user hexes applied inline). It persists to
-`localStorage` and, like the theme toggle, dispatches `themechange` so live charts redraw.
+tokens app-wide between **Standard**, **General colorblind-safe** (recommended), **Red-weak
+(protan)**, **Green-weak (deutan)**, **Blue–yellow (tritan)**, **Monochrome**, and **Custom**.
+The five accessibility modes are theme-aware; Custom applies eight validated user hexes inline.
+The choice persists in `localStorage` and, like the theme toggle, dispatches `themechange` so live
+charts redraw without a request. The former stored value `cb` migrates to `universal`, preserving
+the old colorblind-safe preference.
+
+The setting changes the categorical `--chart-1`…`--chart-8` series tokens, not semantic UI colors
+or sequential heat ramps. Each radio card previews its own eight colors. Accessibility modes also
+turn on a stable non-color cue per series: CanvasPattern fills for filled categorical marks and
+grouped boxes/violins, line dashes plus point shapes for multi-series trends, and opposing hatch
+directions for waterfall increases/decreases. Standard and Custom retain their unpatterned look.
+Companion tables, direct labels, map hatching, signed correlation values, and other existing text
+cues remain the accessible source of exact values. Monochrome depends on these patterns and labels;
+eight gray levels alone are not treated as sufficient identification.
+
+Palette maintenance is guarded by `tests/test_palette_validation.py`, an offline standard-library
+check that parses `tokens.css`, verifies complete eight-slot light/dark rows, simulates complete
+protan/deutan/tritan vision with the documented Machado matrices, measures Lab separation, and
+checks that marks remain visible on the actual chart surfaces. Simulation is a design guardrail,
+not a diagnosis or a substitute for review by people with color-vision deficiencies.
 
 Heatmap shading (crosstab): a single-hue ramp from `--color-accent-subtle` → `--color-accent`.
 The number is **always rendered in the cell** — color is never the only signal.
@@ -526,6 +544,8 @@ reserves its height so the footer is never covered.
 - `aria-current="page"` on active nav; toasts `role="status"`; icons paired with text
   (correct/incorrect shows ✓/✗ **and** words **and** color).
 - `prefers-reduced-motion` honored; 44px touch targets under 1024px.
+- Categorical charts remain understandable without hue alone: accessibility palettes use stable
+  patterns/dashes/shapes, and every chart retains its companion table or textual equivalent.
 
 ## Voice & copy
 

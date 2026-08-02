@@ -3,7 +3,7 @@
     Push a single updated lesson JSON to the running server (targeted bugfix update).
 
 .DESCRIPTION
-    Uploads one lessons/<id>.json file to the deployed app and drops it into place,
+    Uploads one content/lessons/<id>.json file to the deployed app and drops it into place,
     owned by the service user. Lessons are read fresh from disk on every request
     (lessons.get_module), so the change is live immediately - NO redeploy, rebuild,
     or service restart is required.
@@ -23,7 +23,7 @@
 .EXAMPLE
     # A different lesson file, with an explicit key:
     .\update-lesson.ps1 -Server ubuntu@203.0.113.10 -SshKey ~\.ssh\id_ed25519 `
-                        -LessonFile ..\lessons\intro-explorer-basics.json
+                        -LessonFile ..\content\lessons\intro-explorer-basics.json
 #>
 [CmdletBinding()]
 param(
@@ -35,7 +35,7 @@ param(
     [string]$SshKey,
 
     # The lesson JSON to upload. Defaults to the one this update fixes.
-    [string]$LessonFile = (Join-Path $PSScriptRoot "..\lessons\intro-descriptive-stats.json"),
+    [string]$LessonFile = (Join-Path $PSScriptRoot "..\content\lessons\intro-descriptive-stats.json"),
 
     # Service user + app name on the server (must match your setup.sh deploy).
     [string]$AppUser = "crimeedu",
@@ -83,7 +83,7 @@ if ($SshKey) {
 }
 
 $stage  = "/tmp/$fileName"
-$target = "$AppDir/lessons/$fileName"
+$target = "$AppDir/content/lessons/$fileName"
 
 # --- 1. upload to a staging path --------------------------------------------
 Write-Host "==> Uploading $fileName -> ${Server}:$stage" -ForegroundColor Cyan

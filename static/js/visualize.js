@@ -53,6 +53,42 @@
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
 
+  // Accessibility palettes add a second, non-color channel. Keep the default and Custom
+  // palettes visually unchanged; their colors are intentionally user-selected. These cues are
+  // stable by series index, so a legend symbol, line, and filled mark always agree.
+  var ACCESSIBILITY_PALETTES = ['universal', 'protan', 'deutan', 'tritan', 'mono'];
+  var POINT_SHAPES = ['circle', 'triangle', 'rect', 'rectRot', 'star', 'cross', 'crossRot', 'rectRounded'];
+  var LINE_DASHES = [[], [8, 4], [2, 3], [12, 4, 2, 4], [1, 3], [10, 3], [6, 2, 2, 2], [14, 3, 3, 3]];
+
+  function usesAccessibilityCues() {
+    return ACCESSIBILITY_PALETTES.indexOf(document.documentElement.getAttribute('data-palette')) !== -1;
+  }
+
+  // Filled categorical marks need a redundant cue too. This deliberately uses a tiny Canvas
+  // tile rather than a plugin or image dependency; it follows the existing low-N map hatch
+  // pattern and works wherever Chart.js accepts a CanvasPattern as a fillStyle.
+  function cuePattern(canvas, color, index, alpha) {
+    if (!usesAccessibilityCues()) return alpha == null ? color : tokenRgbaFromColor(color, alpha);
+    var tile = document.createElement('canvas');
+    tile.width = tile.height = 12;
+    var g = tile.getContext('2d');
+    g.fillStyle = alpha == null ? color : tokenRgbaFromColor(color, alpha);
+    g.fillRect(0, 0, 12, 12);
+    g.strokeStyle = cssVar('--color-surface');
+    g.fillStyle = cssVar('--color-surface');
+    g.lineWidth = 1.5;
+    var cue = index % 8;
+    g.beginPath();
+    if (cue === 0 || cue === 4) { g.moveTo(-3, 12); g.lineTo(12, -3); }
+    if (cue === 1 || cue === 4) { g.moveTo(-3, 0); g.lineTo(12, 15); }
+    if (cue === 2 || cue === 6) { g.moveTo(3, 0); g.lineTo(3, 12); g.moveTo(9, 0); g.lineTo(9, 12); }
+    if (cue === 3 || cue === 6) { g.moveTo(0, 3); g.lineTo(12, 3); g.moveTo(0, 9); g.lineTo(12, 9); }
+    if (cue === 5) { g.arc(3, 3, 1.25, 0, 2 * Math.PI); g.arc(9, 9, 1.25, 0, 2 * Math.PI); }
+    if (cue === 7) { g.fillRect(1, 1, 3, 3); g.fillRect(7, 7, 3, 3); }
+    if (cue !== 5 && cue !== 7) g.stroke(); else g.fill();
+    return canvas.getContext('2d').createPattern(tile, 'repeat') || color;
+  }
+
   function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
   /* ---------- Chart finder: selection, info box, field visibility, search ---------- */
@@ -226,11 +262,13 @@
     var counts = view.counts.slice();
 
     // slice colors cycle the 8-swatch chart palette; "Other" gets the muted catch-all
-    var colors = labels.map(function (_, i) { return cssVar('--chart-' + (i % 8 + 1)); });
+    var colors = labels.map(function (_, i) {
+      return cuePattern(canvas, cssVar('--chart-' + (i % 8 + 1)), i);
+    });
     if (view.other > 0) {
       labels.push('Other (' + view.otherValues.toLocaleString() + ' values)');
       counts.push(view.other);
-      colors.push(cssVar('--color-text-faint'));
+      colors.push(cuePattern(canvas, cssVar('--color-text-faint'), 7));
     }
 
     var total = view.total || counts.reduce(function (a, c) { return a + c; }, 0);
@@ -332,8 +370,11 @@
     var fontBase = cssVar('--font-base');
 
     // color each parent group a distinct palette hue; "Other" is the muted catch-all
-    var colorFor = {};
-    view.head.forEach(function (p, idx) { colorFor[p.label] = palette[idx % 8]; });
+    var colorFor = {}, fillFor = {};
+    view.head.forEach(function (p, idx) {
+      colorFor[p.label] = palette[idx % 8];
+      fillFor[p.label] = cuePattern(canvas, colorFor[p.label], idx);
+    });
 
     // flatten to the plugin's tree: one row per (parent, child); group by parent
     var tree = [];
@@ -344,6 +385,7 @@
       var otherLabel = 'Other (' + view.otherGroups.toLocaleString() +
                        ' group' + (view.otherGroups === 1 ? '' : 's') + ')';
       colorFor[otherLabel] = faint;
+      fillFor[otherLabel] = cuePattern(canvas, faint, 7);
       tree.push({ x: otherLabel, y: '', v: view.otherValue, n: view.otherN });
     }
 
@@ -368,7 +410,7 @@
             // only fill the leaf tiles; parent-container rects stay transparent (their
             // caption + the leaves nested inside carry the meaning)
             if (!raw || raw.l !== LEAF_LEVEL || !raw._data) return 'transparent';
-            return colorFor[raw._data.x] || faint;
+            return fillFor[raw._data.x] || faint;
           },
           captions: {
             display: true,
@@ -474,8 +516,14 @@
             type: 'bar',
             label: valueNoun,
             data: steps.map(function (s) { return [s.start, s.end]; }),
-            backgroundColor: steps.map(function (s) { return barColor(s.direction); }),
-            borderWidth: 0,
+            backgroundColor: steps.map(function (s) {
+              // Rising bars use / hatching and falling bars use \\ hatching, so direction
+              // remains legible when success/danger colors are indistinguishable.
+              var cue = s.direction === 'up' ? 0 : (s.direction === 'down' ? 1 : (s.direction === 'flat' ? 5 : 2));
+              return cuePattern(canvas, barColor(s.direction), cue);
+            }),
+            borderColor: steps.map(function (s) { return barColor(s.direction); }),
+            borderWidth: usesAccessibilityCues() ? 1 : 0,
             borderSkipped: false,   // draw all four edges of a floating bar
             maxBarThickness: 48,
             order: 2
@@ -910,8 +958,6 @@
   // Distinct point marker per series, cycled with the palette. Used by the multi-series line
   // charts that carry per-line markers (slope / bump), so lines stay separable by SHAPE as well
   // as color — a redundant channel that survives grayscale and color-vision deficiencies.
-  var POINT_SHAPES = ['circle', 'triangle', 'rect', 'rectRot', 'star', 'cross', 'crossRot', 'rectRounded'];
-
   function palette() {
     var p = [];
     for (var i = 1; i <= CAT_PALETTE_SIZE; i++) p.push(cssVar('--chart-' + i));
@@ -962,7 +1008,8 @@
         data: {
           labels: view.labels,
           datasets: [{
-            data: view.values, backgroundColor: colors,
+            data: view.values,
+            backgroundColor: colors.map(function (color, i) { return cuePattern(canvas, color, i); }),
             borderColor: cssVar('--color-surface'), borderWidth: 2
           }]
         },
@@ -1089,7 +1136,7 @@
       return {
         label: s.label,
         data: plotted,
-        backgroundColor: s.isOther ? faint : pal[i % CAT_PALETTE_SIZE],
+        backgroundColor: cuePattern(canvas, s.isOther ? faint : pal[i % CAT_PALETTE_SIZE], i),
         borderColor: surface,
         borderWidth: stacked ? 1 : 0,
         _ns: s.ns, _raw: raw
@@ -1263,10 +1310,12 @@
         label: s.label,
         data: s.values.slice(),
         borderColor: color,
-        backgroundColor: tokenRgbaFromColor(color, 0.55),
+        backgroundColor: cuePattern(canvas, color, i, 0.55),
         borderWidth: 1,
-        pointRadius: 0,
+        pointRadius: usesAccessibilityCues() ? 2 : 0,
         pointHoverRadius: 3,
+        borderDash: usesAccessibilityCues() ? LINE_DASHES[i % LINE_DASHES.length] : [],
+        pointStyle: POINT_SHAPES[i % POINT_SHAPES.length],
         tension: 0,
         fill: true,
         _ns: s.ns
@@ -1323,6 +1372,7 @@
         pointRadius: 5,
         pointHoverRadius: 6,
         pointStyle: POINT_SHAPES[i % POINT_SHAPES.length],
+        borderDash: usesAccessibilityCues() ? LINE_DASHES[i % LINE_DASHES.length] : [],
         tension: 0,
         fill: false,
         spanGaps: false,
@@ -1383,6 +1433,7 @@
         pointRadius: 5,
         pointHoverRadius: 6,
         pointStyle: POINT_SHAPES[i % POINT_SHAPES.length],
+        borderDash: usesAccessibilityCues() ? LINE_DASHES[i % LINE_DASHES.length] : [],
         tension: 0,
         spanGaps: false,
         fill: false,
@@ -1481,8 +1532,10 @@
         borderColor: color,
         backgroundColor: color,
         borderWidth: 2,
-        pointRadius: periods.length > 24 ? 0 : 3,
+        pointRadius: usesAccessibilityCues() ? 4 : (periods.length > 24 ? 0 : 3),
         pointHoverRadius: 5,
+        pointStyle: POINT_SHAPES[i % POINT_SHAPES.length],
+        borderDash: usesAccessibilityCues() ? LINE_DASHES[i % LINE_DASHES.length] : [],
         tension: 0,
         spanGaps: false,
         _ns: s.ns
@@ -1874,15 +1927,6 @@
 
   /* ---------- Box plot & violin (Phase D1) ---------- */
 
-  // #rrggbb -> rgba(r,g,b,a). The --chart-N palette tokens are all 6-digit hex, so a violin body
-  // can be filled translucent (its inner spine/box/median read through) without a color library.
-  function hexRgba(hex, a) {
-    var h = (hex || '').replace('#', '');
-    if (h.length !== 6) return hex;   // non-hex token (shouldn't happen) -> use as-is, opaque
-    var r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
-    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
-  }
-
   // Box: the vendored @sgratzl/chartjs-chart-boxplot 'boxplot' type (self-registered on load, like
   // the treemap plugin) fed B2's PRECOMPUTED five-number summary + Tukey whiskers. No raw per-row
   // arrays cross the wire — outliers are counts (shown in the tooltip/table), never drawn as points.
@@ -1892,7 +1936,6 @@
     if (typeof ChartBoxPlot === 'undefined') return;
     var groups = payload.groups || [];
     var accent = cssVar('--color-accent');
-    var accentFill = tokenRgba('--color-accent', 0.40);   // readable box fill; the accent median still reads over it
     var border = cssVar('--color-border');
     var muted = cssVar('--color-text-muted');
     var fontBase = cssVar('--font-base');
@@ -1914,10 +1957,9 @@
         datasets: [{
           label: payload.valueLabel || '',
           data: boxData,
-          // one accent scheme for every box -- group identity is the x-axis label. A solid accent
-          // outline + median over the subtle-accent fill stays legible; a per-group fill in the box
-          // element's single color would hide the median line (the element draws it in borderColor).
-          backgroundColor: accentFill,
+           // The x-axis labels identify groups; accessibility palettes add a stable texture to each
+           // filled box without changing its median/whisker geometry.
+           backgroundColor: groups.map(function (_, i) { return cuePattern(canvas, accent, i, 0.40); }),
           borderColor: accent,
           borderWidth: 1.5,
           outlierRadius: 0,   // no raw outliers to draw
@@ -2018,7 +2060,7 @@
               g.lineTo(cx - half2, y2);
             }
             g.closePath();
-            g.fillStyle = hexRgba(color, 0.45);
+            g.fillStyle = cuePattern(canvas, color, i, 0.45);
             g.fill();
             g.lineWidth = 1.5; g.strokeStyle = color; g.stroke();
           }

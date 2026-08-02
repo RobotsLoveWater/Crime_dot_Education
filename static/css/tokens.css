@@ -32,43 +32,103 @@
      skill's checker (worst-adjacent normal-vision ΔE 73.5, CVD ΔE 23.0). One hue family
      per slot — blue, orange, green, red, cyan, gold, violet, pink — ordered so adjacent
      and pie-wrap slots never share a family (the old set doubled up: indigo≈violet,
-     sky≈teal). The colorblind-safe alternate is the [data-palette="cb"] block below. */
-  --chart-1: #2563EB;
-  --chart-2: #F97316;
-  --chart-3: #059669;
-  --chart-4: #DC2626;
-  --chart-5: #0891B2;
-  --chart-6: #CA8A04;
-  --chart-7: #8B5CF6;
-  --chart-8: #DB2777;
+     sky≈teal). Named color-vision options and their preview variables follow. */
+  /* Palette previews use --palette-<mode>-N directly; active charts only read
+     --chart-N. The color-vision modes are designed against the corresponding
+     complete dichromacy simulation and retain a luminance spread for grayscale. */
+  --palette-default-1: #2563EB; --palette-default-2: #F97316;
+  --palette-default-3: #059669; --palette-default-4: #DC2626;
+  --palette-default-5: #0891B2; --palette-default-6: #CA8A04;
+  --palette-default-7: #8B5CF6; --palette-default-8: #DB2777;
+
+  /* General-purpose color-vision-safe. */
+  --palette-universal-1: #0072B2; --palette-universal-2: #D55E00;
+  --palette-universal-3: #009E73; --palette-universal-4: #CC79A7;
+  --palette-universal-5: #56B4E9; --palette-universal-6: #E69F00;
+  --palette-universal-7: #8B5CF6; --palette-universal-8: #4D4D4D;
+
+  /* Protan (red-weak): blue, yellow, violet, and neutral-weighted. */
+  --palette-protan-1: #0072B2; --palette-protan-2: #E69F00;
+  --palette-protan-3: #CC79A7; --palette-protan-4: #56B4E9;
+  --palette-protan-5: #757575; --palette-protan-6: #A88F00;
+  --palette-protan-7: #D55E00; --palette-protan-8: #3F3F46;
+
+  /* Deutan (green-weak): avoids relying on red/green separation. */
+  --palette-deutan-1: #1F77B4; --palette-deutan-2: #FF7F0E;
+  --palette-deutan-3: #5E3C99; --palette-deutan-4: #17BECF;
+  --palette-deutan-5: #8C564B; --palette-deutan-6: #A65628;
+  --palette-deutan-7: #666666; --palette-deutan-8: #4D4D4D;
+
+  /* Tritan (blue-yellow): red, green, violet, brown, and neutral-weighted. */
+  --palette-tritan-1: #D73027; --palette-tritan-2: #1B7837;
+  --palette-tritan-3: #762A83; --palette-tritan-4: #B35806;
+  --palette-tritan-5: #5E3C99; --palette-tritan-6: #4D9221;
+  --palette-tritan-7: #C51B7D; --palette-tritan-8: #4D4D4D;
+
+  /* Ordered lightness steps; labels/marks/patterns remain important cues. */
+  --palette-mono-1: #1A1A1A; --palette-mono-2: #353535;
+  --palette-mono-3: #505050; --palette-mono-4: #6B6B6B;
+  --palette-mono-5: #868686; --palette-mono-6: #A1A1A1;
+  --palette-mono-7: #B0B0B0; --palette-mono-8: #BDBDBD;
+
+  /* JavaScript replaces these with a validated custom set when one exists. */
+  --palette-custom-1: var(--palette-default-1); --palette-custom-2: var(--palette-default-2);
+  --palette-custom-3: var(--palette-default-3); --palette-custom-4: var(--palette-default-4);
+  --palette-custom-5: var(--palette-default-5); --palette-custom-6: var(--palette-default-6);
+  --palette-custom-7: var(--palette-default-7); --palette-custom-8: var(--palette-default-8);
+
+  --chart-1: var(--palette-default-1); --chart-2: var(--palette-default-2);
+  --chart-3: var(--palette-default-3); --chart-4: var(--palette-default-4);
+  --chart-5: var(--palette-default-5); --chart-6: var(--palette-default-6);
+  --chart-7: var(--palette-default-7); --chart-8: var(--palette-default-8);
 }
 
-/* ---------- Colorblind-safe chart palette ----------
-   Selected by the global "Chart colors" control (static/js/palette.js sets
-   data-palette="cb" on <html>). Theme-aware: the dark row is the same eight hues
-   stepped for the dark surface, not a separate palette. Validated with the dataviz
-   skill's checker — light worst-adjacent CVD ΔE 24.2, dark 10.3 (floor band, backed
-   by the per-line point-shapes / direct labels). Custom colors, when chosen, are
-   applied as inline --chart-N on <html> and win over these. */
+/* Compatibility for a page painted from an older cached layout. palette.js migrates
+   the persisted "cb" value to "universal" as soon as deferred scripts begin. */
 :root[data-palette="cb"] {
-  --chart-1: #2A78D6;
-  --chart-2: #1BAF7A;
-  --chart-3: #EDA100;
-  --chart-4: #008300;
-  --chart-5: #4A3AA7;
-  --chart-6: #E34948;
-  --chart-7: #E87BA4;
-  --chart-8: #EB6834;
+  --chart-1: var(--palette-universal-1); --chart-2: var(--palette-universal-2);
+  --chart-3: var(--palette-universal-3); --chart-4: var(--palette-universal-4);
+  --chart-5: var(--palette-universal-5); --chart-6: var(--palette-universal-6);
+  --chart-7: var(--palette-universal-7); --chart-8: var(--palette-universal-8);
 }
 :root[data-theme="dark"][data-palette="cb"] {
-  --chart-1: #3987E5;
-  --chart-2: #199E70;
-  --chart-3: #C98500;
-  --chart-4: #008300;
-  --chart-5: #9085E9;
-  --chart-6: #E66767;
-  --chart-7: #D55181;
-  --chart-8: #D95926;
+  --chart-1: var(--palette-universal-1); --chart-2: var(--palette-universal-2);
+  --chart-3: var(--palette-universal-3); --chart-4: var(--palette-universal-4);
+  --chart-5: var(--palette-universal-5); --chart-6: var(--palette-universal-6);
+  --chart-7: var(--palette-universal-7); --chart-8: var(--palette-universal-8);
+}
+
+/* Named modes alias the preview variables. Custom has no selector: its validated
+   values are inline --chart-N overrides managed by palette.js. */
+:root[data-palette="universal"] {
+  --chart-1: var(--palette-universal-1); --chart-2: var(--palette-universal-2);
+  --chart-3: var(--palette-universal-3); --chart-4: var(--palette-universal-4);
+  --chart-5: var(--palette-universal-5); --chart-6: var(--palette-universal-6);
+  --chart-7: var(--palette-universal-7); --chart-8: var(--palette-universal-8);
+}
+:root[data-palette="protan"] {
+  --chart-1: var(--palette-protan-1); --chart-2: var(--palette-protan-2);
+  --chart-3: var(--palette-protan-3); --chart-4: var(--palette-protan-4);
+  --chart-5: var(--palette-protan-5); --chart-6: var(--palette-protan-6);
+  --chart-7: var(--palette-protan-7); --chart-8: var(--palette-protan-8);
+}
+:root[data-palette="deutan"] {
+  --chart-1: var(--palette-deutan-1); --chart-2: var(--palette-deutan-2);
+  --chart-3: var(--palette-deutan-3); --chart-4: var(--palette-deutan-4);
+  --chart-5: var(--palette-deutan-5); --chart-6: var(--palette-deutan-6);
+  --chart-7: var(--palette-deutan-7); --chart-8: var(--palette-deutan-8);
+}
+:root[data-palette="tritan"] {
+  --chart-1: var(--palette-tritan-1); --chart-2: var(--palette-tritan-2);
+  --chart-3: var(--palette-tritan-3); --chart-4: var(--palette-tritan-4);
+  --chart-5: var(--palette-tritan-5); --chart-6: var(--palette-tritan-6);
+  --chart-7: var(--palette-tritan-7); --chart-8: var(--palette-tritan-8);
+}
+:root[data-palette="mono"] {
+  --chart-1: var(--palette-mono-1); --chart-2: var(--palette-mono-2);
+  --chart-3: var(--palette-mono-3); --chart-4: var(--palette-mono-4);
+  --chart-5: var(--palette-mono-5); --chart-6: var(--palette-mono-6);
+  --chart-7: var(--palette-mono-7); --chart-8: var(--palette-mono-8);
 }
 
 /* ---------- Typography, spacing, and the rest of the base tokens ---------- */
@@ -132,6 +192,33 @@
   --color-warning-subtle: #2A2118;
   --color-focus:          #818CF8;
   --overlay:              rgba(0, 0, 0, 0.55);
+
+  /* Dark-theme palette rows are stepped for the dark chart surface, rather than
+     merely reusing their light-theme hexes. */
+  --palette-universal-1: #56B4E9; --palette-universal-2: #FF8A3D;
+  --palette-universal-3: #42C99A; --palette-universal-4: #FF6B6B;
+  --palette-universal-5: #88D3F2; --palette-universal-6: #FFB347;
+  --palette-universal-7: #B69CFF; --palette-universal-8: #C4C4C4;
+
+  --palette-protan-1: #56B4E9; --palette-protan-2: #FFB347;
+  --palette-protan-3: #EEA8CC; --palette-protan-4: #94D9F7;
+  --palette-protan-5: #BDBDBD; --palette-protan-6: #FFF176;
+  --palette-protan-7: #FF8A3D; --palette-protan-8: #D1D5DB;
+
+  --palette-deutan-1: #64B5E8; --palette-deutan-2: #FFAA5C;
+  --palette-deutan-3: #B9A1DB; --palette-deutan-4: #5DD5E2;
+  --palette-deutan-5: #C99A8E; --palette-deutan-6: #F19CCB;
+  --palette-deutan-7: #7A7A7A; --palette-deutan-8: #D1D5DB;
+
+  --palette-tritan-1: #FF887F; --palette-tritan-2: #63BF82;
+  --palette-tritan-3: #CA96D5; --palette-tritan-4: #F0A24A;
+  --palette-tritan-5: #AA90D4; --palette-tritan-6: #91C85A;
+  --palette-tritan-7: #F5F5F5; --palette-tritan-8: #D1D5DB;
+
+  --palette-mono-1: #F2F2F2; --palette-mono-2: #D8D8D8;
+  --palette-mono-3: #BFBFBF; --palette-mono-4: #A8A8A8;
+  --palette-mono-5: #949494; --palette-mono-6: #848484;
+  --palette-mono-7: #777777; --palette-mono-8: #6B6B6B;
 
   --shadow-1: none;
   --shadow-2: none;

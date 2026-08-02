@@ -8,14 +8,15 @@ Lessons reuse the app's existing history→cache substrate: a lesson step can ex
 **data state** as history tokens (the same `f.col.op.val` encoding
 `cache.history_item_to_text` produces), so the exact filtered dataset is reconstructed by the
 existing `_execute`/`get_data` path and numeric answers can be **graded live** rather than
-hardcoded. See `CLAUDE.md` → "Planned: Learning Modules framework" and
-`LEARNING_MODULES_PROMPTS.md` (Appendix A is the authoritative schema; this README expands it).
+hardcoded. See the [contributor guide](../../docs/architecture/contributor-guide.md) → "Planned:
+Learning Modules framework" and the [archived learning-modules plan](../../docs/archive/plans/learning-modules-prompts.md)
+(Appendix A is the authoritative schema; this README expands it).
 
 > **Status:** Phase 0 is data only. No loader or routes read these files yet — that is Phase 1+.
 
 ## File & id rules
 
-- One module per file: `lessons/<id>.json`.
+- One module per file: `content/lessons/<id>.json`.
 - `id` must be **filename- and URL-safe**: `[a-z0-9-]` only. It is simultaneously the JSON
   `id` field, the filename stem, and the `/lesson/<id>` URL segment. They must all match.
 
@@ -161,7 +162,7 @@ format:
 ### Active state (how state carries within a lesson)
 
 A module tracks **one evolving active state**, stored at `progress[<module_id>]['state']`
-(see Appendix B of `LEARNING_MODULES_PROMPTS.md`), **never merged into the student's real
+(see Appendix B of the [archived learning-modules plan](../../docs/archive/plans/learning-modules-prompts.md)), **never merged into the student's real
 `history`** (lessons are strictly sandboxed). An `explore` step with a `state` **sets** the
 active state; later `question`/`checkpoint`/`explore` steps operate on it unless they carry
 their own `state`. In `intro-descriptive-stats.json`, the `explore` step sets
@@ -170,7 +171,7 @@ filtered set.
 
 ## Validity checklist (Phase 0 acceptance)
 
-- Every file in `lessons/` parses with `json.load`.
+- Every file in `content/lessons/` parses with `json.load`.
 - Every `state` / `expect_state` token round-trips through `cache.history_item_to_text`.
 - Every column referenced (`state`/`expect_state` tokens, `focus.column`,
   `focus.dependant/x_axis/y_axis`, `answer.compute.column`) exists in `codebook.xml`.
