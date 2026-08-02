@@ -129,8 +129,8 @@ crosstabs).
 - **Cache-compatible.** Map-click and hand-typed filters must resolve to **byte-identical
   `cache/data/` dirs**. Reuse `cache.history_item_to_text` / `make_history`; touch neither history
   encoding nor the cache-dir layout.
-- **`float64` stays `float64`.** The three checks at [data.py:78](data.py:78) (filter coercion),
-  [data.py:283](data.py:283) (numeric stats gate), [data.py:366](data.py:366)
+- **`float64` stays `float64`.** The filter coercion, numeric-stats gate, and numeric-column
+  checks in [data.py](../../src/mn_sentencing_explorer/analysis/data.py)
   (`get_numeric_columns`) depend on it. `mode` and correlations read floats; they never downcast.
 - **The base DataFrame is immutable.** No `inplace=`/`.drop`/`.fillna`/`astype`/column-assign on the
   shared base — every aggregate and correlation reads a filtered *view/copy*. `test_base_immutability.py`
@@ -237,7 +237,7 @@ No data migration; user pickles, classes, lessons, and the disk cache are untouc
 7. **Partially met.** No change to routes' meaning, cache-dir layout, or the history schema — the
    only new route is `/visualize`; map-click and the "Keep only" button both ride the pre-existing
    `/explore/filter/<column>` POST. **`≥1` lesson uses a Visualize chart is NOT met** — no shipped
-   `lessons/*.json` references a chart, and `app.build_lesson_data` only supports `info`/`table`
+   `content/lessons/*.json` references a chart, and `app.build_lesson_data` only supports `info`/`table`
    focus views. Closing this needs a new chart focus-view plus an authored lesson step; left as
    deliberate follow-up work rather than folded into the QA/docs passes (Phases 14–15).
 

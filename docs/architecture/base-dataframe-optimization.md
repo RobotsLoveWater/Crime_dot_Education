@@ -18,11 +18,11 @@ Every phase was verified **byte-identical** against the Phase 0 golden `.bin` sn
 | Base on disk | 231 MiB `raw.csv` | **23 MiB** `raw.parquet` (~10×; CSV kept as fallback) |
 | Base copies across workers | one per worker (`WORKERS ×`) | ~one, shared CoW via `--preload` (~79% of the base is shareable numpy) |
 
-Where each lever lives: **A** — `Data.load` casts `object` → `category` ([data.py](data.py));
-**B** — `cache._base_df()` module singleton + debug-only shape/id tripwire ([cache.py](cache.py));
+Where each lever lives: **A** — `Data.load` casts `object` → `category` ([data.py](../../src/mn_sentencing_explorer/analysis/data.py));
+**B** — `cache._base_df()` module singleton + debug-only shape/id tripwire ([cache.py](../../src/mn_sentencing_explorer/analysis/cache.py));
 **C** — `Data.save_parquet` + `.parquet` load branch; `cache.DATAFILE` prefers `cache/raw.parquet`,
 falls back to `raw.csv`; built by `cache.py.__main__`'s new third prompt; **D** — import-time
-`cache._base_df()` warm in [app.py](app.py) + `--preload` in `deploy/setup.sh`'s `ExecStart`.
+`cache._base_df()` warm in [application.py](../../src/mn_sentencing_explorer/web/application.py) + `--preload` in `deploy/setup.sh`'s `ExecStart`.
 One deviation from the plan as written: Parquet requires one type per column, so `save_parquet`
 stringifies 4 mixed-type category columns (`Statute_Chapter`, `Statute_Subdivision`,
 `presumptlifeid`, `ssection` — `read_csv` inference artifacts; none golden/excluded). The
@@ -35,11 +35,11 @@ sections below are the original proposal, kept as the design rationale.
 The runtime has **no shared in-memory dataset**. Every request that misses the disk
 cache rebuilds the full dataset from scratch:
 
-- `cache._execute()` ([cache.py:188](cache.py:188)) creates a fresh `Data()` and, for the
+- `cache._execute()` ([cache.py](../../src/mn_sentencing_explorer/analysis/cache.py)) creates a fresh `Data()` and, for the
   base history entry (`action: None`), calls `temp_data.load(DATAFILE)`
-  ([cache.py:220](cache.py:220)).
-- `Data.load()` ([data.py:158](data.py:158)) runs `pd.read_csv('cache/raw.csv')`
-  ([data.py:169](data.py:169)) — a **242 MB text parse** — then filters are applied on top.
+  ([cache.py](../../src/mn_sentencing_explorer/analysis/cache.py)).
+- `Data.load()` ([data.py](../../src/mn_sentencing_explorer/analysis/data.py)) runs `pd.read_csv('cache/raw.csv')`
+  — a **242 MB text parse** — then filters are applied on top.
 
 **Measured cost of that base load** (this machine, `cache/raw.csv`):
 
@@ -55,7 +55,7 @@ The 116 `object` (string) columns are the memory hogs: each cell is a separate P
 `str` object.
 
 **Consequences at deploy time** (`deploy/setup.sh` defaults to `WORKERS=3`,
-[setup.sh:32](deploy/setup.sh:32)):
+[setup.sh](../../deploy/setup.sh)):
 
 1. **Time:** every cold request re-parses 242 MB of CSV (~3–8 s of single-core work)
    before it can compute anything.
@@ -85,7 +85,7 @@ DataFrame on every call. Only the filters layered on top vary.
 Audited `data.py`: **nothing mutates `self.df` in place.** There is no `inplace=True`
 pandas call, no `.drop(...)`, no `.fillna(...)`, no `astype` assignment, and no column
 assignment on `self.df`. Every filter (`filter`, `filter_or_same`, `filter_moc`,
-[data.py:71–153](data.py:71)) produces a **new** DataFrame via boolean masking /
+[data.py](../../src/mn_sentencing_explorer/analysis/data.py)) produces a **new** DataFrame via boolean masking /
 `concat`, and only replaces the whole `self.df` reference. All read paths
 (`get_column_info`, `num_each`, `get_table`, `get_moc_options`) are read-only.
 
@@ -98,9 +98,9 @@ adds a test that locks it in.
 
 Three sites branch on a column being exactly `float64`:
 
-- [data.py:78](data.py:78) — coerce the filter value to `float` so `16 == 16.0`.
-- [data.py:246](data.py:246) — decide whether to emit mean/median/std.
-- [data.py:329](data.py:329) — `get_numeric_columns()` (drives the Compare "Measure"
+- [data.py](../../src/mn_sentencing_explorer/analysis/data.py) — coerce the filter value to `float` so `16 == 16.0`.
+- [data.py](../../src/mn_sentencing_explorer/analysis/data.py) — decide whether to emit mean/median/std.
+- [data.py](../../src/mn_sentencing_explorer/analysis/data.py) — `get_numeric_columns()` (drives the Compare "Measure"
   picker and numeric filter UI).
 
 **Implication:** the dtype optimization must **leave the 59 numeric columns as
@@ -177,7 +177,7 @@ see §0 for the measured outcome.)**
 - **Phase 1 — Lever A (categoricals at load).** In `Data.load`, after read, cast
   `object` columns to `category` (leave numeric dtypes untouched). Verify: filters,
   explore stats, crosstabs, and MOC options produce byte-identical `.bin` outputs vs.
-  Phase 0; numeric checks at [data.py:78/246/329](data.py:78) still fire. Biggest RAM
+  Phase 0; the numeric checks in [data.py](../../src/mn_sentencing_explorer/analysis/data.py) still fire. Biggest RAM
   win, smallest surface area.
 
 - **Phase 2 — Lever B (load-once memoization).** Cache the base DataFrame in a
@@ -189,7 +189,7 @@ see §0 for the measured outcome.)**
   as a fallback. Update `deploy/setup.sh` + the bootstrap note in `CLAUDE.md`.
 
 - **Phase 4 — Lever D (gunicorn `--preload`).** Add `--preload` to the systemd
-  `ExecStart` ([setup.sh:189](deploy/setup.sh:189)) and load the base at import time.
+  `ExecStart` ([setup.sh](../../deploy/setup.sh)) and load the base at import time.
   Measure resident RAM across workers to confirm sharing holds.
 
 Phases 1–2 are worth doing even alone: together they remove the re-parse and cut

@@ -30,7 +30,7 @@ dependencies = [
     "packaging==23.2",
     "pandas",
     "Pillow",
-    "pyarrow",  # Parquet engine for the typed columnar base (cache/raw.parquet); see BASE_DATAFRAME_OPTIMIZATION.md
+    "pyarrow",  # Parquet engine for the typed columnar base (cache/raw.parquet); see docs/architecture/base-dataframe-optimization.md
     "pyparsing==3.1.1",
     "pyreadstat",
     "python-dateutil==2.8.2",
@@ -51,7 +51,7 @@ package = false
 # to match. These constraints pin them to the Phase 0 "known-good" freeze versions so that
 # `uv lock` reproduces the exact environment the app was developed and tested against, instead of
 # resolving to newer majors (pandas 3.x, Pillow 12.x, numpy 2.5.x, matplotlib 3.11, ...). The uv
-# migration is a TOOLING switch, not a dependency bump (see CLAUDE.md "Planned: uv migration").
+# migration is a TOOLING switch, not a dependency bump (see docs/architecture/contributor-guide.md, "Planned: uv migration").
 # Upgrading is a separate, deliberate change: delete the relevant line(s) here and re-run
 # `uv lock` to let that dependency float to the newest compatible release.
 constraint-dependencies = [

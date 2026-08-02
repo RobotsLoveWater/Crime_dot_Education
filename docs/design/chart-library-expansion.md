@@ -78,9 +78,9 @@ closes the lesson-bridge gap at the end (§E1).
 
 ## 3. The spine: a chart registry
 
-Today `VIZ_CHART_TYPES` ([app.py:1573](app.py:1573)) is a flat list of `{id, label, status, blurb}`,
-and the six builders are hand-dispatched in `render_visualize` ([app.py:2229](app.py:2229)) and in
-`renderChart` ([static/js/visualize.js:767](static/js/visualize.js:767)). **A0 expands each entry into
+Today `VIZ_CHART_TYPES` ([application.py](../../src/mn_sentencing_explorer/web/application.py)) is a flat list of `{id, label, status, blurb}`,
+and the six builders are hand-dispatched in `render_visualize` in that module and in
+`renderChart` ([visualize.js](../../static/js/visualize.js)). **A0 expands each entry into
 a full descriptor** and moves the builder-form field logic and the JS dispatch to read from it:
 
 ```
@@ -102,7 +102,7 @@ phase that touches proven shipped code; it is the refactor-risk phase and is gat
 
 | New charts | Data shape (backend source) | Renderer family |
 |---|---|---|
-| **bar, lollipop, dot plot, donut** | one-group series (`Data.aggregate_by_group` — exists, [data.py:441](data.py:441)) | Categorical-series (donut = pie w/ cutout) |
+| **bar, lollipop, dot plot, donut** | one-group series (`Data.aggregate_by_group` — exists, [data.py](../../src/mn_sentencing_explorer/analysis/data.py)) | Categorical-series (donut = pie w/ cutout) |
 | **grouped / stacked / 100% stacked bar** | two-group matrix (**new** `aggregate_by_two`, B1) | Categorical-series |
 | **line, area, stacked area, slope, bump** | one/two-group series over an ordered axis; bump adds a rank transform | Line |
 | **histogram, ECDF, KDE** | distribution stats (**new** numpy engine, B2) | Distribution (bar / stepped line / area) |
@@ -123,7 +123,7 @@ Three new read-only helpers on `Data`, each built **beside** existing code, neve
   count pass + per-group Series reductions for the measure, **not** `groupby.agg` (P4 proved the Cython
   accumulation order can flip a cell on a rounding boundary). Feeds grouped/stacked/100%/stacked-area/
   slope/bump/mosaic/animated. Verified against slow nested-filter oracles; `get_table`
-  ([data.py:357](data.py:357)) is left byte-for-byte untouched (its output is compare-visible).
+  ([data.py](../../src/mn_sentencing_explorer/analysis/data.py)) is left byte-for-byte untouched (its output is compare-visible).
 - **B2 — distribution stats engine, `numpy`-only (no `scipy`).** Per column, optionally per group:
   five-number summary + 1.5·IQR whiskers (summarized — **no raw outlier arrays shipped to the
   client**); histogram (Freedman–Diaconis default bin width, user override); **ECDF as the cumulative

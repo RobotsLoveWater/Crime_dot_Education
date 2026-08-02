@@ -1,6 +1,6 @@
-# CLAUDE.md — Crime[dot]Education / MN Sentencing Explorer
+# Contributor guide — Crime[dot]Education / MN Sentencing Explorer
 
-Guide for future Claude instances working in this repo. Read this before making changes.
+Guide for contributors and coding agents working in this repository. Read this before making changes.
 
 ## What this is
 
@@ -87,14 +87,18 @@ uv run flask --app app run     # add --debug for reload
 
 ## Module map
 
+Python implementations live under `src/mn_sentencing_explorer/`. Historical root modules are
+compatibility aliases that preserve existing imports and operational commands; references below
+to `app.py`, `data.py`, `cache.py`, and the service modules mean their packaged implementations.
+
 | File | Role |
 |------|------|
 | `app.py` | Flask routes + the `is_logged_in` / `not_logged_in` helpers. Thin controller layer. At import time it eagerly warms `cache._base_df()` (guarded — a missing datafile logs and falls back to lazy load) so gunicorn `--preload` shares the base across workers (Lever D). |
-| `data.py` | `Data` class — the actual pandas analysis engine: filtering, cross-tabs, per-column stats, MOC filtering. `load` reads `.sav`/`.parquet`/`.csv` and casts string (`object`) columns to `category` (Lever A — numeric dtypes untouched); `save_parquet` writes the typed Parquet base (Lever C — stringifies 4 mixed-type category columns pyarrow can't encode). Also `format_column_info()` (sorting for display) and `GROUP_ORDER` (column-browser group display order). `Data()` with no preload is cheap — it only parses `codebook.xml` (app.py keeps one as `CODEBOOK` for metadata). Visualization-expansion additions: `get_column_info` also returns `mode`/`mode_extra` (the tie count — first modal value, gated like `mean`/`mdn`/`std`); `aggregate_by_group(group_column, measure, aggregate)` is the one shared `(group, measure ∈ {'#', numeric col}, aggregate ∈ {count,mean,median,mode})` → per-group series helper every Visualize chart reads through; `distinct_counts(*cols)` guards the scatter builder's lattice-size budget before it pays for a full `get_table`. Request-path-optimization additions (P4/P5): `get_table` is one `groupby([x, y], observed=True)` count pass + per-group Series reductions for the measure (deliberately NOT `groupby.agg` — the Cython kernels accumulate in a different order and can flip a value on a rounding boundary; verified cell-for-cell against the old nested-filter path), and `num_each` is one `value_counts` pass re-keyed to `col.unique()`'s own elements in appearance order with a NaN key pinned to 0, so `<col>.bin` pickle bytes are unchanged (the order-preserving swap — verified byte-identical across all non-excluded columns). Chart-library-expansion additions (all additive beside the above, fresh-computed, never disk-cached): `aggregate_by_two(group_a, group_b, measure, aggregate)` (B1) is the two-group sibling of `aggregate_by_group` — one `groupby([a,b], observed=True)` count pass + per-group Series reductions (again **not** `groupby.agg`) → a nested `{a:{b:value}}` matrix; `distribution_stats(column, group_column=None, bins=None, bandwidth=None)` (B2) is the **numpy-only, no-scipy** distribution engine behind histogram/ECDF/KDE/box/violin — per column, optionally per observed group, it returns a five-number summary + 1.5·IQR Tukey whiskers (**outliers summarized as counts, never raw arrays**), a histogram (Freedman–Diaconis default bin count via `_fd_bin_count`, capped `HISTOGRAM_MAX_BINS`; `bins` overrides), an ECDF from the cumulative `np.unique` counts (downsampled to `ECDF_MAX_POINTS`), and a binned Gaussian KDE (linear-binning + kernel convolution on a **shared** grid, Silverman bandwidth via `_silverman_bandwidth`; `bandwidth` overrides). The histogram `bin_edges` + `kde_grid` are derived once from the whole column and shared across group blocks so overlays/violins are comparable; the KDE grid is sized to resolve its kernel (`KDE_GRID_MIN/MAX/STEPS_PER_BW`) and each block's bandwidth is floored at the grid resolution so a tiny Silverman bandwidth over an outlier-stretched range can't alias; a grouped request over `DISTRIBUTION_MAX_GROUPS` observed groups is rejected (payload guard). The numpy helpers (`_five_number_summary`/`_binned_kde`/`_ecdf_from_values`/…) sit at module scope beside `_first_mode`, oracle-tested in `test_base_immutability.py`. `bin2d(col_x, col_y)` (B3) is the SPLOM off-diagonal helper — one `np.histogram2d` over jointly-finite pairs, with a per-axis bin spec reusing `distinct_counts` (a discrete lattice ≤ `BIN2D_MAX_BINS` gets natural midpoint edges via `_lattice_edges`, else a capped equal-width binning). `kde_density(column, source=None)` (D2) is the density-curve read: it reuses `distribution_stats` for the shared grid + FD histogram + Silverman bandwidth, then ships the **pre-convolution linear-binned gridded weights** (`_linear_bin`, extracted from `_binned_kde`) so the client convolves them at any bandwidth with **no refetch**, plus the physical bandwidth bounds and a **spikiness** flag (the `KDE_SPIKY_TOP_K` most common exact values holding ≥ `KDE_SPIKY_SHARE` of cases — the round-number-clustering honesty guardrail, §8). |
-| `cache.py` | The history→cache→dataframe machinery: `get_data`, `get_moc_options`, `_execute`, plus `_base_df()` — the load-once base-DataFrame singleton (Lever B; debug-only shape/id mutation tripwire). `DATAFILE` resolves to `cache/raw.parquet` when present, else `cache/raw.csv`. `__main__` builds `cache/raw.csv` from `dataset.sav`, then `cache/raw.parquet` from the CSV. (Header comment calls it `precache.py`.) Visualization-expansion additions: `get_aggregate(session, group_column, measure, aggregate, history_override=None)` wraps `Data.aggregate_by_group` (fresh per request, never disk-cached, like crosstabs); `_county_crosswalk()` memoizes `{'district': {county: d}, 'region': {county: r}}` from `_base_df().groupby('county')[...].first()` next to `_base_df()`; `county_values()` returns the distinct county list `geo.assert_county_coverage` checks at app startup. Request-path-optimization addition (P3): `_filtered_cache` — the bounded (8-entry) **filtered-slice LRU** next to `_base_df()`/`_county_crosswalk()`, keyed on the canonical history-token tuple (`_slice_key`, the same tokens the disk-cache dir is built from); `_execute` serves cached slices read-only (same contract + tripwire as the base) and the real replay lives in `_replay_history` (the timed miss path); `_clear_filtered_cache()` backs the guardrail test's and benchmark's cold runs. Chart-library-expansion additions (thin fresh/never-cached wrappers beside `get_aggregate`, riding the slice LRU): `get_aggregate_two(session, group_a, group_b, measure, aggregate, history_override=None)` wraps `Data.aggregate_by_two` (B1); `distribution_stats(session, column, group_column=None, bins=None, bandwidth=None, history_override=None)` wraps `Data.distribution_stats` (B2); `bin2d(session, col_x, col_y, history_override=None)` wraps `Data.bin2d` (B3); `kde_density(session, column, history_override=None)` wraps `Data.kde_density` (D2). |
+| `data.py` | `Data` class — the actual pandas analysis engine: filtering, cross-tabs, per-column stats, MOC filtering. `load` reads `.sav`/`.parquet`/`.csv` and casts string (`object`) columns to `category` (Lever A — numeric dtypes untouched); `save_parquet` writes the typed Parquet base (Lever C — stringifies 4 mixed-type category columns pyarrow can't encode). Also `format_column_info()` (sorting for display) and `GROUP_ORDER` (column-browser group display order). `Data()` with no preload is cheap — it only parses `codebook.xml` (app.py keeps one as `CODEBOOK` for metadata). Visualization-expansion additions: `get_column_info` also returns `mode`/`mode_extra` (the tie count — first modal value, gated like `mean`/`mdn`/`std`); `aggregate_by_group(group_column, measure, aggregate)` is the one shared `(group, measure ∈ {'#', numeric col}, aggregate ∈ {count,mean,median,mode})` → per-group series helper every Visualize chart reads through; `distinct_counts(*cols)` guards the scatter builder's lattice-size budget before it pays for a full `get_table`. |
+| `cache.py` | The history→cache→dataframe machinery: `get_data`, `get_moc_options`, `_execute`, plus `_base_df()` — the load-once base-DataFrame singleton (Lever B; debug-only shape/id mutation tripwire). `DATAFILE` resolves to `cache/raw.parquet` when present, else `cache/raw.csv`. `__main__` builds `cache/raw.csv` from `dataset.sav`, then `cache/raw.parquet` from the CSV. (Header comment calls it `precache.py`.) Visualization-expansion additions: `get_aggregate(session, group_column, measure, aggregate, history_override=None)` wraps `Data.aggregate_by_group` (fresh per request, never disk-cached, like crosstabs); `_county_crosswalk()` memoizes `{'district': {county: d}, 'region': {county: r}}` from `_base_df().groupby('county')[...].first()` next to `_base_df()`; `county_values()` returns the distinct county list `geo.assert_county_coverage` checks at app startup. |
 | `geo.py` | **New** (visualization expansion). Pure stdlib (no Flask/pandas), mirrors `lessons.py`/`classroom.py`. Loads/memoizes the vendored `static/geo/mn-counties-topo.json` TopoJSON; `COUNTY_ALIASES` + `_normalize()` reconcile the dataset's county spellings (`LeSueur`, `Lac Qui Parle`, `Saint Louis`) to TopoJSON feature names; `resolve_county`/`county_feature_map` do the join; `assert_county_coverage(counties)` is the startup guard — all 87 dataset counties must map to exactly one feature or it fails loudly — called from `app.py` at import time right after the base-DataFrame preload succeeds, alongside warming `cache._county_crosswalk()`. Imported only by `app.py`; `cache.py`/`data.py` don't depend on it. |
-| `account.py` | User accounts as pickles under `user/`. Create/retrieve/history-add/revert, plus **learning-module `progress`/`state` helpers** (`get_progress`, `set_progress`, `set_lesson_state`) and the `is_educator` role flag. Educator-portal additions: `create(..., classes=)` records class memberships; `add_class`/`remove_class` keep the account's `classes` list in sync with a roster; `reset_progress` and `delete_account` back the portal's roster-management ops. Request-path-optimization additions: `retrieve` is memoized per request in `flask.g` (`g._account_cache`, guarded by `has_app_context`; every writer drops the entry — P1) and `set_history_count` stamps the filter-apply route's remaining-cases count onto the active history entry so the sidebar badge renders without a history replay (P2; revert restores the reverted-to entry's own stamp). |
-| `lessons.py` | Learning-modules loader/validator: `list_modules`, `get_module`, `validate`, `save_module` over `lessons/*.json`. Pure stdlib module (no Flask), mirrors `account.py`. `list_modules` is memoized on a directory signature (each file's name + mtime + size), so authored edits still show up without a restart (request-path P1). |
+| `account.py` | User accounts as pickles under `user/`. Create/retrieve/history-add/revert, plus **learning-module `progress`/`state` helpers** (`get_progress`, `set_progress`, `set_lesson_state`) and the `is_educator` role flag. Educator-portal additions: `create(..., classes=)` records class memberships; `add_class`/`remove_class` keep the account's `classes` list in sync with a roster; `reset_progress` and `delete_account` back the portal's roster-management ops. |
+| `lessons.py` | Learning-modules loader/validator: `list_modules`, `get_module`, `validate`, `save_module` over `content/lessons/*.json`. Pure stdlib module (no Flask), mirrors `account.py`. |
 | `classroom.py` | **Educator-portal class model.** Pure stdlib (no Flask), mirrors `lessons.py`/`account.py` over a git-ignored `classes/<class_id>.json` store. `create_class`/`get_class`/`list_classes`, `find_by_join_code` (case-insensitive, skips archived), roster ops (`enroll`/`remove_student`), `rotate_join_code` (never touches the immutable `class_id` or roster), `set_assignments`/`get_assignments`, `set_email_policy`/`email_allowed`, `set_policy` (retake/feedback), `archive`/`unarchive`, and `validate`. Immutable `class_id` = slug + random suffix; rotatable `join_code` from an unambiguous alphabet (no `0/O/1/I/L`). Schema in `EDUCATOR_PORTAL_PROMPTS.md` Appendix A. |
 | `analytics.py` | **Educator-portal attempt log.** Pure stdlib. One append-only JSONL per student at `user/<userid>.attempts.jsonl` (the full history of graded attempts — distinct from `progress['answers']`, which keeps only the latest per step). `log_attempt`/`read_attempts`/`delete_attempts` + pure aggregators (`item_stats`, `stuck_questions`, `last_active_ts`, `question_stats`) folded across a roster by the dashboard. `STUCK_ATTEMPTS` = the repeated-miss triage threshold. Format in `EDUCATOR_PORTAL_PROMPTS.md` Appendix B. |
 | `make_history.py` | Builds history entry dicts (`action` list + human-readable `desc`). |
@@ -103,11 +107,10 @@ uv run flask --app app run     # add --debug for reload
 | `codebook.xml` | Maps dataset column names → human descriptions; each entry also carries a `group` attribute placing the column in an explore column-browser category (display order in `Data.GROUP_ORDER`). Loaded by `Data.__init__` (descriptions → `self.codebook`, groups → `self.groups`). Some entry names don't match real dataset columns (see gotchas). |
 | `settings.xml` | seaborn palette/style (`deep` / `darkgrid`). Not heavily used yet. |
 | `test.py` | Ad-hoc scratch script for the history→cache-key encoding. Not a real test suite. |
-| `test_base_immutability.py` | **Guardrail for the base DataFrame optimization**: asserts the base frame is byte-for-byte unchanged after the full filter/read pipeline and that `cache._execute` matches direct filtering. Run `uv run python test_base_immutability.py`; must keep passing — the load-once/CoW sharing rests on it. Extended for visualization expansion: also exercises `Data.aggregate_by_group` (count/mean/mode, plus district/region group columns), the raw `county` crosswalk `groupby`, and `base[CORRELATION_SUBSET].corr()` — all asserted read-only over the shared base. Extended again for the request-path optimization (P3): a filtered state executed twice must be served from the slice LRU as the *same* frame object, byte-identical to a direct boolean filter, and unchanged after a full `get_column_info`/`get_table`/`aggregate_by_group`/`get_moc_options` pass over it. Chart-library-expansion additions: the pipeline + slice pass also exercise `aggregate_by_two` (B1) and `distribution_stats` (B2) read-only over the base and the cached slice; `test_aggregate_by_two_matches_nested_oracle` pins the two-group matrix cell-for-cell against a nested-filter oracle, and `test_distribution_stats_matches_numpy_oracle` pins every *deterministic* component (five-number/whiskers/outlier counts, histogram, ECDF) exactly against hand-computed numpy while checking the (smoothing) KDE by properties — unit integral, non-negativity, shape vs an exact Gaussian KDE — and asserting nothing raw-per-row is emitted. The pipeline + slice pass also exercise `bin2d` (B3) and `kde_density` (D2) read-only; `test_kde_density_passthrough_and_readonly` pins that `kde_density` passes the grid/histogram/summary/bandwidth straight through from `distribution_stats`, that the shipped gridded weights sum to ~1 and are non-negative, and that **convolving those weights at the reported bandwidth reproduces the engine's own binned KDE** (the no-refetch contract the JS slider depends on) as a valid unit-integral density; `test_kde_density_spikiness_flag` pins the round-number guardrail on synthetic frames (a 5-pillar column is flagged and its pillars named; a continuous normal column is not). |
+| `test_base_immutability.py` | **Guardrail for the base DataFrame optimization**: asserts the base frame is byte-for-byte unchanged after the full filter/read pipeline and that `cache._execute` matches direct filtering. Run `uv run python test_base_immutability.py`; must keep passing — the load-once/CoW sharing rests on it. Extended for visualization expansion: also exercises `Data.aggregate_by_group` (count/mean/mode, plus district/region group columns), the raw `county` crosswalk `groupby`, and `base[CORRELATION_SUBSET].corr()` — all asserted read-only over the shared base. |
 | `test_map_filter_equivalence.py` | **Guardrail for map-as-filter** (visualization-expansion Phase 11, the "vital" phase). For every county/district/region shape — not a sample — asserts the choropleth's click-derived filter token round-trips and resolves to the identical `cache/data/` dir as hand-typing the same filter (district encodes as `"4.0"`, never `"4"`); the same equivalence for the Filter view's map, its OR-multiselect path, and the `safe_return_target` open-redirect guard on the `next` field. Run `uv run python test_map_filter_equivalence.py`. The failure mode it guards against is silent: a wrong token would resolve to a *different but plausible* cache dir. |
-| `perf/` | **Request-path-optimization measurement scaffolding** (P0), committed to the repo (unlike the base-df golden scripts). `profiling.py` — the env-gated timing shim (`@timed('label')` + `span()`; fully unwrapped, zero overhead, when `PROFILE_REQUESTS` is unset; thread-local counters + `REQUEST_LOG` filled by `app.py`'s before/after_request hooks). `benchmark.py` — the repeatable four-flow driver (`uv run python -m perf.benchmark`; uses a dedicated `perf-bench/bench` account and clears its target cache dirs + the slice LRU for genuinely cold runs). `BASELINE.md` — the Phase 0 before-numbers **and** the all-phases-landed after-numbers. |
-| `templates/` | Jinja2. `layout.html` is the base — the Phase 1 **workbench shell**: top bar (nav + theme toggle + identity), data-state **sidebar** (count badge, filter chips, Clear data; `{% block sidebar_extra %}` hosts view-specific modules), toast region, confirm `<dialog>`, htmx progress bar; others extend it via `{% block body %}`. `explore.html` + `templates/partials/` (`column_browser.html`, `explore_landing.html`, `explore_column.html`) are the Phase 2 statistics workbench — partials render standalone on htmx fragment requests (`fragment=True` adds the `<title>` htmx uses to retitle the page) and are `{% include %}`d on full loads. `compare.html` + `partials/compare_builder.html`/`compare_results.html` are the Phase 3 crosstab workbench on the same pattern (replacing the deleted `perm_menu.html`/`perm.html`). `filter.html` + `partials/filter_landing.html`/`filter_column.html`/`filter_preview.html`/`filter_zero.html` are the Phase 4 **Filter workbench** (same fragment pattern; the sidebar reuses the now-parametrized `column_browser.html` pointed at the filter routes); geography columns (`county`/`district`/`region`) additionally render `partials/filter_map.html` (visualization-expansion Phase 11) beside/below the categorical or numeric control. `moc1.html`/`moc.html` are the rebuilt offense-code chooser + 5-slot stepper. The Phase 4 rewrite deleted `filter_boolean.html`/`filter_boolean_menu.html`. `visualize.html` + `partials/visualize_view.html` are the **Visualize workbench** — same shared-renderer/`wants_fragment()` pattern, sidebar reuses the parametrized column browser; a registry-driven builder (chart-type **finder** — a searchable, purpose-grouped card gallery, `VIZ_CHART_GALLERY` — feeding column/measure/aggregate/grain/subset pickers whose show/hide is derived from `VIZ_FIELD_CHARTS`) dispatches to **26 chart types** (`VIZ_CHART_TYPES`, chart-library-expansion), all documented in `STYLEGUIDE.md`. `partials/viz_info_box.html` renders each chart's `info{shows,best_for,watch_out}` (in the builder on selection, and as a collapsible "About this chart" on results); `partials/viz_result.html` is the extracted per-`kind` result dispatch (the payload if/elif chain) shared by `visualize_view.html` **and** `lesson_data.html`'s `chart` focus (Phase E1) so a lesson can pin a read-only chart with no template fork; `partials/viz_correlation_matrix.html` is the server-rendered `.heat-N` table shared by the correlation matrix and the mosaic (both `renderer: 'server-html'`, no canvas). `partials/other_cutoff_slider.html` is the reusable "Other"-cutoff long-tail control shared by the Explore distribution bar, the Visualize pie, and the Visualize treemap. `error.html` renders the styled 404/500 handlers. Learning-modules views (Phase 5 restyled + docked): `lesson_catalog.html`, `lesson.html`, `lesson_step.html` (extends `layout.html`, fills the new `{% block dock %}`; the main area `{% include %}`s `partials/lesson_data.html` — the read-only sandbox data view), `admin.html`, `admin_edit.html`. (`info.html`/`info_menu.html` were deleted in Phase 2.) **Educator-portal views** (all extend `layout.html`, component-system + both themes): `admin.html` is the portal home (Classes + Lessons); `admin_classes.html` (list + create form), `admin_class.html` (detail: join code, roster, email/retake policy, class tools), `admin_class_assignments.html` (per-module assignment editor), `admin_class_progress.html` (progress dashboard + "needs attention" triage + item-level miss rates), `admin_classes_compare.html` (section comparison), `admin_student_attempts.html` (answer-context inspection), `admin_student_delete.html` (two-step full-deletion confirm), `admin_module_answers.html` (computed answer key). Auth: `login.html`/`new.html` (overloaded class-code box) + `join.html` (logged-in "Join a class"). |
-| `lessons/` | Authored learning-module content (`<id>.json`) + `README.md` schema. **Safe to commit** (unlike `user/`). |
+| `templates/` | Jinja2. `layout.html` is the base — the Phase 1 **workbench shell**: top bar (nav + theme toggle + identity), data-state **sidebar** (count badge, filter chips, Clear data; `{% block sidebar_extra %}` hosts view-specific modules), toast region, confirm `<dialog>`, htmx progress bar; others extend it via `{% block body %}`. `explore.html` + `templates/partials/` (`column_browser.html`, `explore_landing.html`, `explore_column.html`) are the Phase 2 statistics workbench — partials render standalone on htmx fragment requests (`fragment=True` adds the `<title>` htmx uses to retitle the page) and are `{% include %}`d on full loads. `compare.html` + `partials/compare_builder.html`/`compare_results.html` are the Phase 3 crosstab workbench on the same pattern (replacing the deleted `perm_menu.html`/`perm.html`). `filter.html` + `partials/filter_landing.html`/`filter_column.html`/`filter_preview.html`/`filter_zero.html` are the Phase 4 **Filter workbench** (same fragment pattern; the sidebar reuses the now-parametrized `column_browser.html` pointed at the filter routes); geography columns (`county`/`district`/`region`) additionally render `partials/filter_map.html` (visualization-expansion Phase 11) beside/below the categorical or numeric control. `moc1.html`/`moc.html` are the rebuilt offense-code chooser + 5-slot stepper. The Phase 4 rewrite deleted `filter_boolean.html`/`filter_boolean_menu.html`. `visualize.html` + `partials/visualize_view.html` are the visualization-expansion **Visualize workbench** — same shared-renderer/`wants_fragment()` pattern, sidebar reuses the parametrized column browser; one builder form (chart-type → column/measure/aggregate/grain pickers) dispatches to six chart types (pie, treemap, waterfall, choropleth, scatter/bubble, correlation matrix), all documented in `STYLEGUIDE.md`. `partials/other_cutoff_slider.html` is the reusable "Other"-cutoff long-tail control shared by the Explore distribution bar, the Visualize pie, and the Visualize treemap. `error.html` renders the styled 404/500 handlers. Learning-modules views (Phase 5 restyled + docked): `lesson_catalog.html`, `lesson.html`, `lesson_step.html` (extends `layout.html`, fills the new `{% block dock %}`; the main area `{% include %}`s `partials/lesson_data.html` — the read-only sandbox data view), `admin.html`, `admin_edit.html`. (`info.html`/`info_menu.html` were deleted in Phase 2.) **Educator-portal views** (all extend `layout.html`, component-system + both themes): `admin.html` is the portal home (Classes + Lessons); `admin_classes.html` (list + create form), `admin_class.html` (detail: join code, roster, email/retake policy, class tools), `admin_class_assignments.html` (per-module assignment editor), `admin_class_progress.html` (progress dashboard + "needs attention" triage + item-level miss rates), `admin_classes_compare.html` (section comparison), `admin_student_attempts.html` (answer-context inspection), `admin_student_delete.html` (two-step full-deletion confirm), `admin_module_answers.html` (computed answer key). Auth: `login.html`/`new.html` (overloaded class-code box) + `join.html` (logged-in "Join a class"). |
+| `content/lessons/` | Authored learning-module content (`<id>.json`) + `README.md` schema. **Safe to commit** (unlike `user/`). |
 | `LEARNING_MODULES_PROMPTS.md` | Phased build plan for the learning-modules feature. All phases are now implemented; the doc still reads as forward-looking. |
 | `EDUCATOR_PORTAL.md` | **Design/scope authority** for the educator portal + class-code system: features (P0/P1/P2), the resolved class & identity model, privacy rules, open questions. **Auth + all of P0 and P1 are now built** (P2 deferred); read before touching that feature. |
 | `EDUCATOR_PORTAL_PROMPTS.md` | Phased build order (14 phases, 0–13, each with a complexity rating → suggested model) for the educator portal + class-code system + auth hardening, plus Appendix A (class schema) and B (attempt-log format). **All phases done** — see "Educator portal (implemented)" below. |
@@ -117,19 +120,18 @@ uv run flask --app app run     # add --debug for reload
 | `OPTIMIZATION_PROMPTS.md` | Phased build order (Phases 0–4) for the base DataFrame optimization above, house-style like the other `*_PROMPTS.md`. **All phases done (categorical + load-once + Parquet + `--preload`).** |
 | `VISUALIZATION_EXPANSION.md` | **Design/scope authority** for the Visualize workbench: a new top-level tab with an extensive chart vocabulary (pie, treemap, waterfall, choropleth, scatter/bubble, correlation matrix) + map-as-filter, all over the current filtered slice. Verified data facts (geo encodings, numeric columns), the substrate-reuse argument, the confounding/`float64`/immutability constraints, risks. Read before touching the viz work. **Implemented — all 5 tiers/16 phases built on `visualization_expansion`; one acceptance criterion (a lesson using a chart) is tracked as an open gap** — see "Done: visualization expansion" below. |
 | `VISUALIZATION_EXPANSION_PROMPTS.md` | Phased build order (16 phases, 0–15, across 5 tiers) for the visualization expansion, each with an effort · risk rating and a **recommended model** (Sonnet rarely / Opus with escalating effort incl. ultra / Fable only for the vital P11 cache-compat linchpin). House-style like the other `*_PROMPTS.md`. **All phases done.** |
-| `CHART_LIBRARY_EXPANSION.md` | **Design/scope authority** for **wave 2** of the Visualize workbench: grew it from 6 chart types to **26**, added a **chart finder/search**, and gave **every chart an info box** (shows · best-for · watch-out). The spine is a **chart registry** (`VIZ_CHART_TYPES` expanded) that a data-driven builder/finder/renderer reads from; new backend engines (`aggregate_by_two`, a numpy-only distribution-stats engine, `bin2d`) are additive beside `get_table`/`aggregate_by_group`, fresh-computed, never disk-cached. Regression parked (both flavors). Read before touching wave-2 viz work. **Shipped — all 5 tiers/17 phases built on `chart-library-expansion`** — see "Done: chart library expansion" below. |
-| `CHART_LIBRARY_EXPANSION_PROMPTS.md` | Phased build order (17 phases across 5 tiers A–E) for the chart-library expansion, each with an effort · risk rating and a **recommended model for every step** (Sonnet once for docs / Opus with escalating effort incl. ultra for the B2 stats engine + D1 box-violin; **no Fable phase** — nothing is cache-keyed this wave). House-style like the other `*_PROMPTS.md`. **All phases done.** |
-| `REQUEST_PATH_OPTIMIZATION_PROMPTS.md` | Phased build order (Phases 0–5) for the **request-path optimization** — the per-request work layered on top of the base-df levers (measurement harness, per-request `account.retrieve` memo, sidebar badge without a replay, the filtered-slice LRU, `get_table`/`num_each` vectorization). Self-contained (rationale + build order in one doc), house-style like the other `*_PROMPTS.md`; each phase carries an effort · risk rating and a **recommended model from a four-model vocabulary — Sonnet ultracode / Opus xhigh / Opus ultracode / Fable xhigh** (Fable reserved for the Phase 5 `.bin` byte-identity linchpin, mirroring its P11 role in the viz prompts). **All phases done (0–5) on `optimizations-minor`; Phase 5 took the order-preserving option (a), so no `.bin` byte changed and no cache/golden re-warm was needed.** Before/after numbers in `perf/BASELINE.md`. See "Done: request-path optimization" below. |
-| `static/css/tokens.css`, `static/css/base.css` | Phase 0 token system: all design tokens (both themes, exact `STYLEGUIDE.md` tables — plus `--overlay` for drawer/dialog backdrops) and reset/typography/focus/reduced-motion. Loaded first; theme switches via `data-theme` on `<html>` (FOUC-guard inline script in `layout.html` — which also sets a `js` class gating JS-only CSS — toggle in `static/js/theme.js`, persisted to `localStorage.theme`, fires a `themechange` event). |
+| `static/css/tokens.css`, `static/css/base.css` | Phase 0 token system: all design tokens (both themes, exact `STYLEGUIDE.md` tables — plus `--overlay` for drawer/dialog backdrops) and reset/typography/focus/reduced-motion. Loaded first; theme switches via `data-theme` on `<html>` (FOUC-guard inline script in `layout.html` — which also sets a `js` class gating JS-only CSS — toggle in `static/js/theme.js`, persisted to `localStorage.theme`, fires a `themechange` event). `tokens.css` also owns the theme-aware eight-slot Standard / universal / protan / deutan / tritan / monochrome chart palettes; active charts continue to consume only `--chart-1`…`--chart-8`. |
 | `static/css/components.css`, `static/css/views.css` | Phase 1 shell styles per the styleguide's file organization: `components.css` = buttons/badges/chips/toasts/dialog/alerts/empty-state/loading; `views.css` = top bar, workbench grid, sidebar + tablet drawer, breakpoints, **phone shell (data-state bar, bottom nav, sticky-first-column tables, bottom-sheet dock — Phase 7)**. The retired `style.css` is gone (Phase 7); its still-live base rules (`.container`, bare `h1`/`h2`/`h3`/`p`) moved here + into `base.css`. |
 | `static/js/app.js` | Phase 1 shell behaviors (vanilla, no build step): toast auto-dismiss + `HX-Trigger`/`htmx:responseError` toast paths, `[data-confirm]` dialog interception, sidebar drawer with focus trap (Phase 7: opened by **any** `[aria-controls="sidebar"]` trigger — the tablet ☰ or the phone data-state bar — focus returns to the opener), htmx-bound global progress bar, `[data-loading]` submit feedback ("Computing statistics…"). Phase 3 added the **searchable picker**: a `[data-picker]` wrapper around a native `<select>` gets a filtering combobox (arrows/Enter/Esc); the hidden select keeps carrying the form value (and is the no-JS fallback). |
-| `static/js/compare.js` | Phase 3 compare behaviors: stat toggle (sets `data-stat` on the crosstab — pure CSS show/hide, since all four stats ship in the markup — updates `aria-pressed`, and re-shades the `.heat-N` heatmap from each cell's `data-heat-<stat>` attributes) and the grouped-bar companion chart (theme-aware, ≤8×8 tables only, re-rendered on `themechange` and history restores). **The chart renders on `htmx:afterSettle` (not `afterSwap`) + a next-frame `chart.resize()`** — the swapped DOM/scroll must settle before Chart.js measures the container, or it intermittently paints blank until a manual refresh; don't move it back to `afterSwap`. Loaded (with `chart.umd.min.js`) only via `compare.html`'s `{% block head %}`. |
+| `static/js/compare.js` | Phase 3 compare behaviors: stat toggle (sets `data-stat` on the crosstab — pure CSS show/hide, since all four stats ship in the markup — updates `aria-pressed`, and re-shades the `.heat-N` heatmap from each cell's `data-heat-<stat>` attributes) and the grouped-bar companion chart (theme-aware, ≤8×8 tables only, re-rendered on `themechange` and history restores). Accessibility palette modes add stable native CanvasPattern fills and borders to the grouped bars; Standard and Custom stay unpatterned. **The chart renders on `htmx:afterSettle` (not `afterSwap`) + a next-frame `chart.resize()`** — the swapped DOM/scroll must settle before Chart.js measures the container, or it intermittently paints blank until a manual refresh; don't move it back to `afterSwap`. Loaded (with `chart.umd.min.js`) only via `compare.html`'s `{% block head %}`. |
 | `static/js/explore.js` | Phase 2 explore behaviors: distribution chart (Chart.js; colors read from CSS tokens at render time, re-rendered on `themechange` and history restores; horizontal bars when labels run long), column-browser search, value-table search + "show more" pagination, active-column `aria-current` sync, tablet-drawer auto-close on column pick. **The chart renders on `htmx:afterSettle` (not `afterSwap`) + a next-frame `chart.resize()`** (interactive bits — table/active-column — still run on `afterSwap`): Chart.js must measure the container after the swap/`show:window:top` scroll settles, or it intermittently paints blank until a refresh; don't move it back to `afterSwap`. Loaded (with `chart.umd.min.js`) only via `explore.html`'s `{% block head %}`. |
 | `static/js/filter.js` | Phase 4 filter-workbench behaviors: column-browser search + active-column `aria-current` sync (against `#filter-view`), categorical value-list search + "Select shown"/"Clear" bulk actions, and MOC option/category table search. The live "~N cases match" preview is pure htmx (`hx-get` on the preview element) and needs no JS here — all of this is progressive enhancement over plain forms/links. Loaded via `filter.html`/`moc.html`/`moc1.html`'s `{% block head %}`. Visualization-expansion Phase 11 added the map input: `initFilterMap()` (bound on `htmx:afterSettle`, using the shared `geomap.js` plumbing) draws the county/district/region canvas and wires clicks to fill/toggle the existing form controls and fire `change` — the map is progressive enhancement; the categorical list/value input stays the complete no-JS/screen-reader path. |
-| `static/js/visualize.js` | Visualize-view behaviors, loaded only via `visualize.html`'s `{% block head %}` (after `otherbucket.js`/`geomap.js`/the treemap, geo, and boxplot plugins). `renderChart` dispatches off a registry-driven `RENDERERS` table keyed by each payload's `kind` (mirroring `VIZ_CHART_TYPES`' `renderer` field): `renderPie`, `renderTreemap`, `renderWaterfall` (Chart.js floating bars + an optional running-total line), `renderScatter` (bubble radius ∝ √count), `renderChoropleth`/`drawChoropleth` (fills read the 8 `.heat-N` legend swatch colors so map/legend/crosstab stay in lockstep; `onClick` → `applyGeoFilter`, a hidden-form POST to the existing filter-apply route), `renderCategoricalSeries` (C1 — bar/lollipop/dot/donut/grouped/stacked/100%-stacked, one renderer driven by each entry's `variant`), `renderLine` (C2 — line/area/stacked-area/slope/bump, server-side rank transform for bump), `renderDistribution` (histogram/ECDF, C3), `renderKde` (D2 — **convolves the server's binned gridded weights client-side** via `kdeDensityFromWeights`, the exact JS twin of `data._binned_kde`, so its bandwidth slider re-smooths with **no refetch**, clamped to the reported physical bounds; the round-number **spikiness nudge** is server-rendered as a loud `.alert-warning` callout linking to the histogram), `renderPlugin` (box/violin, D1 — box via the vendored `@sgratzl/chartjs-chart-boxplot`; violin is hand-rolled, not the plugin's `violin` type, see `static/js/vendor/VERSIONS.md`), `renderAnimated` (D5 — a year scrubber over `chart.js` transitions; `animRevealData` nulls frames beyond the scrub index, no autoplay, disabled under `prefers-reduced-motion`), and `renderPairplot` (D4, `tiled` — many Chart instances, one per SPLOM panel; `destroyPairCharts()` tears them all down before a re-render so canvases aren't leaked). The **correlation matrix and mosaic (D3) have no chart** — both are plain server-rendered `.heat-N` HTML (renderer `server-html`), so `RENDERERS` has no key for them. Small-N choropleth texture is a hand-rolled `hatchPattern()` `CanvasPattern` (diagonal stripes from an offscreen canvas tile) — **no `patternomaly` dependency**. Also here: the chart-finder search/gallery filtering (label + `synonyms` + `tags`), the correlation/pair-plot column-subset picker (search + soft cap), and companion-table search/"show more". **Same `htmx:afterSettle` + next-frame `resize()` lifecycle as `explore.js`/`compare.js`.** |
+| `static/js/visualize.js` | Visualization-expansion Visualize-view behaviors, loaded only via `visualize.html`'s `{% block head %}` (after `otherbucket.js`/`geomap.js`/the treemap and geo plugins). Reads embedded JSON payloads and renders the registered chart families. Categorical colors always come from `--chart-1`…`--chart-8`; accessibility palette modes add a stable second channel—native CanvasPattern fills, line dashes, point shapes, and opposing waterfall hatches—without changing payloads or fetching data. Standard and Custom retain the original rendering. The choropleth/correlation heat ramps remain separate sequential encodings with their existing hatch, number, and sign cues. **Same `htmx:afterSettle` + next-frame `resize()` lifecycle as `explore.js`/`compare.js`.** |
+| `static/js/palette.js` | Global, device-local Chart colors control. Applies Standard / universal / protan / deutan / tritan / monochrome / Custom modes, strictly validates eight custom `#RRGGBB` values, migrates legacy `cb` storage to `universal`, updates per-card custom previews, and dispatches `themechange` for a no-refetch redraw. Its partner inline guard in `layout.html` applies the saved mode before first paint. |
+| `tests/test_palette_validation.py` | Dependency-free palette guardrail: parses the authored CSS rows, checks eight valid distinct colors per mode/theme, applies complete-dichromacy simulation matrices, measures Lab separation, and verifies chart-mark visibility against the real light/dark surfaces. Run directly with the project Python environment. |
 | `static/js/geomap.js` | Shared map plumbing used by *both* the Visualize choropleth and the Filter view's map (`filter.js`): registers the `chartjs-chart-geo` plugin components (the plugin doesn't self-register), fetches/memoizes the vendored TopoJSON once, and dissolves county geometry into district/region shapes at runtime via `topojson.merge` (memoized) per the data-derived crosswalk — so there are no separate district/region geometry files. Exposes `window.GeoMap`. |
 | `static/js/otherbucket.js` | The reusable **"Other"-cutoff slider** control's JS half (markup in `templates/partials/other_cutoff_slider.html`): `bucket(payload, cutoff)` re-slices a value list into a head + "Other" tail entirely client-side (no refetch); `wireSlider()` binds the range input. Shared by three call sites: the Explore distribution bar, the Visualize pie, and the Visualize treemap. Exposes `window.chartBucket`. |
-| `static/js/vendor/` | Vendored, pinned htmx 2.0.10 + Chart.js 4.5.1 + chartjs-chart-treemap 3.1.0 + chartjs-chart-geo 4.3.6 + (chart-library-expansion, Phase D1) `chartjs-chart-boxplot.min.js` (`@sgratzl/chartjs-chart-boxplot` 4.4.5 — self-registers `boxplot`/`violin` types, but **only `boxplot` is used**; violin is hand-rolled from B2's KDE, see `VERSIONS.md`) (`VERSIONS.md` is the manifest; never hand-edit). Inter variable font at `static/fonts/InterVariable.woff2`. `static/geo/mn-counties-topo.json` (~20 KB, derived from `us-atlas@3/counties-10m.json`, pruned to MN's 87 counties) is the one geometry file district/region shapes dissolve from at runtime. htmx is loaded by `layout.html`; Chart.js by each view that charts (`explore.html`, `compare.html`, `lesson_step.html`, `filter.html`, `visualize.html`); the treemap, geo, and boxplot plugins load only on `visualize.html` (the geo plugin also on `filter.html`, for its map). **No `patternomaly`** — small-N texture is hand-rolled Canvas 2D. |
+| `static/js/vendor/` | Vendored, pinned htmx 2.0.10 + Chart.js 4.5.1 + (visualization expansion) chartjs-chart-treemap 3.1.0 + chartjs-chart-geo 4.3.6 (`VERSIONS.md` is the manifest; never hand-edit). Inter variable font at `static/fonts/InterVariable.woff2`. `static/geo/mn-counties-topo.json` (~20 KB, derived from `us-atlas@3/counties-10m.json`, pruned to MN's 87 counties) is the one geometry file district/region shapes dissolve from at runtime. htmx is loaded by `layout.html`; Chart.js by each view that charts (`explore.html`, `compare.html`, `lesson_step.html`, `filter.html`, `visualize.html`); the treemap plugin loads only on `visualize.html`, the geo plugin on `visualize.html` and `filter.html` (for its map). **No `patternomaly`** — small-N texture is hand-rolled Canvas 2D. |
 
 ## Key data structures
 
@@ -226,47 +228,38 @@ CODES['A'] = [ 'Assault',                 # [0] title (comment '# Complete' = fu
 - **Legacy filter redirects:** `/filter/` and `/filter/boolean/...` → `/explore/filter[...]`;
   `/filter/moc/...` → `/explore/moc/...`. Endpoint names (`filter_menu`, `filter_boolean`,
   `filter_moc1`, `filter_moc`) survive for old bookmarks.
-- `/visualize` (GET only) — the **Visualize workbench** (`render_visualize` + `wants_fragment()`,
-  the same shared-renderer/fragment pattern as explore/compare/filter). All state is URL query
-  params (`chart`, `column`, `column2`, `measure`, `aggregate`, `grain`, repeated `cols`) —
-  hard-refresh- and lesson-deep-link-safe; an unknown `chart` id falls back to the blank-canvas
-  builder rather than 404ing. A registry-driven builder (chart-type **finder** — a searchable,
-  purpose-grouped card gallery over `VIZ_CHART_GALLERY`, reusing `build_compare_options` for the
-  column/measure pickers) dispatches to **26 chart types** (`VIZ_CHART_TYPES`, all
-  `status: 'ready'`, chart-library-expansion Tiers A–E) across six families: **Comparison**
-  (bar, lollipop, dot plot, grouped bar), **Composition** (pie, treemap, donut, stacked bar,
-  100% stacked bar, mosaic — pie/treemap/donut/stacked share
-  `partials/other_cutoff_slider.html`'s "Other"-cutoff control where applicable), **Distribution**
-  (histogram, ECDF, KDE, box, violin), **Trend** (waterfall, line, area, stacked area, slope,
-  bump, animated time-series), **Relationship** (scatter/bubble, correlation matrix, pair plot),
-  and **Geography** (choropleth — county/district/region grain toggle, `chartjs-chart-geo`,
-  small-N hatch below `CHOROPLETH_MIN_N`). Each registry entry carries an `info{shows,best_for,
-  watch_out}` rendered by `partials/viz_info_box.html`, and every chart ships a companion data
-  table (the a11y/no-JS/honesty twin — never a chart alone). New backend engines feed the wave-2
-  families, all additive beside `get_table`/`aggregate_by_group`, fresh-computed, never
-  disk-cached: `Data.aggregate_by_two` (B1, two-group matrix), `Data.distribution_stats` (B2,
-  numpy-only five-number/histogram/ECDF/KDE, no scipy), `Data.bin2d` (B3, 2D binning for the
-  pair plot), and `Data.kde_density` (D2, ships pre-convolution gridded weights so the client
-  re-smooths with no refetch). Every chart builder (`build_treemap`/`build_waterfall`/
-  `build_choropleth`/`build_scatter`/`build_correlation`/`build_pairplot`/
-  `build_catseries_single`/`build_catseries_two`/`build_mosaic`/`build_line_single`/
-  `build_line_two`/`build_animated`/`build_distribution`/`build_kde`/`build_boxviolin` in
-  `app.py`) reads the active history and never mutates the shared base. **Map-click → filter and
-  the choropleth's per-row "Keep only" button both POST the existing `/explore/filter/<column>`
-  route** (`explore_filter_column`) — there is no bespoke click-filter route, so the resulting
-  history entry, chip, and cache dir are byte-identical to hand-typing the same filter
-  (`safe_return_target` guards the `next` redirect target against open-redirect). Nav entry sits
-  between Filter and Lessons in both the top bar and the phone bottom nav.
+- `/visualize` (GET only) — the visualization-expansion **Visualize workbench**
+  (`render_visualize` + `wants_fragment()`, the same shared-renderer/fragment pattern as
+  explore/compare/filter). All state is URL query params (`chart`, `column`, `column2`,
+  `measure`, `aggregate`, `grain`, repeated `cols`) — hard-refresh- and lesson-deep-link-safe; an
+  unknown `chart` id falls back to the blank-canvas builder rather than 404ing. One builder
+  (chart-type picker → column/measure/aggregate pickers, reusing `build_compare_options`)
+  dispatches to six chart types (`VIZ_CHART_TYPES`, all `status: 'ready'`): **pie** and
+  **treemap** (both share `partials/other_cutoff_slider.html`'s "Other"-cutoff control),
+  **waterfall** (year-over-year over `sentyear`, Chart.js floating bars), **choropleth**
+  (county/district/region grain toggle, `chartjs-chart-geo`, small-N hatch below
+  `CHOROPLETH_MIN_N`), **scatter/bubble** (aggregated lattice, guarded by `SCATTER_MAX_CELLS`),
+  and **correlation matrix** (a user-picked 2–8 numeric-column subset, `DataFrame.corr()`,
+  computed fresh — never disk-cached — flagging near-mechanical pairs at
+  `|r| ≥ CORRELATION_MECHANICAL_THRESHOLD` rather than hiding them). Every chart builder
+  (`build_treemap`/`build_waterfall`/`build_choropleth`/`build_scatter`/`build_correlation` in
+  `app.py`) reads the active history through `Data.aggregate_by_group` and never mutates the
+  shared base. **Map-click → filter and the choropleth's per-row "Keep only" button both POST
+  the existing `/explore/filter/<column>` route** (`explore_filter_column`) — there is no
+  bespoke click-filter route, so the resulting history entry, chip, and cache dir are
+  byte-identical to hand-typing the same filter (`safe_return_target` guards the `next` redirect
+  target against open-redirect). Nav entry sits between Filter and Lessons in both the top bar
+  and the phone bottom nav.
 - `/load` — clear history (revert to the base full-dataset entry); no longer linked from the
   nav (the sidebar's confirmed "Clear data" button hits `/revert/1` instead). `/revert/<n>` —
   revert the history to a prior entry (`account.history_revert`, truncating to `history[:n]`;
   `n` is the 1-based history position — the sidebar chips link here: clicking a chip reverts
   to that step, the last chip's `×` removes just that step). Filter apply, revert, and clear
   all `flash()` a message that `layout.html` renders as a toast.
-- **Learning modules:** `/lesson` (catalog with per-module status + resume), `/lesson/<module_id>` (overview), `/lesson/<module_id>/<int:step>` (Phase 5 **docked lesson**: workbench shell + lesson dock; the main area shows the step's read-only sandbox data — `info`, `table`, or (chart-library-expansion Phase E1) `chart`, a read-only pinned Visualize chart built by `build_lesson_chart` reusing the same registry/builders/renderers with `session=None` — the sidebar shows the "Lesson data" module; POST grades a `question`, `checkpoint` steps compare state), `/lesson/<module_id>/complete` (mark done). See "Learning Modules" below.
+- **Learning modules:** `/lesson` (catalog with per-module status + resume), `/lesson/<module_id>` (overview), `/lesson/<module_id>/<int:step>` (Phase 5 **docked lesson**: workbench shell + lesson dock; the main area shows the step's read-only sandbox data, the sidebar shows the "Lesson data" module; POST grades a `question`, `checkpoint` steps compare state), `/lesson/<module_id>/complete` (mark done). See "Learning Modules" below.
 - **Educator portal (educators only, `require_educator()` / `require_class_owner()`):**
   `/admin` (portal home — your classes + your authored modules), `/admin/edit[/<module_id>]`
-  (lesson authoring → validated JSON to `lessons/`). Classes: `/admin/classes` (list + create),
+  (lesson authoring → validated JSON to `content/lessons/`). Classes: `/admin/classes` (list + create),
   `/admin/classes/<class_id>` (detail: join code, roster, email + retake/feedback policy),
   `/admin/classes/<class_id>/assignments` (per-module required/optional/hidden/scheduled + dates),
   `/admin/classes/<class_id>/progress` (dashboard + "needs attention" triage + item-level miss
@@ -307,12 +300,9 @@ so the client does a full-page redirect instead of swapping the login page into 
 
 Styled `404`/`500` handlers render `error.html` (via the never-raising `current_user()` helper).
 The `inject_globals` context processor also computes `datastate` (current + total case count)
-for the sidebar badge on every logged-in render — since request-path P2 it reads the count
-stamped on the active history entry (`account.set_history_count`, written by the filter-apply
-route; a revert restores the target entry's own stamp, and the base entry maps to the memoized
-`dataset_total()`) with `get_data` as the fallback for unstamped entries, so the badge no
-longer forces a history replay after applying a new filter. `hx_toast()` sets the
-`HX-Trigger` header for htmx-response toasts (used from Phase 2 on).
+for the sidebar badge on every logged-in render — cheap when cached, but it means the redirect
+after applying a *new* filter pays the history replay immediately rather than on the next data
+view. `hx_toast()` sets the `HX-Trigger` header for htmx-response toasts (used from Phase 2 on).
 
 ## Storage layout (all git-ignored — see `.gitignore`)
 
@@ -607,7 +597,7 @@ Appendix A class schema / Appendix B attempt-log format).
 
 Guided lessons that reuse the history/cache substrate. Built across the phases in
 `LEARNING_MODULES_PROMPTS.md` — **all phases are now implemented** on the `learning-modules`
-branch. That doc and `lessons/README.md` still read as forward-looking plans (e.g. README says
+branch. That doc and `content/lessons/README.md` still read as forward-looking plans (e.g. README says
 "Phase 0 is data only"); treat **this section** as the current-state authority.
 
 **Core idea — reuse the history/cache substrate.** A lesson is an ordered list of *steps*; a
@@ -618,9 +608,9 @@ existing `_execute`/`get_data` path, and numeric questions are **graded live**
 (`Data.get_column_info`) rather than hardcoded — so answers stay correct if the data changes.
 
 **Files:**
-- `lessons/<id>.json` — one module: `id`, `title`, `description`, `author` (classcode), optional
+- `content/lessons/<id>.json` — one module: `id`, `title`, `description`, `author` (classcode), optional
   `order` (catalog sort position — lower shows first, missing sorts last), `objectives`, ordered
-  `steps`. Schema is documented in `lessons/README.md`. `id` must be `[a-z0-9-]` and match the
+  `steps`. Schema is documented in `content/lessons/README.md`. `id` must be `[a-z0-9-]` and match the
   filename stem (enforced by `lessons.validate`; also blocks path traversal). Three shipped
   lessons, sequenced via `order`: `intro-what-this-data-is.json` (data provenance/interpretation
   primer — where the dataset sits in the criminal-justice funnel, unit of analysis, description
@@ -630,9 +620,7 @@ existing `_execute`/`get_data` path, and numeric questions are **graded live**
 - `lessons.py` — loader/validator: `list_modules`, `get_module`, `validate`, `save_module`.
 
 **Step types:** `read` (body only), `explore` (sets a data `state`; `focus` picks the main-area
-view — `info` a column, `table` a crosstab, or (chart-library-expansion Phase E1) `chart` a
-pinned Visualize chart (`build_lesson_chart`, any registry chart except the map-click/"Keep
-only" choropleth, since those mutate history) — which the docked lesson renders read-only), `question`
+view — `info` a column, `table` a crosstab — which the docked lesson renders read-only), `question`
 (`numeric` graded live within `tolerance` / `choice` graded by index / `free` stored ungraded),
 `checkpoint` (**wired in Phase 5**: `expect_state` is compared to the active lesson state as a
 token multiset; pass/fail diff; gates Next — see `build_checkpoint`).
@@ -765,95 +753,10 @@ column); responsive at 375/768/1280 in both themes; zero external/failed network
 chartjs-chart-geo 4.3.6 — **no `patternomaly`**, the small-N hatch is a hand-rolled `CanvasPattern`
 in `static/js/visualize.js`).
 
-**The one open gap this wave left** (§10 criterion 7 in `VISUALIZATION_EXPANSION.md` — no shipped
-lesson used a Visualize chart) is **closed** by the chart library expansion's Phase E1, directly
-below.
-
-## Done: chart library expansion (Visualize workbench, wave 2)
-
-**All 5 tiers / 17 phases built** on the `chart-library-expansion` branch (2026-07-11), off
-`optimizations-minor`. Governed by two docs: **`CHART_LIBRARY_EXPANSION.md`** (design/scope
-authority — the why + the registry design) and **`CHART_LIBRARY_EXPANSION_PROMPTS.md`** (the
-phased build order, a recommended model on every step, all marked done).
-
-**What shipped:** the Visualize tab grew from the shipped **6 chart types to 26**, spanning six
-purpose families — **Comparison** (bar, lollipop, dot plot, grouped bar), **Composition** (pie,
-treemap, donut, stacked bar, 100% stacked bar, mosaic), **Distribution** (histogram, ECDF, KDE,
-box, violin), **Trend** (waterfall, line, area, stacked area, slope, bump, animated time-series),
-**Relationship** (scatter/bubble, correlation matrix, pair plot), and **Geography** (choropleth)
-— plus a searchable, purpose-grouped **chart finder** and an **info box** (shows · best-for ·
-watch-out) on every chart. See the Routes section (`/visualize`) and the `data.py`/`cache.py`/
-`static/js/visualize.js` module-map rows above for exactly which function builds which chart.
-
-**The architectural spine (Tier A):** `VIZ_CHART_TYPES` (A0) expanded from a flat
-`{id,label,status,blurb}` list into a full descriptor (`family`, `synonyms`/`tags`,
-`info{shows,best_for,watch_out}`, `inputs`, `aggregates`, `column_types`, `renderer`, an optional
-`variant`) that the builder, the JS `renderChart` dispatch (`RENDERERS` keyed by `renderer`), and
-the finder all read from — adding chart #27 is a registry entry, not a refactor. The 6 shipped
-charts migrated onto the registry with **zero behavior change** (byte-identical builder output,
-verified by a 17-URL test-client harness). A1 replaced the flat picker with `VIZ_CHART_GALLERY`, a
-family-grouped, `.js-only`-searched card gallery (label + synonyms + tags, keyboard-complete,
-no-JS falls back to the grouped list); A2 authored all 26 `info` entries, including the honesty
-caveats (KDE/violin smooth away the sentence-length round-number clustering; 100%-stacked/mosaic
-hide absolute Ns; small-N maps mislead; animation dramatizes noise) — flagged for author
-(Dr. Vigesaa / Dr. Clifford) review.
-
-**New backend engines (Tier B), all additive beside `get_table`/`aggregate_by_group`, fresh-
-computed, never disk-cached:** `Data.aggregate_by_two` (B1 — the two-group sibling of
-`aggregate_by_group`: one `groupby([a,b], observed=True)` count pass + per-group Series
-reductions, **not** `groupby.agg`, carrying forward the request-path P4 lesson that its Cython
-accumulation order can flip a rounding-boundary cell) feeds
-grouped/stacked/100%-stacked/stacked-area/slope/bump/mosaic/animated; `Data.distribution_stats`
-(B2 — **numpy-only, no scipy**: a five-number summary + 1.5·IQR whiskers as outlier *counts*,
-never raw arrays; a Freedman–Diaconis histogram; an ECDF from cumulative `value_counts`; and a
-binned Gaussian KDE on a shared grid sized to resolve its own kernel) feeds
-histogram/ECDF/KDE/box/violin; `Data.bin2d` (B3 — capped `np.histogram2d`, discrete columns on
-their natural lattice) feeds the pair plot's off-diagonal panels; `Data.kde_density` (D2) reuses
-B2's grid and ships the pre-convolution linear-binned weights so the client re-smooths at any
-bandwidth with **no refetch**, plus a spikiness flag driving the round-number nudge.
-
-**The chart families (Tiers C–D):** categorical-series (C1 — one `renderCategoricalSeries` for
-all 7 bar-family variants, driven by each entry's `variant`), line (C2 — one `renderLine`,
-including a **server-side** per-period rank transform for bump), histogram + ECDF (C3); box +
-violin (D1 — spiked `@sgratzl/chartjs-chart-boxplot` 4.4.5 first: box takes its precomputed
-five-number summary directly, but its `violin` type wants raw arrays, so **violin is a
-hand-rolled mirrored-KDE-area render off B2** instead, per the design doc's fallback plan — no
-raw per-row array ever crosses the wire), KDE (D2), mosaic (D3 — server-rendered `.heat-N` HTML,
-no canvas, sharing the correlation-matrix precedent), pair plot (D4 — the correlation matrix's
-numeric-subset picker, capped at 5 columns, tiled B3 bins off-diagonal + B2 histograms on the
-diagonal), and animated time-series (D5 — a year scrubber over B1 frames; no autoplay,
-`prefers-reduced-motion` disables the tween and the static multi-line chart is the fallback).
-
-**The lesson bridge (E1):** `build_lesson_data` gained a `chart` focus (`build_lesson_chart`) that
-renders a read-only Visualize chart from lesson state, reusing the same registry and builders
-with `session=None` — closing the standing wave-1 gap (`VISUALIZATION_EXPANSION.md` §10 crit 7).
-`templates/partials/viz_result.html` was extracted from `visualize_view.html` so both the live
-workbench and the lesson sandbox render off the same payload dispatch, with no JS change. One
-authored step (`intro-explorer-basics.json`, step 8: a histogram of `time`) exercises it. The
-choropleth is excluded from the lesson focus — its map-click/"Keep only" affordances mutate
-history, which a lesson sandbox must never do.
-
-**Verified (Phase E2 cross-cutting QA):** all 26 charts render with a companion data table and
-zero console errors; the 6 shipped charts stayed byte-identical to pre-A0 (worktree diff against
-`HEAD`); the `data.py` changes are purely additive (only the new B1–B3/D2 methods; `get_table`
-untouched); per-family spot-checks reconcile against Explore/Compare/raw pandas; zero external
-network requests at 375/768/1280px in both themes (`VERSIONS.md` matches disk: htmx 2.0.10,
-Chart.js 4.5.1, chartjs-chart-treemap 3.1.0, chartjs-chart-geo 4.3.6, chartjs-chart-boxplot
-4.4.5); both guardrail tests green throughout. One caveat logged rather than fixed: the pair-plot
-SPLOM warms in ≈150 ms at 3 columns but ≈370 ms at the 5-column cap — over the ~100 ms perf
-budget, but an anticipated O(k²) peak (the off-diagonal `bin2d` calls dominate) that the cap
-exists precisely to bound.
-
-**Hard constraints — all held:** nothing new is disk-cached and `get_table`'s output is
-byte-for-byte unchanged (no `.bin` exposure; `test_map_filter_equivalence.py` is untouched — no
-map paths changed this wave); `float64` stays `float64`; the base and cached slices are never
-mutated in place (`test_base_immutability.py` extended over every new engine); no runtime CDN /
-no build step (the boxplot plugin is vendored + recorded in `VERSIONS.md`, loaded only on
-Visualize); tokens + both themes throughout; every chart renders on `htmx:afterSettle` + next-
-frame `resize()`. **Regression (both flavors) stays parked** by author decision, as do the
-"improbable list" (sunburst, strip/swarm, ridgeline, hexbin, calendar heatmap) and the
-domain-shaped views floated in brainstorm (grid heatmap, dumbbell, departure-as-default-measure,
-small multiples, diverging bar) — noted as a future initiative, not folded into this wave.
+**One open gap** (§10 criterion 7 in `VISUALIZATION_EXPANSION.md`): **no shipped lesson uses a
+Visualize chart** — `app.build_lesson_data` only supports `info`/`table` focus views. Closing it
+needs a new chart focus-view plus an authored lesson step; left as deliberate follow-up rather than
+folded into the QA/docs passes (Phases 14–15).
 
 ## Done: base DataFrame optimization (runtime memory/latency)
 
@@ -890,60 +793,9 @@ shared RSS/PSS is a Linux-target measurement (Windows has no `fork`) — recipe 
 
 **Two hard constraints** (both in the prompts doc's Global constraints): results and cache keys
 must stay identical (so **numeric columns must stay `float64`** — the three checks at
-[data.py:78](data.py:78)/[246](data.py:246)/[329](data.py:329) depend on it; only strings get
+The numeric checks in [data.py](../../src/mn_sentencing_explorer/analysis/data.py) depend on it; only strings get
 re-typed), and the base DataFrame is **never mutated in place** today (no `inplace=`/`.drop`/
 `.fillna`/`astype` on `self.df`) — the sharing levers rest on keeping it that way.
-
-## Done: request-path optimization (per-request work on top of the base)
-
-**All six phases (0–5) built** on the `optimizations-minor` branch (off `main`, which includes the
-merged visualization-expansion PR #4; landed 2026-07-09). Governed by one self-contained doc,
-**`REQUEST_PATH_OPTIMIZATION_PROMPTS.md`** (rationale + phased build order + the per-phase
-resolutions folded in). This is the **sequel** to the base DataFrame optimization: Levers A–D made
-the *base* cheap to hold and share; this pass removed everything redundant that ran *on top of the
-base, per request* — the repeated history replays, the O(n·k) stat loop, the nested-filter
-crosstab, and the repeat pickle reads. Measured before/after for every flow is in
-`perf/BASELINE.md`; headline: filter-then-browse-8-columns 535–555 ms → **135–156 ms** (9 replays →
-1), Compare crosstab 207–216 ms → **~40 ms**, Visualize choropleth+scatter ~1.6 s → **~90–104 ms**,
-cold column view ~109 ms → **~40–49 ms**.
-
-**What each phase landed:**
-- **P0 — Baseline & harness**: `perf/` (env-gated `@timed` shim, four-flow benchmark, before-numbers
-  in `perf/BASELINE.md`). The shim is a no-op unless `PROFILE_REQUESTS=1`.
-- **P1 — Cache-neutral I/O reclamation**: per-request `account.retrieve` memo in `flask.g`
-  (writers invalidate), `build_column_browser` memo (keyed on the column/excluded tuples),
-  `lessons.list_modules` memo on a name+mtime+size dir signature (authored edits still show up).
-- **P2 — Sidebar badge without a replay**: the filter-apply route stamps its remaining-cases count
-  onto the active history entry (`account.set_history_count`); `inject_globals` reads the stamp
-  (base entry → memoized `dataset_total()`; unstamped → `get_data` fallback).
-- **P3 — Filtered-slice LRU (the structural win)**: `cache._filtered_cache`, bounded at 8 slices,
-  keyed on the canonical history-token tuple; `_execute` serves warm slices, `_replay_history` is
-  the timed miss path. Collapsed flow (a) from 9 replays to 1 and the cold double-replay to 1;
-  `get_aggregate`/`build_choropleth`/`get_moc_options` ride it too. `test_base_immutability.py`
-  extended with the slice-served-and-immutable case.
-- **P4 — Vectorize the crosstab**: `get_table` = one `groupby([x, y], observed=True)` count pass +
-  per-group Series reductions for the measure — deliberately **not** `groupby.agg`, whose Cython
-  sum order flipped one cell on a rounding boundary ('33.007' vs '33.008') during verification.
-  Cell-for-cell identical output; never disk-cached, so no `.bin` exposure. ~8× on Compare, ~90×
-  on the scatter lattice (1.53 s → 17 ms); `SCATTER_MAX_CELLS` is now a readability cap, not a
-  perf cap (left unchanged — product call, logged in Appendix B).
-- **P5 — Vectorize per-column stats (the cache-bytes linchpin)**: `num_each` = one `value_counts`
-  pass, **order-preserving swap (option (a) of the gate)** — the pickled dict keeps `col.unique()`'s
-  own key objects/order, Python-int values, NaN key pinned to 0, so `<col>.bin` bytes are unchanged
-  and no cache or golden re-warm was needed. Verified by a before/after oracle over **all 170
-  non-excluded columns × 2 history states**: 372 files (raw `.bin` pickles + formatted display
-  output across all 5 sortings for 16 sample columns) byte-identical, plus an old-vs-new
-  equivalence check on the all-distinct `Unnamed: 0` shape (unreachable in routes — no codebook
-  entry — and infeasible under the old loop). `get_column_info` over all columns: 22.9 s → 0.96 s
-  (23.8×); worst column `moc` (11,475 uniques): 4.22 s → 9 ms (~446×).
-
-**Inherited hard constraints — all held:** cache byte-identity (P1–P4 cache-neutral by design; P5
-verified byte-identical via the order-preserving swap), `float64` stays `float64`, and neither the
-base nor a cached filtered slice is ever mutated in place (`test_base_immutability.py`, extended in
-P3, and `test_map_filter_equivalence.py` both green after every phase). Appendix B of the prompts
-doc holds the found-but-unscheduled leads (`get_moc_options`'s per-option sweep, `filter_or_same` →
-`isin`, the dashboard N+1, deriving `get_column_info`'s unique-count/mode from the value counts,
-raising `SCATTER_MAX_CELLS`).
 
 ## Git remotes
 

@@ -59,6 +59,9 @@ developed toward a grant, with an emphasis on **education and public disseminati
 
 - **Stack:** Flask 3 + Jinja2 templates; pandas / numpy for analysis; SPSS `.sav` read via
   `pyreadstat`.
+- **Code organization:** Python implementations live in `src/mn_sentencing_explorer/`, grouped
+  into analysis and filesystem-backed service packages. Root modules remain compatibility entry
+  points, preserving existing Flask, gunicorn, cache-build, benchmark, and test commands.
 - **No database.** User accounts are pickle files under `user/` (with per-student append-only
   attempt logs beside them); classes are JSON under `classes/`; computed results are a
   content-addressed disk cache under `cache/data/`. All of these are git-ignored.
@@ -71,7 +74,36 @@ developed toward a grant, with an emphasis on **education and public disseminati
   base, string columns stored as pandas categoricals for ~8× less RAM) and is replayed against
   read-only — filters always produce new frames. In production, gunicorn `--preload` lets all
   workers share that one copy copy-on-write.
-- **Deeper architectural notes for contributors live in [`CLAUDE.md`](CLAUDE.md).**
+- **Deeper architectural notes for contributors live in the [contributor guide](docs/architecture/contributor-guide.md).**
+
+The project's public manuscript is available in [docs/research](docs/research/).
+
+## Repository layout
+
+```text
+run.ps1                         local Flask development-server launcher
+app.py, data.py, cache.py, …    compatibility entry points for established commands/imports
+src/mn_sentencing_explorer/
+  analysis/                     dataframe, cache, geography, history, offense-code engines
+  services/                     accounts, classes, lessons, and attempt analytics
+  resources/                    dataset codebook and legacy plotting settings
+  web/application.py            Flask routes and web view-model builders
+content/lessons/                authored lesson JSON and its schema
+docs/
+  architecture/                 contributor guide and technical design records
+  design/                       UI and visualization design authorities
+  research/                     current public manuscript and historical versions
+  archive/plans/                completed implementation plans
+scripts/                        cache build, history-key, and instance-reset utilities
+tests/                          regression contracts and isolated script fixtures
+perf/                           request profiling and benchmark harness
+deploy/                         production provisioning and lesson-update scripts
+static/, templates/             browser assets and Jinja templates
+cache/, user/, classes/         git-ignored runtime data retained for compatibility
+```
+
+See the [repository-layout guide](docs/architecture/repository-layout.md) for the compatibility
+entry points and runtime-path rationale.
 
 ## Getting started
 
@@ -100,20 +132,51 @@ first-time setup is a one-time precompute:
 4. Build the runtime base and warm the cache — this writes `cache/raw.csv`, then
    `cache/raw.parquet` from it, and pre-computes per-column stats into `cache/data/`:
    ```
-   uv run python cache.py        # answer "y" to all three prompts
+   uv run python scripts/build_cache.py  # answer "y" to all three prompts
    ```
-5. Run the app:
+   The historical `uv run python cache.py` command remains supported.
+5. Run the app from PowerShell:
+
+   ```powershell
+   .\run.ps1
    ```
+
+   The launcher can be called from any working directory. It runs the pinned uv environment,
+   uses the repository-local `.uv-cache/`, and serves on `http://127.0.0.1:5000` by default.
+   Common options are:
+
+   ```powershell
+   .\run.ps1 -Debug
+   .\run.ps1 -Port 5050
+   .\run.ps1 -BindAddress 0.0.0.0 -Port 5000
+   ```
+
+   The equivalent direct command remains supported:
+
+   ```powershell
    uv run flask --app app run    # add --debug for auto-reload
    ```
 
 Every command runs inside uv's managed environment via `uv run …`, so there is no separate
 "activate the virtualenv" step.
 
+To start a clean development instance while keeping the generated cache, preview the safe,
+timestamped archive operation and then run it explicitly:
+
+```powershell
+.\scripts\reset-instance.ps1 -WhatIf
+.\scripts\reset-instance.ps1 -Force
+```
+
+This archives all accounts, attempt logs, and classes under the git-ignored
+`instance-archives/` directory, then recreates empty `user/` and `classes/` stores. See
+[`scripts/README.md`](scripts/README.md) for recovery and safety details.
+
 ## Project status
 
 This is an **active academic / research prototype**, not a hardened production service. Known
-limitations (see [`ROADMAP.md`](ROADMAP.md) and [`CLAUDE.md`](CLAUDE.md) for the full list):
+limitations (see [`ROADMAP.md`](ROADMAP.md) and the
+[contributor guide](docs/architecture/contributor-guide.md) for the full list):
 
 - **Authentication is verified but not fully hardened.** Login now checks the password
   (bcrypt via `util.check_password`) and the Flask `secret_key` reads from the `SECRET_KEY`

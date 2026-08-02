@@ -8,8 +8,8 @@
 <header class="view-header">
     <div class="view-heading">
         <h1>{% if editing %}Edit{% else %}New{% endif %} module</h1>
-        <p class="view-subtitle">Lessons are stored as JSON in <code>lessons/</code>.
-            See <code>lessons/README.md</code> for the step schema.</p>
+        <p class="view-subtitle">Lessons are stored as JSON in <code>content/lessons/</code>.
+            See <code>content/lessons/README.md</code> for the step schema.</p>
     </div>
 </header>
 
@@ -46,7 +46,7 @@
     <div class="field">
         <label for="steps">Steps (JSON array)</label>
         <textarea id="steps" name="steps" rows="16" class="code-area" spellcheck="false">{{ form['steps'] }}</textarea>
-        <p class="field-hint">See <code>lessons/README.md</code> for the schema.</p>
+        <p class="field-hint">See <code>content/lessons/README.md</code> for the schema.</p>
     </div>
 
     <button type="submit" class="btn btn-primary">Save module</button>

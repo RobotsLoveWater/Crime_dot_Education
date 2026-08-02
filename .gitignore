@@ -8,6 +8,11 @@ user/
 # Educator portal: classes (rosters tie to real students, like user/)
 classes/
 
+# Local instance resets and the future consolidated runtime layout. Archives contain
+# password hashes, rosters, and student activity and must never be committed.
+instance/
+instance-archives/
+
 # uv migration Phase 0 reference freeze (throwaway snapshot, not a source of truth)
 requirements.lock.txt
 
@@ -16,6 +21,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 .venv/
+.venv.bak/
+.uv-cache/
 venv/
 env/
 
@@ -24,3 +31,8 @@ env/
 
 # IDE
 .idea/
+.claude/settings.local.json
+.claude/worktrees/
+
+# Generated document/PDF previews and other disposable local output
+tmp/
